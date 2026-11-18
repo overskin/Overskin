@@ -140,8 +140,10 @@ public static class ScreenGrabber
 
     public static async Task<string?> OutputOf(string tool, string args)
     {
-        using var p = Process.Start(new ProcessStartInfo(tool, args) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true });
+        using var p = Process.Start(new ProcessStartInfo(tool, args) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true });
         if (p == null) return null;
+        p.StandardInput.Close(); // nothing to type: tools that would wait for keys see the end straight away
+        _ = p.StandardError.ReadToEndAsync();
         var text = await p.StandardOutput.ReadToEndAsync();
         await p.WaitForExitAsync();
         return p.ExitCode == 0 ? text : null;
@@ -173,8 +175,10 @@ public static class ScreenGrabber
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            RedirectStandardInput = true,
         });
         if (p == null) return (false, "couldn't start");
+        p.StandardInput.Close(); // nothing to type: tools that would wait for keys see the end straight away
         var output = p.StandardOutput.ReadToEndAsync();
         var error = p.StandardError.ReadToEndAsync();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));

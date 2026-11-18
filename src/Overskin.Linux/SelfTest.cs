@@ -50,6 +50,12 @@ public static class SelfTest
 
     public static async Task<int> RunAsync()
     {
+        // never hang a build: give up loudly if something gets stuck
+        _ = Task.Delay(TimeSpan.FromMinutes(4)).ContinueWith(_ =>
+        {
+            Console.WriteLine("FAIL  the self-test took longer than 4 minutes and was stopped");
+            Environment.Exit(2);
+        });
         Console.WriteLine($"Overskin for Linux self-test on {Environment.OSVersion} " +
                           $"({(OperatingSystem.IsLinux() ? (ScreenGrabber.IsWayland ? "Wayland" : "X11") : "not Linux")})");
 

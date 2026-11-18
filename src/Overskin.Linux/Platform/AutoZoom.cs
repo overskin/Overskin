@@ -100,7 +100,7 @@ public static class AutoZoom
         var ring = RingSprite(Math.Max(1, h / 540.0));
         var output = Path.Combine(Path.GetDirectoryName(video)!, Path.GetFileNameWithoutExtension(video) + ".zoom.mp4");
 
-        using var decoder = Process.Start(new ProcessStartInfo("ffmpeg", $"-hide_banner -loglevel error -i \"{video}\" -f rawvideo -pix_fmt bgra -")
+        using var decoder = Process.Start(new ProcessStartInfo("ffmpeg", $"-nostdin -hide_banner -loglevel error -i \"{video}\" -f rawvideo -pix_fmt bgra -")
         { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true })!;
         using var encoder = Process.Start(new ProcessStartInfo("ffmpeg",
             $"-hide_banner -loglevel error -y -f rawvideo -pix_fmt bgra -s {w}x{h} -r {fps.ToString(CultureInfo.InvariantCulture)} -i - " +
