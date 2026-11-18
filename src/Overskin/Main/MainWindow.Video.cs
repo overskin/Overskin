@@ -1,0 +1,231 @@
+using System.IO;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media.Imaging;
+
+namespace Overskin;
+
+/// <summary>Screen recording to MP4, plain or with auto-zoom.</summary>
+public partial class MainWindow
+{
+    private const int HkVideoEsc = 20;
+
+    private VideoRecorder? _video;
+    private bool _videoWasShown;
+
+    private void RecordVideo_Click(object sender, RoutedEventArgs e) => ToggleVideo(_settings.Video.AutoZoom);
+
+    // ---- step recorder -----------------------------------------------------------------------
+
+    private StepRecorder? _steps;
+    private bool _stepsWasShown;
+
+    private void RecordSteps_Click(object sender, RoutedEventArgs e) => ToggleSteps();
+
+    private void ToggleSteps()
+    {
+        if (_steps?.IsRecording == true)
+        {
+            _steps.Stop();
+            return;
+        }
+        if (_video?.IsRecording == true || _recorder?.IsRecording == true) return;
+        if (_steps == null)
+        {
+            _steps = new StepRecorder(Dispatcher, _manager.IsOwnWindow);
+            _steps.Finished += OnStepsFinished;
+        }
+        _stepsWasShown = IsVisible && WindowState != WindowState.Minimized;
+        Hide();
+        if (!_steps.Start())
+        {
+            Reappear(_stepsWasShown);
+            Toast.Show("Couldn't start recording steps.", true);
+        }
+    }
+
+    private async void OnStepsFinished(List<RecordedStep>? steps)
+    {
+        Reappear(_stepsWasShown);
+        if (steps == null)
+        {
+            Toast.Show("Step recording cancelled.");
+            return;
+        }
+        await Task.Delay(400); // the last names of what was clicked are still being looked up
+        var accent = ((System.Windows.Media.SolidColorBrush)FindResource("Accent")).Color;
+        var guide = ImageLoader.Normalize(StepTutorial.Build(steps, accent));
+        OpenEditor(guide, null, $"Steps {DateTime.Now:HH.mm.ss}  ·  {steps.Count} step{(steps.Count == 1 ? "" : "s")}");
+    }
+
+    // ---- Screenshots / Recording -------------------------------------------------------------
+
+    private void CaptureMode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (CaptureShots == null || CaptureRecord == null) return;
+        bool record = CaptureRecordTab.IsChecked == true;
+        CaptureShots.Visibility = record ? Visibility.Collapsed : Visibility.Visible;
+        CaptureRecord.Visibility = record ? Visibility.Visible : Visibility.Collapsed;
+        if (PageCapture is System.Windows.Controls.ScrollViewer sv) sv.ScrollToTop();
+    }
+
+    // ---- video settings ----------------------------------------------------------------------
+
+    private bool _syncingVideo;
+
+    private void SyncVideoControls()
+    {
+        _syncingVideo = true;
+        var v = _settings.Video;
+        VidFps30.IsChecked = v.Fps != 60;
+        VidFps60.IsChecked = v.Fps == 60;
+        VidQualityStandard.IsChecked = !v.HighQuality;
+        VidQualityHigh.IsChecked = v.HighQuality;
+        VidPointerSwitch.IsChecked = v.Pointer;
+        VidStyleWhite.IsChecked = v.PointerStyle == "White";
+        VidStyleBlack.IsChecked = v.PointerStyle == "Black";
+        VidStyleSystem.IsChecked = v.PointerStyle == "System";
+        VidPointerSize.Value = v.PointerSize;
+        VidSmoothing.Value = v.PointerSmoothing;
+        VidRingsSwitch.IsChecked = v.ClickRings;
+        VideoZoomSwitch.IsChecked = v.AutoZoom;
+        VidZoom.Value = v.Zoom;
+        VidZoomSpeed.Value = v.ZoomSpeed;
+        VidFollow.Value = v.FollowSmoothing;
+        VidHold.Value = v.ZoomHold;
+        _syncingVideo = false;
+        UpdateVideoLabels();
+    }
+
+    private void UpdateVideoLabels()
+    {
+        var v = _settings.Video;
+        VidPointerSizeText.Text = $"{v.PointerSize:0.##}×";
+        VidSmoothingText.Text = v.PointerSmoothing == 0 ? "Off" : $"{v.PointerSmoothing}";
+        VidZoomText.Text = $"{v.Zoom:0.0}×";
+        VidZoomSpeedText.Text = $"{v.ZoomSpeed}";
+        VidFollowText.Text = $"{v.FollowSmoothing}";
+        VidHoldText.Text = $"{v.ZoomHold:0.#} s";
+        foreach (var c in new FrameworkElement[] { VidZoom, VidZoomSpeed, VidFollow, VidHold }) c.IsEnabled = v.AutoZoom;
+        foreach (var c in new FrameworkElement[] { VidStyleWhite, VidStyleBlack, VidStyleSystem, VidPointerSize, VidSmoothing }) c.IsEnabled = v.Pointer;
+    }
+
+    private void VideoSetting_Click(object sender, RoutedEventArgs e) => ReadVideoControls();
+
+    private void VideoSetting_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) => ReadVideoControls();
+
+    private void ReadVideoControls()
+    {
+        if (_syncingVideo || VidHoldText == null || VidHold == null) return;
+        var v = _settings.Video;
+        v.Fps = VidFps60.IsChecked == true ? 60 : 30;
+        v.HighQuality = VidQualityHigh.IsChecked == true;
+        v.Pointer = VidPointerSwitch.IsChecked == true;
+        v.PointerStyle = VidStyleBlack.IsChecked == true ? "Black" : VidStyleSystem.IsChecked == true ? "System" : "White";
+        v.PointerSize = VidPointerSize.Value;
+        v.PointerSmoothing = (int)VidSmoothing.Value;
+        v.ClickRings = VidRingsSwitch.IsChecked == true;
+        v.AutoZoom = VideoZoomSwitch.IsChecked == true;
+        v.Zoom = Math.Round(VidZoom.Value, 1);
+        v.ZoomSpeed = (int)VidZoomSpeed.Value;
+        v.FollowSmoothing = (int)VidFollow.Value;
+        v.ZoomHold = VidHold.Value;
+        UpdateVideoLabels();
+        if (_ready) SaveSettings();
+    }
+
+    /// <summary>Starts a recording, or stops the one that's running.</summary>
+    private void ToggleVideo(bool autoZoom)
+    {
+        if (_video?.IsRecording == true)
+        {
+            _video.Stop();
+            return;
+        }
+        if (_recorder?.IsRecording == true) return;
+
+        Guarded(async () =>
+        {
+            var chosen = await Choose(OverlayMode.Region,
+                "Drag over what to record, or click a window or the desktop for the whole screen.  Esc cancels.", useDelay: false);
+            if (chosen is not { } c) return;
+            if (c.Overlay.Selection is not { } area || area.Width < 16 || area.Height < 16)
+            {
+                Reappear(c.WasShown);
+                return;
+            }
+
+            _videoWasShown = c.WasShown;
+            if (_video == null)
+            {
+                _video = new VideoRecorder(Dispatcher);
+                _video.Finished += OnVideoFinished;
+            }
+            _hotkeys?.Register(HkVideoEsc, new Hotkey(ModifierKeys.None, Key.Escape), () => _video.Stop());
+            string path = ImageFiles.NewPath(_settings.SaveFolder, ".mp4");
+            _video.Start(area, path, _settings.Video.With(autoZoom));
+        });
+    }
+
+    private void OnVideoFinished(string? path, string? error)
+    {
+        _hotkeys?.Unregister(HkVideoEsc);
+        Reappear(_videoWasShown);
+        if (error != null)
+        {
+            Toast.Show("The recording failed: " + error, true);
+            return;
+        }
+        if (path == null)
+        {
+            Toast.Show("Recording cancelled.");
+            return;
+        }
+        AddToHistory(path);
+        Toast.Show("Video saved. It's in the Library.");
+    }
+
+    // ---- videos in the library ---------------------------------------------------------------
+
+    private static bool IsVideo(string path) =>
+        Path.GetExtension(path).Equals(".mp4", StringComparison.OrdinalIgnoreCase);
+
+    private static void OpenWithDefaultApp(string path)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }); }
+        catch { Toast.Show("Couldn't open the video.", true); }
+    }
+
+    /// <summary>Windows' own thumbnail for a video, and its length.</summary>
+    private static async Task LoadVideoThumbAsync(LibraryItem item)
+    {
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(item.Path);
+            using var thumb = await file.GetThumbnailAsync(Windows.Storage.FileProperties.ThumbnailMode.VideosView, 300);
+            var props = await file.Properties.GetVideoPropertiesAsync();
+            var bitmap = new BitmapImage();
+            using (var stream = thumb.AsStreamForRead())
+            {
+                var copy = new MemoryStream();
+                await stream.CopyToAsync(copy);
+                copy.Position = 0;
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.StreamSource = copy;
+                bitmap.EndInit();
+                bitmap.Freeze();
+            }
+            long bytes = new FileInfo(item.Path).Length;
+            var d = props.Duration;
+            item.Thumb = bitmap;
+            item.Details = $"Video  ·  {(int)d.TotalMinutes}:{d.Seconds:00}  ·  {(bytes >= 1 << 20 ? $"{bytes / (1024.0 * 1024):0.#} MB" : $"{Math.Max(1, bytes / 1024)} KB")}";
+            item.Raise(nameof(LibraryItem.Details));
+        }
+        catch
+        {
+            item.Details = "Video";
+            item.Raise(nameof(LibraryItem.Details));
+        }
+    }
+}

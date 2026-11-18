@@ -1,0 +1,21 @@
+# build output
+bin/
+obj/
+dist/
+build/
+publish/
+staging/
+*.pdb
+
+# editor and tool files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+.claude/
+
+# settings written next to the exe while testing
+overskin.settings.json
+onionskin.settings.json
+overlay.settings.json

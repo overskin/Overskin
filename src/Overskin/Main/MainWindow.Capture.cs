@@ -1,0 +1,735 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using static Overskin.NativeMethods;
+
+namespace Overskin;
+
+/// <summary>A saved capture shown in the library.</summary>
+public sealed class LibraryItem : INotifyPropertyChanged
+{
+    private ImageSource? _thumb;
+
+    public required string Path { get; init; }
+    public required DateTime Time { get; init; }
+    public string Caption { get; init; } = "";
+    public string Details { get; set; } = "";
+
+    public ImageSource? Thumb
+    {
+        get => _thumb;
+        set { _thumb = value; Raise(); }
+    }
+
+    private bool _selected;
+
+    /// <summary>Picked for combining.</summary>
+    public bool IsSelected
+    {
+        get => _selected;
+        set { _selected = value; Raise(); }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public void Raise([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
+
+/// <summary>Screenshots: capturing, what happens afterwards, the editor, the library and the screen tools.</summary>
+public partial class MainWindow
+{
+    private readonly ObservableCollection<LibraryItem> _library = new();
+    private bool _captureBusy;
+
+    // ===================================================================================
+    //  getting out of the way of the camera
+    // ===================================================================================
+
+    /// <summary>Hides everything of ours that would show up in a screenshot. Returns whether the main window was showing.</summary>
+    private async Task<bool> ClearTheScreen()
+    {
+        bool wasShown = IsVisible && WindowState != WindowState.Minimized;
+        _ghost?.Hide();
+        Toast.HideNow();
+        CaptureNotice.CloseAll();
+        if (wasShown) Hide();
+        await Task.Delay(wasShown ? 180 : 60); // let the window's fade finish before the screen is copied
+        return wasShown;
+    }
+
+    private void Reappear(bool wasShown)
+    {
+        if (wasShown)
+        {
+            Show();
+            UpdateGhost();
+        }
+    }
+
+    /// <summary>Counts down in the toast, then clears it so it isn't captured.</summary>
+    private async Task CountDown(int seconds)
+    {
+        for (int s = seconds; s > 0; s--)
+        {
+            Toast.ShowSticky($"Capturing in {s}…");
+            await Task.Delay(1000);
+        }
+        Toast.HideNow();
+        await Task.Delay(60);
+    }
+
+    /// <summary>Freezes the screen and lets the user choose; null if they cancelled.</summary>
+    private async Task<(CaptureOverlay Overlay, bool WasShown)?> Choose(OverlayMode mode, string hint, bool useDelay, bool tools = false)
+    {
+        bool wasShown = await ClearTheScreen();
+        if (useDelay && _settings.CaptureDelay > 0) await CountDown(_settings.CaptureDelay);
+
+        bool pointer = _settings.AfterCursor && mode is OverlayMode.Region or OverlayMode.Window;
+        var overlay = CaptureOverlay.Open(mode, hint, pointer, tools);
+        if (overlay == null)
+        {
+            Reappear(wasShown);
+            Toast.Show("Couldn't read the screen.", true);
+            return null;
+        }
+        overlay.ShowDialog();
+        if (overlay.HasToolbar && overlay.IncludePointer != _settings.AfterCursor)
+        {
+            // the pointer button on the capture bar is the same setting as on the Capture page
+            _settings.AfterCursor = overlay.IncludePointer;
+            AfterCursorSwitch.IsChecked = _settings.AfterCursor;
+            SaveSettings();
+        }
+        return (overlay, wasShown);
+    }
+
+    private async void Guarded(Func<Task> work)
+    {
+        if (_captureBusy || _drawer.IsRunning) return;
+        _captureBusy = true;
+        try { await work(); }
+        catch (Exception ex) { Toast.Show("Something went wrong: " + ex.Message, true); }
+        finally { _captureBusy = false; }
+    }
+
+    // ===================================================================================
+    //  capture modes
+    // ===================================================================================
+
+    private void CaptureRegion_Click(object sender, RoutedEventArgs e) => CaptureRegion(useDelay: true);
+    private void CaptureWindow_Click(object sender, RoutedEventArgs e) => CaptureWindowPick();
+    private void CaptureScreen_Click(object sender, RoutedEventArgs e) => CaptureFullScreen(useDelay: true);
+    private void RepeatRegion_Click(object sender, RoutedEventArgs e) => CaptureLastRegion();
+
+    private void CaptureRegion(bool useDelay = false) => Guarded(async () =>
+    {
+        var chosen = await Choose(OverlayMode.Region, "Drag over an area, or click a window.  Esc cancels.", useDelay, tools: true);
+        if (chosen is not { } c) return;
+        Reappear(c.WasShown);
+        if (c.Overlay.Selection is not { } r) return;
+        _settings.LastRegion = new[] { r.X, r.Y, r.Width, r.Height };
+        Finish(WindowAloneOr(c.Overlay, r), r);
+    });
+
+    private void CaptureWindowPick() => Guarded(async () =>
+    {
+        var chosen = await Choose(OverlayMode.Window, "Click the window to capture.  Esc cancels.", useDelay: true, tools: true);
+        if (chosen is not { } c) return;
+        Reappear(c.WasShown);
+        if (c.Overlay.Selection is { } r) Finish(WindowAloneOr(c.Overlay, r), r);
+    });
+
+    /// <summary>
+    /// With "Windows on a transparent background", a clicked window is grabbed on its own and set
+    /// on a transparent backdrop with a shadow; otherwise (or if it can't be) the frozen crop.
+    /// </summary>
+    private BitmapSource WindowAloneOr(CaptureOverlay overlay, Int32Rect r)
+    {
+        if (_settings.WindowAlpha && overlay.SelectedWindow != IntPtr.Zero && !overlay.HasMarks && WindowAlone(overlay.SelectedWindow) is { } alone)
+            return alone;
+        return overlay.Crop(r);
+    }
+
+    private static BitmapSource? WindowAlone(IntPtr window)
+    {
+        var shot = CaptureWindowOnly(window);
+        if (shot == null) return null;
+        bool rounded = Environment.OSVersion.Version.Build >= 22000; // Windows 11 rounds window corners
+        return ImageLoader.Normalize(Beautify.Render(shot, new BeautifyOptions { Background = "None", Padding = 36, Corners = rounded ? 8 : 0, Shadow = 45 }));
+    }
+
+    /// <summary>The hotkey version: whatever window is in front right now, no clicking.</summary>
+    private void CaptureActiveWindow()
+    {
+        IntPtr front = GetForegroundWindow();
+        if (front == IntPtr.Zero || _manager.IsOwnWindow(front) || ClassName(front) is "Progman" or "WorkerW")
+        {
+            CaptureWindowPick(); // nothing useful in front: let the user click one
+            return;
+        }
+        CaptureWindowHandle(front);
+    }
+
+    private void CaptureWindowHandle(IntPtr front) => Guarded(async () =>
+    {
+        bool wasShown = await ClearTheScreen();
+        var b = VisibleBounds(front);
+        var vs = VirtualScreen();
+        int x = Math.Max(b.Left, vs.Left), y = Math.Max(b.Top, vs.Top);
+        int w = Math.Min(b.Right, vs.Right) - x, h = Math.Min(b.Bottom, vs.Bottom) - y;
+        var shot = (_settings.WindowAlpha ? WindowAlone(front) : null) ?? CaptureScreen(x, y, w, h, _settings.AfterCursor);
+        Reappear(wasShown);
+        if (shot != null) Finish(shot, new Int32Rect(x, y, w, h));
+    });
+
+    private void CaptureFullScreen(bool useDelay = false) => Guarded(async () =>
+    {
+        bool wasShown = await ClearTheScreen();
+        if (useDelay && _settings.CaptureDelay > 0) await CountDown(_settings.CaptureDelay);
+        var r = _settings.FullScreenAllMonitors ? VirtualScreen() : MonitorBounds(CursorPos());
+        var shot = CaptureScreen(r.Left, r.Top, r.Width, r.Height, _settings.AfterCursor);
+        Reappear(wasShown);
+        if (shot != null) Finish(shot, new Int32Rect(r.Left, r.Top, r.Width, r.Height));
+    });
+
+    private void CaptureLastRegion()
+    {
+        if (_settings.LastRegion is not { Length: 4 } a)
+        {
+            Toast.Show("Capture a region first; this repeats it.");
+            return;
+        }
+        Guarded(async () =>
+        {
+            bool wasShown = await ClearTheScreen();
+            if (_settings.CaptureDelay > 0) await CountDown(_settings.CaptureDelay);
+            var shot = CaptureScreen(a[0], a[1], a[2], a[3], _settings.AfterCursor);
+            Reappear(wasShown);
+            if (shot != null) Finish(shot, new Int32Rect(a[0], a[1], a[2], a[3]));
+        });
+    }
+
+    // ===================================================================================
+    //  after a capture
+    // ===================================================================================
+
+    /// <summary>The strip of latest captures (Ctrl+Alt+H).</summary>
+    private void ShowRecent()
+    {
+        var paths = _settings.History.AsEnumerable().Reverse().Select(h => h.Path).Where(File.Exists).Take(10).ToList();
+        RecentStrip.Toggle(paths, path =>
+        {
+            if (IsVideo(path)) OpenWithDefaultApp(path);
+            else if (IsGif(path)) OpenClipFile(path);
+            else if (TryLoadFile(path, out var image)) OpenEditor(image!, path, Path.GetFileName(path));
+        });
+    }
+
+    private string CaptureName(string? path) =>
+        path != null ? Path.GetFileName(path) : $"Capture {DateTime.Now:HH.mm.ss}";
+
+    /// <summary>Copy, save, pin, edit or preview, as set on the Capture page.</summary>
+    private async void Finish(BitmapSource image, Int32Rect where)
+    {
+        if (_settings.AutoHide)
+        {
+            try
+            {
+                var found = await Redaction.FindPrivateAsync(image);
+                if (found is { Count: > 0 })
+                {
+                    image = Redaction.Apply(image, found.Select(f => f.Area), HideMode.Pixelate, 4);
+                    Toast.Show("Hid " + Redaction.Describe(found.Select(f => f.Kind)) + ".");
+                }
+            }
+            catch
+            {
+                // a failed read leaves the picture as it is
+            }
+        }
+        string? path = _settings.AfterSave ? SaveCapture(image) : null;
+        if (_settings.AfterCopy) CopyImage(image, quiet: true, path);
+        if (_settings.AfterPin) PinImage(image, CaptureName(path), path, placeAt: where);
+
+        if (_settings.AfterEditor)
+        {
+            OpenEditor(image, path, CaptureName(path));
+        }
+        else if (_settings.AfterPreview)
+        {
+            string what = string.Join(" and ", new[] { _settings.AfterSave ? "saved" : null, _settings.AfterCopy ? "copied" : null }.Where(s => s != null));
+            string caption = $"{image.PixelWidth} × {image.PixelHeight}" + (what.Length > 0 ? $"  ·  {char.ToUpper(what[0])}{what[1..]}" : "");
+            CaptureNotice.ShowFor(image, path, caption,
+                edit: () => OpenEditor(image, path, CaptureName(path)),
+                pin: () => PinImage(image, CaptureName(path), path, placeAt: where),
+                copy: () => CopyImage(image, quiet: false, path),
+                openFolder: path != null ? () => ShowInFolder(path) : null,
+                trace: () => SendToTrace(image));
+        }
+        else
+        {
+            string what = string.Join(" and ", new[] { _settings.AfterSave ? "Saved" : null, _settings.AfterCopy ? "copied" : null }.Where(s => s != null));
+            if (what.Length > 0) Toast.Show(what + ".");
+        }
+    }
+
+    /// <summary>Writes a capture into the screenshots folder and adds it to the library.</summary>
+    private string? SaveCapture(BitmapSource image)
+    {
+        string path = ImageFiles.NewPath(_settings.SaveFolder, _settings.ImageFormat == "jpg" ? ".jpg" : ".png");
+        if (!ImageFiles.TrySave(image, path, out string? error))
+        {
+            Toast.Show("Couldn't save the capture: " + error, true);
+            return null;
+        }
+        AddToHistory(path);
+        return path;
+    }
+
+    /// <summary>The picture, and the saved file too when there is one, so pasting into a chat keeps its name.</summary>
+    private static void CopyImage(BitmapSource image, bool quiet, string? path = null)
+    {
+        bool ok;
+        if (path != null && File.Exists(path)) ok = ClipboardFiles.Copy(new[] { path }, image);
+        else
+        {
+            try { Clipboard.SetImage(image); ok = true; }
+            catch { ok = false; }
+        }
+        if (!ok) Toast.Show("The clipboard is busy. Try again.", true);
+        else if (!quiet) Toast.Show("Copied to the clipboard.");
+    }
+
+    private static void ShowInFolder(string path)
+    {
+        try { System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\""); }
+        catch { Toast.Show("Couldn't open the folder.", true); }
+    }
+
+    private void SendToTrace(BitmapSource image)
+    {
+        SelectTab(TabTraceIndex);
+        LoadTraceImage(image);
+        ShowFromTray();
+    }
+
+    private void OpenEditor(BitmapSource image, string? path, string name)
+    {
+        var editor = new EditorWindow(image, path, name, new EditorHost
+        {
+            SaveNew = SaveCapture,
+            Pin = (bmp, n) => PinImage(bmp, n),
+            Trace = SendToTrace,
+            Saved = p => { AddToHistory(p); RefreshLibrary(); },
+            Folder = _settings.SaveFolder,
+        });
+        editor.Show();
+        editor.Activate();
+    }
+
+    // ===================================================================================
+    //  screen tools
+    // ===================================================================================
+
+    private void SnipPin_Click(object sender, RoutedEventArgs e) => SnipAndPin();
+    private void TextFromScreen_Click(object sender, RoutedEventArgs e) => TextFromScreen();
+    private void ColourPicker_Click(object sender, RoutedEventArgs e) => PickScreenColour();
+    private void Ruler_Click(object sender, RoutedEventArgs e) => ShowRuler();
+
+    /// <summary>Drag over part of the screen; a copy of it is pinned right where it was.</summary>
+    private void SnipAndPin() => Guarded(async () =>
+    {
+        var chosen = await Choose(OverlayMode.Region, "Drag over what you want to pin, or click a window.  Esc cancels.", useDelay: false, tools: true);
+        if (chosen is not { } c) return;
+        Reappear(c.WasShown);
+        if (c.Overlay.Selection is not { } r) return;
+        PinImage(c.Overlay.Crop(r), $"Snip {DateTime.Now:HH.mm.ss}", placeAt: r);
+        Toast.Show("Pinned. Drag it anywhere, or right-click it for options.");
+    });
+
+    private void TextFromScreen() => Guarded(async () =>
+    {
+        var chosen = await Choose(OverlayMode.Region, "Drag over the text you want to copy.  Esc cancels.", useDelay: false);
+        if (chosen is not { } c) return;
+        Reappear(c.WasShown);
+        if (c.Overlay.Selection is not { } r) return;
+
+        Toast.ShowSticky("Reading text…");
+        string? text = await TextRecognizer.RecognizeAsync(c.Overlay.Crop(r));
+        Toast.Hide();
+        if (text == null)
+        {
+            Toast.Show("Windows has no text-recognition language installed. Add one under Settings › Time & language › Language.", true);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            Toast.Show("No text found there.");
+            return;
+        }
+        try { Clipboard.SetText(text); } catch { }
+        new TextResultWindow(text).Show();
+    });
+
+    private void PickScreenColour() => Guarded(async () =>
+    {
+        var chosen = await Choose(OverlayMode.Colour, "Click any pixel to copy its colour.  Esc cancels.", useDelay: false);
+        if (chosen is not { } c) return;
+        Reappear(c.WasShown);
+        if (c.Overlay.PickedColour is not { } colour) return;
+        string hex = Theming.ToHex(colour);
+        try { Clipboard.SetText(hex); } catch { }
+        Toast.ShowColour($"Copied {hex}   ·   rgb({colour.R}, {colour.G}, {colour.B})", colour);
+    });
+
+    private void ShowRuler() => Guarded(async () =>
+    {
+        var chosen = await Choose(OverlayMode.Ruler, "Drag to measure. Drag again for a new measurement.  Esc closes.", useDelay: false);
+        if (chosen is { } c) Reappear(c.WasShown);
+    });
+
+    private void OpenInEditor_Click(object sender, RoutedEventArgs e)
+    {
+        string? file = BrowseForImage("Open an image to mark up");
+        if (file != null && TryLoadFile(file, out var image)) OpenEditor(image!, file, Path.GetFileName(file));
+    }
+
+    private void EditClipboard_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var image = ImageLoader.FromClipboard(out _);
+            if (image == null) Toast.Show("There's no picture on the clipboard.");
+            else OpenEditor(image, null, "Clipboard");
+        }
+        catch (Exception ex)
+        {
+            Toast.Show(ex.Message, true);
+        }
+    }
+
+    // ===================================================================================
+    //  capture settings
+    // ===================================================================================
+
+    private void ApplyCaptureSettingsToControls()
+    {
+        AfterCopySwitch.IsChecked = _settings.AfterCopy;
+        AutoHideSwitch.IsChecked = _settings.AutoHide;
+        WindowAlphaSwitch.IsChecked = _settings.WindowAlpha;
+        SyncVideoControls();
+        AfterSaveSwitch.IsChecked = _settings.AfterSave;
+        AfterEditorSwitch.IsChecked = _settings.AfterEditor;
+        AfterPinSwitch.IsChecked = _settings.AfterPin;
+        AfterPreviewSwitch.IsChecked = _settings.AfterPreview;
+        AfterCursorSwitch.IsChecked = _settings.AfterCursor;
+        FormatPng.IsChecked = _settings.ImageFormat != "jpg";
+        FormatJpg.IsChecked = _settings.ImageFormat == "jpg";
+        foreach (var chip in new[] { Delay0, Delay3, Delay5, Delay10 })
+            chip.IsChecked = (string)chip.Tag == _settings.CaptureDelay.ToString();
+        SaveFolderText.Text = _settings.SaveFolder;
+        SaveFolderText.ToolTip = _settings.SaveFolder;
+        AfterPreviewSwitch.IsEnabled = !_settings.AfterEditor;
+    }
+
+    private void CaptureSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.AfterCopy = AfterCopySwitch.IsChecked == true;
+        _settings.AfterSave = AfterSaveSwitch.IsChecked == true;
+        _settings.AfterEditor = AfterEditorSwitch.IsChecked == true;
+        _settings.AfterPin = AfterPinSwitch.IsChecked == true;
+        _settings.AfterPreview = AfterPreviewSwitch.IsChecked == true;
+        _settings.AfterCursor = AfterCursorSwitch.IsChecked == true;
+        _settings.AutoHide = AutoHideSwitch.IsChecked == true;
+        _settings.WindowAlpha = WindowAlphaSwitch.IsChecked == true;
+        AfterPreviewSwitch.IsEnabled = !_settings.AfterEditor; // the editor already shows the picture
+        SaveSettings();
+    }
+
+    private void Delay_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!_ready || sender is not RadioButton { Tag: string tag } || !int.TryParse(tag, out int seconds)) return;
+        _settings.CaptureDelay = seconds;
+        SaveSettings();
+    }
+
+    private void Format_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!_ready || sender is not RadioButton { Tag: string tag }) return;
+        _settings.ImageFormat = tag;
+        SaveSettings();
+    }
+
+    private void ChangeFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Where should captures be saved?",
+            InitialDirectory = Directory.Exists(_settings.SaveFolder) ? _settings.SaveFolder : null,
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        _settings.SaveFolder = dialog.FolderName;
+        ApplyCaptureSettingsToControls();
+        SaveSettings();
+    }
+
+    // ===================================================================================
+    //  library
+    // ===================================================================================
+
+    private void AddToHistory(string path)
+    {
+        _settings.History.RemoveAll(h => string.Equals(h.Path, path, StringComparison.OrdinalIgnoreCase));
+        _settings.History.Add(new HistoryEntry { Path = path, Time = DateTime.Now });
+        if (_settings.History.Count > 500) _settings.History.RemoveRange(0, _settings.History.Count - 500);
+        RefreshLibrary();
+    }
+
+    private static string Friendly(DateTime t)
+    {
+        var today = DateTime.Today;
+        if (t.Date == today) return $"Today, {t:HH:mm}";
+        if (t.Date == today.AddDays(-1)) return $"Yesterday, {t:HH:mm}";
+        return t.Year == today.Year ? t.ToString("d MMM, HH:mm") : t.ToString("d MMM yyyy");
+    }
+
+    /// <summary>Rebuilds the library from the history, newest first, loading thumbnails in the background.</summary>
+    private string _libraryFilter = "All";
+
+    private static bool IsGif(string path) => Path.GetExtension(path).Equals(".gif", StringComparison.OrdinalIgnoreCase);
+
+    private void LibraryFilter_Checked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not RadioButton { Tag: string tag }) return;
+        _libraryFilter = tag;
+        if (_ready) RefreshLibrary();
+    }
+
+    private readonly SearchIndex _search = new();
+    private bool _searchHooked;
+
+    private void LibrarySearch_Changed(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        LibrarySearchHint.Visibility = LibrarySearch.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (_ready) RefreshLibrary();
+    }
+
+    private void UpdateIndexing()
+    {
+        int pending = _search.Pending;
+        LibraryIndexing.Text = pending > 0 ? $"Reading text… {pending} left" : "";
+    }
+
+    private void RefreshLibrary()
+    {
+        _settings.History.RemoveAll(h => !File.Exists(h.Path));
+        if (!_searchHooked)
+        {
+            _searchHooked = true;
+            // new text was read: refresh the results if a search is showing, and the progress either way
+            _search.Updated += () => Dispatcher.BeginInvoke(() =>
+            {
+                UpdateIndexing();
+                if (LibrarySearch.Text.Trim().Length > 0) RefreshLibrary();
+            });
+        }
+        _search.Add(_settings.History.Select(h => h.Path));
+        UpdateIndexing();
+        string query = LibrarySearch.Text.Trim();
+        var entries = Sorted(_settings.History.AsEnumerable().Reverse())
+            .Where(h => _libraryFilter switch
+            {
+                "GIFs" => IsGif(h.Path),
+                "Videos" => IsVideo(h.Path),
+                "Pictures" => !IsGif(h.Path) && !IsVideo(h.Path),
+                _ => true,
+            })
+            .Where(h => query.Length == 0 || _search.Matches(h.Path, Friendly(h.Time), query))
+            .ToList();
+
+        var existing = _library.ToDictionary(i => i.Path, StringComparer.OrdinalIgnoreCase);
+        _library.Clear();
+        foreach (var h in entries)
+        {
+            if (existing.TryGetValue(h.Path, out var kept) && kept.Time == h.Time)
+            {
+                _library.Add(kept);
+                continue;
+            }
+            var item = new LibraryItem { Path = h.Path, Time = h.Time, Caption = Friendly(h.Time) };
+            _library.Add(item);
+            _ = IsVideo(item.Path) ? LoadVideoThumbAsync(item) : LoadThumbAsync(item);
+        }
+
+        LibraryCount.Text = _library.Count == 0 ? "" : _library.Count.ToString();
+        LibraryEmpty.Visibility = _library.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        LibraryEmptyTitle.Text = query.Length > 0 ? "Nothing matches"
+            : _libraryFilter switch { "GIFs" => "No GIFs", "Videos" => "No videos", "Pictures" => "No pictures", _ => "No captures yet" };
+        LibraryEmptyHint.Text = query.Length > 0 ? (_search.Pending > 0 ? "Some captures haven't been read yet." : "")
+            : _libraryFilter == "All" ? $"Press {_settings.HotkeyRegion}, or click Region on the Capture tab." : "";
+    }
+
+    private static async Task LoadThumbAsync(LibraryItem item)
+    {
+        try
+        {
+            var (thumb, w, h, bytes) = await Task.Run(() =>
+            {
+                using var stream = new FileStream(item.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+                int pw = decoder.Frames[0].PixelWidth, ph = decoder.Frames[0].PixelHeight;
+                stream.Position = 0;
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.DecodePixelWidth = 300;
+                bmp.StreamSource = stream;
+                bmp.EndInit();
+                bmp.Freeze();
+                return (bmp, pw, ph, new FileInfo(item.Path).Length);
+            });
+            item.Thumb = thumb;
+            item.Details = $"{w} × {h}  ·  {(bytes >= 1 << 20 ? $"{bytes / (1024.0 * 1024):0.#} MB" : $"{Math.Max(1, bytes / 1024)} KB")}";
+            item.Raise(nameof(LibraryItem.Details));
+        }
+        catch
+        {
+            item.Details = "Couldn't read this file";
+            item.Raise(nameof(LibraryItem.Details));
+        }
+    }
+
+    private static LibraryItem? ItemOf(object sender) => (sender as FrameworkElement)?.DataContext as LibraryItem;
+
+    private BitmapSource? LoadLibraryImage(LibraryItem item)
+    {
+        if (!File.Exists(item.Path))
+        {
+            Toast.Show("That file has been moved or deleted.");
+            RefreshLibrary();
+            return null;
+        }
+        if (IsVideo(item.Path))
+        {
+            Toast.Show("That's a video. Click it to play it.");
+            return null;
+        }
+        return TryLoadFile(item.Path, out var image) ? image : null;
+    }
+
+    private void LibraryOpen_Click(object sender, RoutedEventArgs e)
+    {
+        // Ctrl+click starts picking several
+        if (!_combining && sender is Button && Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) SetCombining(true);
+        if (_combining && sender is Button && ItemOf(sender) is { } pick)
+        {
+            pick.IsSelected = !pick.IsSelected;
+            _pickOrder.Remove(pick);
+            if (pick.IsSelected) _pickOrder.Add(pick);
+            UpdateCombineBar();
+            return;
+        }
+        if (ItemOf(sender) is { } video && IsVideo(video.Path))
+        {
+            OpenWithDefaultApp(video.Path);
+            return;
+        }
+        if (ItemOf(sender) is { } gif && Path.GetExtension(gif.Path).Equals(".gif", StringComparison.OrdinalIgnoreCase) && File.Exists(gif.Path))
+        {
+            OpenClipFile(gif.Path);
+            return;
+        }
+        if (ItemOf(sender) is { } item && LoadLibraryImage(item) is { } image)
+            OpenEditor(image, item.Path, Path.GetFileName(item.Path));
+    }
+
+    /// <summary>Right-click → Convert to: makes a copy in another format next to the original.</summary>
+    private async void LibraryConvert_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.MenuItem { Tag: string target } || ItemOf(sender) is not { } item) return;
+        if (!File.Exists(item.Path))
+        {
+            Toast.Show("That file has been moved or deleted.");
+            return;
+        }
+        Toast.ShowSticky($"Converting to {target}…");
+        try
+        {
+            string made = await Converter.ConvertAsync(item.Path, target);
+            AddToHistory(made);
+            Toast.Show($"Made {Path.GetFileName(made)}.");
+        }
+        catch (Exception ex)
+        {
+            Toast.Show(ex is InvalidOperationException ? ex.Message : "Couldn't convert it: " + ex.Message, ex is not InvalidOperationException);
+        }
+    }
+
+    private void LibraryCopy_Click(object sender, RoutedEventArgs e)
+    {
+        if (ItemOf(sender) is not { } item) return;
+        if (!File.Exists(item.Path))
+        {
+            Toast.Show("That file has been moved or deleted.");
+            return;
+        }
+        // the file itself (same name, GIFs keep moving), plus the pixels for still pictures
+        var image = ClipboardFiles.IsStill(item.Path) && TryLoadFile(item.Path, out var still) ? still : null;
+        Toast.Show(ClipboardFiles.Copy(new[] { item.Path }, image) ? $"Copied {Path.GetFileName(item.Path)}." : "The clipboard is busy. Try again.",
+            warning: false);
+    }
+
+    private void LibraryPin_Click(object sender, RoutedEventArgs e)
+    {
+        if (ItemOf(sender) is { } item && LoadLibraryImage(item) is { } image) PinImage(image, Path.GetFileName(item.Path), item.Path);
+    }
+
+    private void LibraryTrace_Click(object sender, RoutedEventArgs e)
+    {
+        if (ItemOf(sender) is { } item && LoadLibraryImage(item) is { } image) SendToTrace(image);
+    }
+
+    private void LibraryShow_Click(object sender, RoutedEventArgs e)
+    {
+        if (ItemOf(sender) is { } item) ShowInFolder(item.Path);
+    }
+
+    private void LibraryDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (ItemOf(sender) is not { } item) return;
+        try
+        {
+            // to the Recycle Bin, so a slip of the mouse is easy to undo
+            Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(item.Path,
+                Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+            Toast.Show("Moved to the Recycle Bin.");
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Toast.Show("Couldn't delete it: " + ex.Message, true);
+        }
+        RefreshLibrary();
+    }
+
+    private void OpenFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(_settings.SaveFolder);
+            System.Diagnostics.Process.Start("explorer.exe", $"\"{_settings.SaveFolder}\"");
+        }
+        catch
+        {
+            Toast.Show("Couldn't open the folder.", true);
+        }
+    }
+}

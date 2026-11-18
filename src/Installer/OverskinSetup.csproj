@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The setup app. It targets .NET Framework 4.7.2, which every supported Windows 10/11 already
+    has, so the installer stays small and needs no runtime of its own. Overskin.exe is appended
+    to the built exe by build.ps1, and the same exe without that payload becomes Uninstall.exe.
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+
+    <AssemblyName>OverskinSetup</AssemblyName>
+    <RootNamespace>OverskinSetup</RootNamespace>
+    <Version>2.4.0</Version>
+    <Product>Overskin Setup</Product>
+    <Description>Installs Overskin.</Description>
+
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\Overskin\Assets\overskin.ico</ApplicationIcon>
+    <DebugType>embedded</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System" />
+    <Using Include="System.Collections.Generic" />
+    <Using Include="System.IO" />
+    <Using Include="System.Linq" />
+  </ItemGroup>
+
+  <!-- the app's own look: palette, icons, control styles and the icon control -->
+  <ItemGroup>
+    <Page Include="..\Overskin\Themes\Palette.xaml" Link="Themes\Palette.xaml" />
+    <Page Include="..\Overskin\Themes\Icons.xaml" Link="Themes\Icons.xaml" />
+    <Page Include="..\Overskin\Themes\Theme.xaml" Link="Themes\Theme.xaml" />
+    <Compile Include="..\Overskin\Interface\Icon.cs" Link="Icon.cs" />
+  </ItemGroup>
+
+</Project>

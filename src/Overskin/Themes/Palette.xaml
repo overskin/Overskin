@@ -1,0 +1,53 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!--
+        Default colours and the shape language. The brushes marked "themed" are replaced at
+        startup by Theming.Apply with values derived from the user's accent and background.
+    -->
+
+    <!-- themed -->
+    <SolidColorBrush x:Key="Bg" Color="#121316" />
+    <SolidColorBrush x:Key="Panel" Color="#1B1D22" />
+    <SolidColorBrush x:Key="Field" Color="#25282F" />
+    <SolidColorBrush x:Key="FieldHover" Color="#2E323B" />
+    <SolidColorBrush x:Key="Line" Color="#2A2D35" />
+    <SolidColorBrush x:Key="LineStrong" Color="#3B3F4A" />
+    <SolidColorBrush x:Key="Accent" Color="#4F8CFF" />
+    <SolidColorBrush x:Key="AccentInk" Color="#071530" />
+    <SolidColorBrush x:Key="AccentSoft" Color="#18223A" />
+    <SolidColorBrush x:Key="AccentLine" Color="#324E86" />
+
+    <SolidColorBrush x:Key="ButtonFill" Color="#25282F" />
+    <SolidColorBrush x:Key="ButtonFillHover" Color="#2E323B" />
+    <SolidColorBrush x:Key="AccentFill" Color="#4F8CFF" />
+    <SolidColorBrush x:Key="MenuBg" Color="#1B1D22" />
+    <SolidColorBrush x:Key="MenuHover" Color="#25282F" />
+    <SolidColorBrush x:Key="MenuHoverLine" Color="Transparent" />
+    <SolidColorBrush x:Key="HeaderBg" Color="Transparent" />
+
+    <SolidColorBrush x:Key="TileFill" Color="#1B1D22" />
+    <SolidColorBrush x:Key="Bevel" Color="Transparent" />
+    <SolidColorBrush x:Key="Shadow" Color="Black" />
+    <SolidColorBrush x:Key="Stage" Color="#0A0A0C" />
+    <FontWeight x:Key="ButtonWeight">SemiBold</FontWeight>
+    <sys:Double x:Key="ScrollBarWidth">8</sys:Double>
+
+    <!-- fixed -->
+    <SolidColorBrush x:Key="Text" Color="#E7E8EB" />
+    <SolidColorBrush x:Key="TextDim" Color="#9094A0" />
+    <SolidColorBrush x:Key="TextFaint" Color="#5E626E" />
+    <SolidColorBrush x:Key="Warn" Color="#E0A23C" />
+    <SolidColorBrush x:Key="Danger" Color="#C8383E" />
+
+    <!-- shape: two opposite corners rounded, the other two almost square -->
+    <CornerRadius x:Key="RadiusWindow">16,3,16,3</CornerRadius>
+    <CornerRadius x:Key="RadiusCard">13,2,13,2</CornerRadius>
+    <CornerRadius x:Key="RadiusControl">9,2,9,2</CornerRadius>
+    <CornerRadius x:Key="RadiusSmall">6,1,6,1</CornerRadius>
+    <CornerRadius x:Key="RadiusPill">9,2,9,2</CornerRadius>
+    <CornerRadius x:Key="RadiusKnob">6,1,6,1</CornerRadius>
+    <CornerRadius x:Key="RadiusBar">2</CornerRadius>
+
+</ResourceDictionary>

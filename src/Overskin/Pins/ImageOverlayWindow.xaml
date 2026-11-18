@@ -1,0 +1,84 @@
+<Window x:Class="Overskin.ImageOverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pinned image"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
+        WindowStartupLocation="Manual" UseLayoutRounding="True"
+        FontFamily="{StaticResource UiFont}">
+
+    <Window.Resources>
+        <Style x:Key="PinHandle" TargetType="Thumb">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="White" BorderBrush="{DynamicResource Accent}" BorderThickness="2" CornerRadius="3" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <!-- the near-invisible fill keeps transparent parts of the picture draggable -->
+    <Grid x:Name="Root" Background="#01000000">
+        <!-- a Canvas never clips its child, which matters once the picture is rotated -->
+        <Canvas IsHitTestVisible="False">
+            <!-- the picture and its drawing grid turn and flip together -->
+            <Grid x:Name="Sheet" RenderTransformOrigin="0.5,0.5">
+                <Grid.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform x:Name="Flip" ScaleX="1" ScaleY="1" />
+                        <RotateTransform x:Name="Spin" Angle="0" />
+                    </TransformGroup>
+                </Grid.RenderTransform>
+                <Image x:Name="Picture" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality" />
+                <Canvas x:Name="GridLines" />
+            </Grid>
+        </Canvas>
+        <Border x:Name="Frame" BorderBrush="{DynamicResource Accent}" BorderThickness="1" Opacity="0" IsHitTestVisible="False" />
+
+        <!-- transform mode (double-click): drag a corner to resize -->
+        <Grid x:Name="Handles" Visibility="Collapsed">
+            <Border BorderBrush="{DynamicResource Accent}" BorderThickness="1.5" IsHitTestVisible="False" />
+            <Thumb Tag="TL" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="SizeNWSE" DragDelta="Handle_Drag" Style="{StaticResource PinHandle}" />
+            <Thumb Tag="TR" HorizontalAlignment="Right" VerticalAlignment="Top" Cursor="SizeNESW" DragDelta="Handle_Drag" Style="{StaticResource PinHandle}" />
+            <Thumb Tag="BL" HorizontalAlignment="Left" VerticalAlignment="Bottom" Cursor="SizeNESW" DragDelta="Handle_Drag" Style="{StaticResource PinHandle}" />
+            <Thumb Tag="BR" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="SizeNWSE" DragDelta="Handle_Drag" Style="{StaticResource PinHandle}" />
+        </Grid>
+
+        <Grid.ContextMenu>
+            <ContextMenu x:Name="Menu" Opened="Menu_Opened">
+                <MenuItem x:Name="Opacity100" Header="Opacity 100%" Tag="100" Click="OpacityPreset_Click" />
+                <MenuItem x:Name="Opacity75" Header="Opacity 75%" Tag="75" Click="OpacityPreset_Click" />
+                <MenuItem x:Name="Opacity50" Header="Opacity 50%" Tag="50" Click="OpacityPreset_Click" />
+                <MenuItem x:Name="Opacity25" Header="Opacity 25%" Tag="25" Click="OpacityPreset_Click" />
+                <Separator />
+                <MenuItem x:Name="ClickThroughItem" Header="Click-through" Click="ClickThrough_Click" />
+                <MenuItem x:Name="LockItem" Header="Lock position" Click="Lock_Click" />
+                <Separator />
+                <MenuItem Header="Rotate left" Tag="-90" Click="Rotate_Click" />
+                <MenuItem Header="Rotate right" Tag="90" Click="Rotate_Click" />
+                <MenuItem x:Name="FlipItem" Header="Flip horizontal" Click="Flip_Click" />
+                <MenuItem x:Name="FlipVItem" Header="Flip vertical" Click="FlipV_Click" />
+                <MenuItem x:Name="GrayItem" Header="Grayscale" Click="Gray_Click" />
+                <MenuItem x:Name="GridItem" Header="Drawing grid">
+                    <MenuItem x:Name="Grid0" Header="Off" Tag="0" Click="GridPreset_Click" />
+                    <MenuItem x:Name="Grid3" Header="3 × 3" Tag="3" Click="GridPreset_Click" />
+                    <MenuItem x:Name="Grid4" Header="4 × 4" Tag="4" Click="GridPreset_Click" />
+                    <MenuItem x:Name="Grid6" Header="6 × 6" Tag="6" Click="GridPreset_Click" />
+                    <MenuItem x:Name="Grid8" Header="8 × 8" Tag="8" Click="GridPreset_Click" />
+                </MenuItem>
+                <Separator />
+                <MenuItem Header="Reset size and rotation" Click="Reset_Click" />
+                <Separator />
+                <MenuItem Header="Copy image" Click="Copy_Click" />
+                <MenuItem Header="Save as PNG…" Click="Save_Click" />
+                <MenuItem Header="Trace this image" Click="Trace_Click" />
+                <Separator />
+                <MenuItem Header="Close" InputGestureText="Esc" Click="Close_Click" />
+            </ContextMenu>
+        </Grid.ContextMenu>
+    </Grid>
+</Window>

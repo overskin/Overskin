@@ -1,0 +1,229 @@
+<Window x:Class="OverskinSetup.SetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:Overskin"
+        Title="Overskin Setup"
+        Width="508" Height="392"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+        UseLayoutRounding="True" SnapsToDevicePixels="True" Opacity="0"
+        FontFamily="{StaticResource UiFont}" FontSize="12" Foreground="{DynamicResource Text}"
+        TextOptions.TextFormattingMode="Display">
+
+    <Window.Resources>
+        <Style x:Key="Title" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="19" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Margin" Value="0,0,0,18" />
+        </Style>
+
+        <!-- one option: icon, label, switch; the whole row toggles -->
+        <Style x:Key="OptionRow" TargetType="ToggleButton">
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Margin" Value="0,0,0,7" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="B" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadiusCard}" Padding="12,9,10,9" SnapsToDevicePixels="True">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="IconBox" Width="30" Height="30" Background="{DynamicResource Field}"
+                                        CornerRadius="{DynamicResource RadiusControl}">
+                                    <ui:Icon x:Name="Glyph" Data="{TemplateBinding Tag}" Width="15" Height="15"
+                                             Foreground="{DynamicResource TextDim}" />
+                                </Border>
+                                <ContentPresenter Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                <ToggleButton Grid.Column="2" Style="{StaticResource Switch}" IsHitTestVisible="False" Focusable="False"
+                                              IsChecked="{Binding IsChecked, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource LineStrong}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="IconBox" Property="Background" Value="{DynamicResource AccentSoft}" />
+                                <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="14">
+        <!-- soft shadow -->
+        <Border Background="Black" CornerRadius="{DynamicResource RadiusWindow}" Opacity="0.6" Margin="1,3,1,-1">
+            <Border.Effect>
+                <BlurEffect Radius="14" />
+            </Border.Effect>
+        </Border>
+
+        <Border x:Name="Shell" Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                CornerRadius="{DynamicResource RadiusWindow}" RenderTransformOrigin="0.5,0.5">
+            <Border.RenderTransform>
+                <ScaleTransform x:Name="ShellScale" ScaleX="0.965" ScaleY="0.965" />
+            </Border.RenderTransform>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="46" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="58" />
+                </Grid.RowDefinitions>
+
+                <!-- ============ top bar ============ -->
+                <Border Background="Transparent" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0" IsHitTestVisible="False">
+                            <!-- the app mark: one leaf settling onto another -->
+                            <Canvas Width="17" Height="17" VerticalAlignment="Center">
+                                <Border Canvas.Left="0" Canvas.Top="0" Width="11" Height="11" BorderBrush="{DynamicResource TextDim}"
+                                        BorderThickness="1.5" CornerRadius="5,1,5,1" />
+                                <Border x:Name="FrontLeaf" Canvas.Left="4.5" Canvas.Top="4.5" Width="12.5" Height="12.5" Background="{DynamicResource Accent}"
+                                        BorderBrush="{DynamicResource Bg}" BorderThickness="1.5" CornerRadius="6,1.5,6,1.5">
+                                    <Border.RenderTransform>
+                                        <TranslateTransform x:Name="FrontLeafShift" X="-4.5" Y="-4.5" />
+                                    </Border.RenderTransform>
+                                </Border>
+                            </Canvas>
+                            <TextBlock Text="Overskin" FontSize="13.5" FontWeight="Bold" VerticalAlignment="Center" Margin="9,0,0,1" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0">
+                            <!-- step marks -->
+                            <StackPanel x:Name="Steps" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0" IsHitTestVisible="False" />
+                            <Button x:Name="CloseButton" Style="{StaticResource BtnCaptionClose}" Click="Close_Click" ToolTip="Close">
+                                <ui:Icon Data="{StaticResource IcX}" Width="13" Height="13" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- ============ pages ============ -->
+                <Grid x:Name="Stage" Grid.Row="1" Margin="30,14,30,0" ClipToBounds="False">
+
+                    <!-- install folder -->
+                    <StackPanel x:Name="PageFolder" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource Title}" Text="Install folder" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="FolderBox" Style="{StaticResource TextField}" Height="34" Padding="10,0"
+                                     TextChanged="FolderBox_TextChanged" />
+                            <Button Grid.Column="1" Style="{StaticResource Btn}" Height="34" Width="38" Padding="0" Margin="6,0,0,0"
+                                    Click="Browse_Click" ToolTip="Browse">
+                                <ui:Icon Data="{StaticResource IcFolderOpen}" Width="15" Height="15" />
+                            </Button>
+                        </Grid>
+                        <Grid Margin="2,10,2,0">
+                            <TextBlock x:Name="FolderNote" Style="{StaticResource Dim}" HorizontalAlignment="Left" />
+                            <TextBlock x:Name="SizeText" Style="{StaticResource Dim}" HorizontalAlignment="Right" Foreground="{DynamicResource TextFaint}" />
+                        </Grid>
+                        <Border x:Name="FolderWarning" Margin="0,16,0,0" Padding="11,9" Visibility="Collapsed" Opacity="0"
+                                Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadiusCard}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:Icon Data="{StaticResource IcInfo}" Width="15" Height="15" Foreground="{DynamicResource Warn}" />
+                                <TextBlock x:Name="FolderWarningText" Style="{StaticResource Label}" Margin="9,0,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- options -->
+                    <StackPanel x:Name="PageOptions" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource Title}" Text="Options" />
+                        <ToggleButton x:Name="OptStartMenu" Style="{StaticResource OptionRow}" Tag="{StaticResource IcAppWindow}">
+                            <TextBlock Style="{StaticResource Label}" Text="Start menu shortcut" />
+                        </ToggleButton>
+                        <ToggleButton x:Name="OptDesktop" Style="{StaticResource OptionRow}" Tag="{StaticResource IcMonitor}">
+                            <TextBlock Style="{StaticResource Label}" Text="Desktop shortcut" />
+                        </ToggleButton>
+                        <ToggleButton x:Name="OptStartup" Style="{StaticResource OptionRow}" Tag="{StaticResource IcPower}">
+                            <TextBlock Style="{StaticResource Label}" Text="Start with Windows" />
+                        </ToggleButton>
+                    </StackPanel>
+
+                    <!-- remove (uninstall) -->
+                    <StackPanel x:Name="PageRemove" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource Title}" Text="Remove Overskin" />
+                        <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadiusCard}" Padding="12,10" Margin="0,0,0,7">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:Icon Data="{StaticResource IcFolder}" Width="15" Height="15" Foreground="{DynamicResource TextDim}" />
+                                <TextBlock x:Name="RemoveFolderText" Style="{StaticResource Label}" Margin="10,0,0,0" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Border>
+                        <ToggleButton x:Name="OptRemoveSettings" Style="{StaticResource OptionRow}" Tag="{StaticResource IcSettings}">
+                            <TextBlock Style="{StaticResource Label}" Text="Remove settings" />
+                        </ToggleButton>
+                        <Border x:Name="RemoveWarning" Margin="0,9,0,0" Padding="11,9" Visibility="Collapsed" Opacity="0"
+                                Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadiusCard}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:Icon Data="{StaticResource IcInfo}" Width="15" Height="15" Foreground="{DynamicResource Warn}" />
+                                <TextBlock x:Name="RemoveWarningText" Style="{StaticResource Label}" Margin="9,0,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- progress -->
+                    <StackPanel x:Name="PageProgress" Visibility="Collapsed">
+                        <TextBlock x:Name="ProgressTitle" Style="{StaticResource Title}" Text="Installing" />
+                        <Grid Height="6" Margin="0,8,0,0">
+                            <Border Background="{DynamicResource Field}" CornerRadius="3" />
+                            <Border x:Name="ProgressFill" Background="{DynamicResource Accent}" CornerRadius="3" RenderTransformOrigin="0,0.5">
+                                <Border.RenderTransform>
+                                    <ScaleTransform x:Name="ProgressScale" ScaleX="0" />
+                                </Border.RenderTransform>
+                            </Border>
+                        </Grid>
+                        <Grid Margin="1,11,1,0">
+                            <TextBlock x:Name="ProgressStatus" Style="{StaticResource Dim}" HorizontalAlignment="Left" TextWrapping="Wrap" Margin="0,0,48,0" />
+                            <TextBlock x:Name="ProgressPercent" Style="{StaticResource Dim}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                       Foreground="{DynamicResource TextFaint}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- done -->
+                    <StackPanel x:Name="PageDone" Visibility="Collapsed" VerticalAlignment="Center" Margin="0,0,0,10">
+                        <Grid Width="64" Height="64" HorizontalAlignment="Center" Margin="0,0,0,18">
+                            <Border x:Name="DoneDisc" Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}"
+                                    BorderThickness="1" CornerRadius="22,5,22,5" RenderTransformOrigin="0.5,0.5">
+                                <Border.RenderTransform>
+                                    <ScaleTransform x:Name="DoneDiscScale" ScaleX="0.5" ScaleY="0.5" />
+                                </Border.RenderTransform>
+                            </Border>
+                            <Path x:Name="DoneCheck" Data="M 20 33 L 28 41 L 45 23" Stroke="{DynamicResource Accent}" StrokeThickness="2.6"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  StrokeDashArray="14 14" StrokeDashOffset="14" />
+                        </Grid>
+                        <TextBlock x:Name="DoneTitle" Style="{StaticResource Title}" HorizontalAlignment="Center" Margin="0,0,0,6" Text="Overskin is installed" />
+                        <TextBlock x:Name="DoneNote" Style="{StaticResource Dim}" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- ============ buttons ============ -->
+                <Grid Grid.Row="2" Margin="30,0,30,4">
+                    <Button x:Name="BackButton" Style="{StaticResource Btn}" Height="32" MinWidth="84" HorizontalAlignment="Left"
+                            VerticalAlignment="Center" Click="Back_Click" Content="Back" />
+                    <Button x:Name="NextButton" Style="{StaticResource BtnAccent}" Height="32" MinWidth="112" Padding="16,0"
+                            HorizontalAlignment="Right" VerticalAlignment="Center" IsDefault="True" Click="Next_Click" Content="Next" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

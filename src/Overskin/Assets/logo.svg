@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Overskin: one leaf-shaped sheet layered over another -->
+  <path d="M28 76 A48 48 0 0 1 76 28 L156 28 A8 8 0 0 1 164 36 L164 116 A48 48 0 0 1 116 164 L36 164 A8 8 0 0 1 28 156 Z"
+        fill="none" stroke="#A9B4C6" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M92 140 A48 48 0 0 1 140 92 L220 92 A8 8 0 0 1 228 100 L228 180 A48 48 0 0 1 180 228 L100 228 A8 8 0 0 1 92 220 Z"
+        fill="#4F8CFF" stroke="#121316" stroke-width="12" paint-order="stroke"/>
+</svg>

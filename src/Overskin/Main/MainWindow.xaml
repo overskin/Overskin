@@ -1,0 +1,1697 @@
+<Window x:Class="Overskin.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Overskin"
+        Title="Overskin"
+        Width="540" Height="700"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="CanMinimize" WindowStartupLocation="CenterScreen"
+        AllowDrop="True" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        FontFamily="{StaticResource UiFont}" FontSize="12" Foreground="{DynamicResource Text}"
+        TextOptions.TextFormattingMode="Display">
+
+    <Window.Resources>
+
+        <!-- big capture button -->
+        <Style x:Key="Tile" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="B" Background="{DynamicResource TileFill}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadiusCard}" Padding="14,14,12,13" RenderTransformOrigin="0.5,0.5" SnapsToDevicePixels="True">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="S" />
+                            </Border.RenderTransform>
+                            <ContentPresenter HorizontalAlignment="Left" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+                                <Setter TargetName="B" Property="Background" Value="{DynamicResource Field}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="S" Storyboard.TargetProperty="ScaleX" To="0.97" Duration="0:0:0.08" />
+                                            <DoubleAnimation Storyboard.TargetName="S" Storyboard.TargetProperty="ScaleY" To="0.97" Duration="0:0:0.08" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="S" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.16" />
+                                            <DoubleAnimation Storyboard.TargetName="S" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.16" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="TileIcon" TargetType="Border">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+        </Style>
+
+        <!-- a tool in the Screen tools grid -->
+        <Style x:Key="ToolRow" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="B" Background="Transparent" CornerRadius="{DynamicResource RadiusControl}" Padding="8,8,8,8">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="B" Property="Background" Value="{DynamicResource Field}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="B" Property="Opacity" Value="0.75" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- a saved capture in the library -->
+        <Style x:Key="LibTile" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="B" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadiusCard}" Padding="6,6,6,7">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="B" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="B" Property="Background" Value="{DynamicResource AccentSoft}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- a picture in the Trace catalog: click to trace it again -->
+        <DataTemplate x:Key="CatalogTile" DataType="{x:Type local:CatalogItem}">
+            <Button Width="78" Height="62" Margin="0,0,6,2" Click="CatalogOpen_Click" Cursor="Hand" FocusVisualStyle="{x:Null}">
+                <Button.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Trace this" Click="CatalogOpen_Click" />
+                        <MenuItem Header="Pin on screen" Click="CatalogPin_Click" />
+                        <Separator />
+                        <MenuItem Header="Remove from catalog" Click="CatalogRemove_Click" />
+                    </ContextMenu>
+                </Button.ContextMenu>
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="B" Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Line}" BorderThickness="1.5"
+                                CornerRadius="{DynamicResource RadiusSmall}" Padding="2" ClipToBounds="True">
+                            <Image Source="{Binding Thumb}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource LineStrong}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            </DataTrigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="B" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </DataTemplate>
+
+        <DataTemplate x:Key="LibraryTile" DataType="{x:Type local:LibraryItem}">
+            <Button Style="{StaticResource LibTile}" Width="150" Margin="0,0,8,8" Click="LibraryOpen_Click" ToolTip="{Binding Path}">
+                <Button.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Edit" Click="LibraryOpen_Click" />
+                        <MenuItem Header="Copy" Click="LibraryCopy_Click" />
+                        <MenuItem Header="Copy path" Click="LibraryCopyPath_Click" />
+                        <MenuItem Header="Rename…" Click="LibraryRename_Click" />
+                        <MenuItem Header="Convert to">
+                            <MenuItem Header="PNG" Tag="PNG" Click="LibraryConvert_Click" />
+                            <MenuItem Header="JPG" Tag="JPG" Click="LibraryConvert_Click" />
+                            <MenuItem Header="BMP" Tag="BMP" Click="LibraryConvert_Click" />
+                            <MenuItem Header="TIFF" Tag="TIFF" Click="LibraryConvert_Click" />
+                            <Separator />
+                            <MenuItem Header="GIF" Tag="GIF" Click="LibraryConvert_Click" />
+                            <MenuItem Header="MP4 video" Tag="MP4" Click="LibraryConvert_Click" />
+                        </MenuItem>
+                        <MenuItem Header="Pin on screen" Click="LibraryPin_Click" />
+                        <MenuItem Header="Trace" Click="LibraryTrace_Click" />
+                        <Separator />
+                        <MenuItem Header="Show in folder" Click="LibraryShow_Click" />
+                        <MenuItem Header="Delete" Click="LibraryDelete_Click" />
+                    </ContextMenu>
+                </Button.ContextMenu>
+                <StackPanel>
+                    <Border Height="88" CornerRadius="{DynamicResource RadiusSmall}" Background="{DynamicResource Bg}" ClipToBounds="True">
+                        <Image Source="{Binding Thumb}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Border>
+                    <TextBlock Text="{Binding Caption}" Style="{StaticResource Label}" FontSize="11.5" Margin="2,7,0,0" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Details}" Style="{StaticResource Dim}" FontSize="10.5" Margin="2,1,0,0" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+
+        <!-- small keycap used in the shortcut cheat sheet -->
+        <Style x:Key="Key" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Field}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource RadiusSmall}" />
+            <Setter Property="Padding" Value="6,1,6,2" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="KeyText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        </Style>
+
+        <!-- a palette colour: filled when in use, crossed out when skipped -->
+        <Style x:Key="PaletteChip" TargetType="ToggleButton">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Margin" Value="0,0,5,5" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Ring" Background="Transparent" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                                CornerRadius="{DynamicResource RadiusControl}" Padding="3" SnapsToDevicePixels="True">
+                            <Grid>
+                                <Border x:Name="Fill" Background="{TemplateBinding Background}" CornerRadius="{DynamicResource RadiusSmall}"
+                                        BorderBrush="#33FFFFFF" BorderThickness="1" />
+                                <Line x:Name="Cross" X1="2" Y1="18" X2="18" Y2="2" Stroke="{DynamicResource Text}" StrokeThickness="1.5"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed" HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource LineStrong}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="False">
+                                <Setter TargetName="Fill" Property="Opacity" Value="0.3" />
+                                <Setter TargetName="Cross" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- one row of the window list -->
+        <DataTemplate x:Key="WindowRow" DataType="{x:Type local:WindowItem}">
+            <StackPanel>
+                <Grid Height="24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid Width="16" Height="16" Margin="1,0,10,0">
+                        <local:Icon x:Name="NoIcon" Data="{StaticResource IcAppWindow}" Width="16" Height="16"
+                                    Foreground="{DynamicResource TextFaint}" Visibility="Collapsed" />
+                        <Image Source="{Binding Icon}" RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Grid>
+                    <TextBlock Grid.Column="1" Text="{Binding Title}" Style="{StaticResource Label}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" Text="{Binding Badge}" Style="{StaticResource Dim}" Margin="8,0,0,0" />
+                    <local:Icon x:Name="PinIcon" Grid.Column="3" Data="{StaticResource IcPin}" Width="14" Height="14"
+                                Foreground="{DynamicResource TextFaint}" Margin="10,0,8,0" />
+                    <ToggleButton Grid.Column="4" Style="{StaticResource Switch}" IsChecked="{Binding IsPinned, Mode=TwoWay}"
+                                  ToolTip="Keep this window on top" />
+                </Grid>
+
+                <Grid x:Name="Details" Margin="0,9,0,2" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="40" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Opacity" Style="{StaticResource Dim}" Margin="0,0,10,0" />
+                    <Slider Grid.Column="1" Minimum="10" Maximum="100" SmallChange="5" LargeChange="10"
+                            TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding Opacity, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="2" Text="{Binding OpacityText}" Style="{StaticResource Value}" />
+                    <TextBlock Grid.Column="3" Text="Click-through" Style="{StaticResource Dim}" Margin="18,0,8,0" />
+                    <ToggleButton Grid.Column="4" Style="{StaticResource Switch}" IsChecked="{Binding ClickThrough, Mode=TwoWay}"
+                                  ToolTip="Let the mouse pass through this window" />
+                </Grid>
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                    <Setter TargetName="Details" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                    <Setter TargetName="PinIcon" Property="Foreground" Value="{DynamicResource Accent}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HasIcon}" Value="False">
+                    <Setter TargetName="NoIcon" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- one row of the pinned-image list; everything here works while the image is click-through -->
+        <DataTemplate x:Key="ImageRow" DataType="{x:Type local:ImageOverlayWindow}">
+            <StackPanel>
+                <Grid Height="34">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Width="34" Height="34" CornerRadius="{DynamicResource RadiusSmall}" Background="{DynamicResource Bg}"
+                            BorderBrush="{DynamicResource Line}" BorderThickness="1" Margin="0,0,11,0">
+                        <Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="2" RenderOptions.BitmapScalingMode="LowQuality" />
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Label}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Details}" Style="{StaticResource Dim}" FontSize="11" Margin="0,1,0,0" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Text="Click-through" Style="{StaticResource Dim}" Margin="8,0,8,0" />
+                    <ToggleButton Grid.Column="3" Style="{StaticResource Switch}" IsChecked="{Binding IsClickThrough, Mode=TwoWay}" />
+                    <Button Grid.Column="4" Style="{StaticResource BtnIcon}" Margin="6,0,0,0" ToolTip="Close this image" Click="ImageClose_Click">
+                        <local:Icon Data="{StaticResource IcX}" Width="13" Height="13" />
+                    </Button>
+                </Grid>
+
+                <StackPanel x:Name="Details" Margin="0,9,0,2" Visibility="Collapsed">
+                    <Grid Height="25">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="60" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="46" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Opacity" Style="{StaticResource Dim}" />
+                        <Slider Grid.Column="1" Minimum="10" Maximum="100" SmallChange="5" LargeChange="10"
+                                TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding OpacityPercent, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2" Text="{Binding OpacityText}" Style="{StaticResource Value}" />
+                    </Grid>
+                    <Grid Height="25">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="60" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="46" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Rotation" Style="{StaticResource Dim}" />
+                        <Slider Grid.Column="1" Minimum="-180" Maximum="180" SmallChange="1" LargeChange="15"
+                                TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding Rotation, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2" Text="{Binding RotationText}" Style="{StaticResource Value}" />
+                    </Grid>
+                    <Grid Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <ToggleButton Style="{StaticResource Chip}" IsChecked="{Binding FlipHorizontal, Mode=TwoWay}" ToolTip="Mirror left to right">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcMoveHorizontal}" Width="13" Height="13" Margin="0,0,5,0" />
+                                    <TextBlock Text="Flip" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource Chip}" IsChecked="{Binding FlipVertical, Mode=TwoWay}" ToolTip="Mirror top to bottom">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcMoveVertical}" Width="13" Height="13" Margin="0,0,5,0" />
+                                    <TextBlock Text="Flip" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource Chip}" IsChecked="{Binding Grayscale, Mode=TwoWay}" ToolTip="Show in black and white">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcContrast}" Width="13" Height="13" Margin="0,0,5,0" />
+                                    <TextBlock Text="Gray" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource Chip}" IsChecked="{Binding ShowGrid, Mode=TwoWay}"
+                                          ToolTip="Squares over the picture, for copying it by hand. Right-click the picture for sizes.">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcGrid3x3}" Width="13" Height="13" Margin="0,0,5,0" />
+                                    <TextBlock Text="Grid" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <ToggleButton Style="{StaticResource Chip}" IsChecked="{Binding Locked, Mode=TwoWay}"
+                                          ToolTip="Stop the image from being dragged or resized">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcLock}" Width="13" Height="13" Margin="0,0,5,0" />
+                                    <TextBlock Text="Lock" />
+                                </StackPanel>
+                            </ToggleButton>
+                        </StackPanel>
+                        <Button Style="{StaticResource Btn}" Height="23" Padding="9,0" HorizontalAlignment="Right"
+                                ToolTip="Back to actual size, no rotation" Click="ImageReset_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcRotateCcw}" Width="12" Height="12" Margin="0,0,5,0" />
+                                <TextBlock Text="Reset" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <Grid Margin="0,6,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource Btn}" Height="23" Padding="9,0" Margin="0,0,5,0" Click="ImageTrace_Click"
+                                    ToolTip="Open this picture in the Trace tab">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcPenTool}" Width="12" Height="12" Margin="0,0,5,0" />
+                                    <TextBlock Text="Trace it" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource Btn}" Height="23" Padding="9,0" Margin="0,0,5,0" Click="ImageCopy_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcCopy}" Width="12" Height="12" Margin="0,0,5,0" />
+                                    <TextBlock Text="Copy" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource Btn}" Height="23" Padding="9,0" Click="ImageSave_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcDownload}" Width="12" Height="12" Margin="0,0,5,0" />
+                                    <TextBlock Text="Save" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                    <Setter TargetName="Details" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid x:Name="Root" Margin="14">
+        <Grid.LayoutTransform>
+            <ScaleTransform x:Name="RootScale" ScaleX="1" ScaleY="1" />
+        </Grid.LayoutTransform>
+        <!-- shadow lives on its own layer so it never has to be redrawn with the content -->
+        <Border Background="{DynamicResource Shadow}" CornerRadius="{DynamicResource RadiusWindow}" Opacity="0.6" Margin="1,3,1,-1">
+            <Border.Effect>
+                <BlurEffect Radius="14" />
+            </Border.Effect>
+        </Border>
+
+        <Border Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                CornerRadius="{DynamicResource RadiusWindow}">
+            <Grid ClipToBounds="True"> <!-- pages slide in; keep them inside the window -->
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="46" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="28" />
+                </Grid.RowDefinitions>
+
+                <!-- ============ top bar: name, pages, window buttons ============ -->
+                <Border Background="{DynamicResource HeaderBg}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1"
+                        MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0" IsHitTestVisible="False">
+                            <!-- the app mark: one leaf sitting on another -->
+                            <Canvas Width="17" Height="17" VerticalAlignment="Center">
+                                <Border Canvas.Left="0" Canvas.Top="0" Width="11" Height="11" BorderBrush="{DynamicResource TextDim}"
+                                        BorderThickness="1.5" CornerRadius="5,1,5,1" />
+                                <Border Canvas.Left="4.5" Canvas.Top="4.5" Width="12.5" Height="12.5" Background="{DynamicResource Accent}"
+                                        BorderBrush="{DynamicResource Bg}" BorderThickness="1.5" CornerRadius="6,1.5,6,1.5" />
+                            </Canvas>
+                            <TextBlock Text="Overskin" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource Text}"
+                                       VerticalAlignment="Center" Margin="9,0,0,1" />
+                            <Border Width="1" Height="15" Background="{DynamicResource LineStrong}" Margin="15,1,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="16,0,0,-1">
+                            <RadioButton x:Name="TabCapture" Style="{StaticResource Tab}" GroupName="Tabs" Content="Capture" Checked="Tab_Checked" />
+                            <RadioButton x:Name="TabLibrary" Style="{StaticResource Tab}" GroupName="Tabs" Content="Library" Checked="Tab_Checked" />
+                            <RadioButton x:Name="TabPins" Style="{StaticResource Tab}" GroupName="Tabs" Content="Pins" Checked="Tab_Checked" />
+                            <RadioButton x:Name="TabTrace" Style="{StaticResource Tab}" GroupName="Tabs" Content="Trace" Checked="Tab_Checked" />
+                            <RadioButton x:Name="TabSettings" Style="{StaticResource Tab}" GroupName="Tabs" Content="Settings" Checked="Tab_Checked" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                            <Button Style="{StaticResource BtnCaption}" ToolTip="Minimize" Click="Minimize_Click">
+                                <local:Icon Data="{StaticResource IcMinus}" Width="14" Height="14" />
+                            </Button>
+                            <Button Style="{StaticResource BtnCaptionClose}" ToolTip="Close" Click="Close_Click">
+                                <local:Icon Data="{StaticResource IcX}" Width="14" Height="14" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- ============ capture ============ -->
+                <ScrollViewer x:Name="PageCapture" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                    <StackPanel Margin="14,12,6,8">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <RadioButton x:Name="CaptureShotsTab" Style="{StaticResource Seg}" GroupName="CaptureMode" Margin="0" IsChecked="True" Checked="CaptureMode_Checked">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcCamera}" Width="13" Height="13" Margin="0,0,6,0" />
+                                    <TextBlock Text="Screenshots" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="CaptureRecordTab" Style="{StaticResource Seg}" GroupName="CaptureMode" Checked="CaptureMode_Checked">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcCircleDot}" Width="13" Height="13" Margin="0,0,6,0" />
+                                    <TextBlock Text="Recording" />
+                                </StackPanel>
+                            </RadioButton>
+                        </StackPanel>
+                        <StackPanel x:Name="CaptureShots">
+                            <UniformGrid Columns="4" Margin="0,0,-8,0">
+                                <Button Style="{StaticResource Tile}" Click="CaptureRegion_Click" ToolTip="Drag over an area, or click a window">
+                                    <StackPanel>
+                                        <Border Style="{StaticResource TileIcon}">
+                                            <local:Icon Data="{StaticResource IcSquareDashedMousePointer}" Width="17" Height="17" Foreground="{DynamicResource Accent}" />
+                                        </Border>
+                                        <TextBlock Text="Region" Style="{StaticResource Heading}" Margin="0,12,0,0" />
+                                        <TextBlock x:Name="TileRegionKey" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource Tile}" Click="CaptureWindow_Click" ToolTip="Click the window to capture">
+                                    <StackPanel>
+                                        <Border Style="{StaticResource TileIcon}">
+                                            <local:Icon Data="{StaticResource IcAppWindow}" Width="17" Height="17" Foreground="{DynamicResource Accent}" />
+                                        </Border>
+                                        <TextBlock Text="Window" Style="{StaticResource Heading}" Margin="0,12,0,0" />
+                                        <TextBlock x:Name="TileWindowKey" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource Tile}" Click="CaptureScreen_Click" ToolTip="The monitor the mouse is on">
+                                    <StackPanel>
+                                        <Border Style="{StaticResource TileIcon}">
+                                            <local:Icon Data="{StaticResource IcMonitor}" Width="17" Height="17" Foreground="{DynamicResource Accent}" />
+                                        </Border>
+                                        <TextBlock Text="Full screen" Style="{StaticResource Heading}" Margin="0,12,0,0" />
+                                        <TextBlock x:Name="TileScreenKey" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource Tile}" Click="CaptureScrolling_Click"
+                                        ToolTip="Pick the scrolling part of a window. Overskin scrolls it and joins everything into one tall picture">
+                                    <StackPanel>
+                                        <Border Style="{StaticResource TileIcon}">
+                                            <local:Icon Data="{StaticResource IcArrowUpDown}" Width="17" Height="17" Foreground="{DynamicResource Accent}" />
+                                        </Border>
+                                        <TextBlock Text="Scrolling" Style="{StaticResource Heading}" Margin="0,12,0,0" />
+                                        <TextBlock Text="Whole page" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Button>
+                            </UniformGrid>
+
+                            <Grid Margin="1,2,0,14">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcTimer}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                    <TextBlock Text="Delay" Style="{StaticResource Label}" Margin="0,0,4,0" />
+                                    <RadioButton x:Name="Delay0" Style="{StaticResource Seg}" GroupName="Delay" Content="Off" Tag="0" Checked="Delay_Checked" />
+                                    <RadioButton x:Name="Delay3" Style="{StaticResource Seg}" GroupName="Delay" Content="3 s" Tag="3" Checked="Delay_Checked" />
+                                    <RadioButton x:Name="Delay5" Style="{StaticResource Seg}" GroupName="Delay" Content="5 s" Tag="5" Checked="Delay_Checked" />
+                                    <RadioButton x:Name="Delay10" Style="{StaticResource Seg}" GroupName="Delay" Content="10 s" Tag="10" Checked="Delay_Checked" />
+                                </StackPanel>
+                                <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="RepeatRegion_Click"
+                                        ToolTip="Capture the same area as last time">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcRepeat}" Width="13" Height="13" Margin="0,0,6,0" />
+                                        <TextBlock Text="Same area" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+
+                            <!-- tools -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcZap}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Screen tools" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <UniformGrid Columns="2" Margin="-4,-2,-4,-4">
+                                        <Button x:Name="ToolSnipButton" Style="{StaticResource ToolRow}" Click="SnipPin_Click">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <local:Icon Data="{StaticResource IcPin}" Width="16" Height="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Snip and pin" Style="{StaticResource Label}" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                        <Button x:Name="ToolTextButton" Style="{StaticResource ToolRow}" Click="TextFromScreen_Click">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <local:Icon Data="{StaticResource IcScanText}" Width="16" Height="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Text from screen" Style="{StaticResource Label}" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                        <Button x:Name="ToolColourButton" Style="{StaticResource ToolRow}" Click="ColourPicker_Click">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <local:Icon Data="{StaticResource IcPipette}" Width="16" Height="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Colour picker" Style="{StaticResource Label}" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                        <Button Style="{StaticResource ToolRow}" Click="Ruler_Click" ToolTip="Drag to measure. Esc closes.">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <local:Icon Data="{StaticResource IcRuler}" Width="16" Height="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Ruler" Style="{StaticResource Label}" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                        <Button Style="{StaticResource ToolRow}" Click="OpenInEditor_Click">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <local:Icon Data="{StaticResource IcFolderOpen}" Width="16" Height="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Open an image" Style="{StaticResource Label}" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                        <Button Style="{StaticResource ToolRow}" Click="EditClipboard_Click">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <local:Icon Data="{StaticResource IcClipboardPaste}" Width="16" Height="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Edit the clipboard" Style="{StaticResource Label}" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                        <Button Style="{StaticResource ToolRow}" Click="CaptionGif_Click">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <local:Icon Data="{StaticResource IcType}" Width="16" Height="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Caption a GIF" Style="{StaticResource Label}" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- after capture -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcCamera}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="After capturing" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31">
+                                        <TextBlock Text="Copy to the clipboard" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="AfterCopySwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Save to a file" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="AfterSaveSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
+                                    </Grid>
+                                    <Grid Height="33" Margin="0,0,0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                                                CornerRadius="{DynamicResource RadiusSmall}" Padding="9,0" Height="26" Margin="0,0,8,0">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <local:Icon Data="{StaticResource IcFolder}" Width="13" Height="13" Foreground="{DynamicResource TextFaint}" Margin="0,0,7,0" />
+                                                <TextBlock x:Name="SaveFolderText" Style="{StaticResource Dim}" FontSize="11.5" TextTrimming="CharacterEllipsis" MaxWidth="240" />
+                                            </StackPanel>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <RadioButton x:Name="FormatPng" Style="{StaticResource Seg}" Margin="0,0,5,0" MinWidth="0" GroupName="Format" Content="PNG" Tag="png" Checked="Format_Checked" ToolTip="Lossless, best for screenshots" />
+                                            <RadioButton x:Name="FormatJpg" Style="{StaticResource Seg}" Margin="0,0,8,0" MinWidth="0" GroupName="Format" Content="JPG" Tag="jpg" Checked="Format_Checked" ToolTip="Smaller files, best for photos" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Style="{StaticResource Btn}" Height="25" Content="Change" Click="ChangeFolder_Click" />
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Open in the editor" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="AfterEditorSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Pin it where it was" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="AfterPinSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="A small card in the corner with Edit, Pin, Copy and Trace">
+                                        <TextBlock Text="Show a preview" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="AfterPreviewSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Draw the mouse pointer into screenshots and GIFs">
+                                        <TextBlock Text="Show the mouse pointer" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="AfterCursorSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Reads the text in every screenshot and hides emails, phone numbers, card numbers, IP addresses and keys before it's copied or saved">
+                                        <TextBlock Text="Hide private details automatically" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="AutoHideSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="When you click a window, keep only the window: no desktop behind it, a transparent background and a soft shadow (PNG)">
+                                        <TextBlock Text="Windows on a transparent background" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="WindowAlphaSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel x:Name="CaptureRecord" Visibility="Collapsed">
+                            <UniformGrid Columns="3" Margin="0,0,-8,0">
+                                <Button Style="{StaticResource Tile}" Click="RecordVideo_Click" ToolTip="Record an area as an MP4 video. Click again, or press Esc, to stop">
+                                    <StackPanel>
+                                        <Border Style="{StaticResource TileIcon}">
+                                            <local:Icon Data="{StaticResource IcCircleDot}" Width="17" Height="17" Foreground="{DynamicResource Accent}" />
+                                        </Border>
+                                        <TextBlock Text="Video" Style="{StaticResource Heading}" Margin="0,12,0,0" />
+                                        <TextBlock Text="MP4" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource Tile}" Click="RecordGif_Click" ToolTip="Record an area as a GIF, then caption and trim it">
+                                    <StackPanel>
+                                        <Border Style="{StaticResource TileIcon}">
+                                            <local:Icon Data="{StaticResource IcFilm}" Width="17" Height="17" Foreground="{DynamicResource Accent}" />
+                                        </Border>
+                                        <TextBlock Text="GIF" Style="{StaticResource Heading}" Margin="0,12,0,0" />
+                                        <TextBlock x:Name="TileGifKey" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource Tile}" Click="RecordSteps_Click"
+                                        ToolTip="Click through something and get a numbered how-to picture: one screenshot per click, with what was clicked">
+                                    <StackPanel>
+                                        <Border Style="{StaticResource TileIcon}">
+                                            <local:Icon Data="{StaticResource IcListOrdered}" Width="17" Height="17" Foreground="{DynamicResource Accent}" />
+                                        </Border>
+                                        <TextBlock Text="Steps" Style="{StaticResource Heading}" Margin="0,12,0,0" />
+                                        <TextBlock Text="How-to guide" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Button>
+                            </UniformGrid>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcFilm}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Video" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31" ToolTip="60 fps is smoother, if your PC keeps up">
+                                        <TextBlock Text="Frame rate" Style="{StaticResource Label}" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton x:Name="VidFps30" Style="{StaticResource Seg}" GroupName="VidFps" Content="30 fps" Checked="VideoSetting_Click" />
+                                            <RadioButton x:Name="VidFps60" Style="{StaticResource Seg}" GroupName="VidFps" Content="60 fps" Checked="VideoSetting_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Quality" Style="{StaticResource Label}" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton x:Name="VidQualityStandard" Style="{StaticResource Seg}" GroupName="VidQuality" Content="Smaller file" Checked="VideoSetting_Click" />
+                                            <RadioButton x:Name="VidQualityHigh" Style="{StaticResource Seg}" GroupName="VidQuality" Content="Sharper" Checked="VideoSetting_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcMousePointer2}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Pointer" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31">
+                                        <TextBlock Text="Draw the pointer" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="VidPointerSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="White and Black are drawn from shapes, so they stay sharp at any size. Windows uses your own pointer.">
+                                        <TextBlock Text="Look" Style="{StaticResource Label}" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton x:Name="VidStyleWhite" Style="{StaticResource Seg}" GroupName="VidPointerStyle" Content="White" Checked="VideoSetting_Click" />
+                                            <RadioButton x:Name="VidStyleBlack" Style="{StaticResource Seg}" GroupName="VidPointerStyle" Content="Black" Checked="VideoSetting_Click" />
+                                            <RadioButton x:Name="VidStyleSystem" Style="{StaticResource Seg}" GroupName="VidPointerStyle" Content="Windows" Checked="VideoSetting_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Size" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="VidPointerSize" Minimum="0.75" Maximum="3" SmallChange="0.25" LargeChange="0.25" TickFrequency="0.25"
+                                                    IsSnapToTickEnabled="True" ValueChanged="VideoSetting_Changed" />
+                                            <TextBlock x:Name="VidPointerSizeText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Calms shaky or jumpy movement. Higher is smoother but trails a little further behind.">
+                                        <TextBlock Text="Smoothing" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="VidSmoothing" Minimum="0" Maximum="100" SmallChange="5" LargeChange="5" TickFrequency="5"
+                                                    IsSnapToTickEnabled="True" ValueChanged="VideoSetting_Changed" />
+                                            <TextBlock x:Name="VidSmoothingText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Ring on each click" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="VidRingsSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcZoomIn}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Auto-zoom" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31" ToolTip="Zooms in where you click, follows the pointer while you work, and eases back out when you stop">
+                                        <TextBlock Text="Zoom in on clicks" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="VideoZoomSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Zoom" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="VidZoom" Minimum="1.2" Maximum="3" SmallChange="0.1" LargeChange="0.1" TickFrequency="0.1"
+                                                    IsSnapToTickEnabled="True" ValueChanged="VideoSetting_Changed" />
+                                            <TextBlock x:Name="VidZoomText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Low is slow and gentle; high snaps in quickly">
+                                        <TextBlock Text="Zoom speed" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="VidZoomSpeed" Minimum="0" Maximum="100" SmallChange="5" LargeChange="5" TickFrequency="5"
+                                                    IsSnapToTickEnabled="True" ValueChanged="VideoSetting_Changed" />
+                                            <TextBlock x:Name="VidZoomSpeedText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Low keeps the view tight on the pointer; high lets it drift after it">
+                                        <TextBlock Text="Follow smoothing" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="VidFollow" Minimum="0" Maximum="100" SmallChange="5" LargeChange="5" TickFrequency="5"
+                                                    IsSnapToTickEnabled="True" ValueChanged="VideoSetting_Changed" />
+                                            <TextBlock x:Name="VidFollowText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Seconds without a click before it zooms back out">
+                                        <TextBlock Text="Zoom out after" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="VidHold" Minimum="0.5" Maximum="8" SmallChange="0.5" LargeChange="0.5" TickFrequency="0.5"
+                                                    IsSnapToTickEnabled="True" ValueChanged="VideoSetting_Changed" />
+                                            <TextBlock x:Name="VidHoldText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ============ library ============ -->
+                <Grid x:Name="PageLibrary" Grid.Row="1" Margin="14,12,14,6" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Margin="1,0,0,10">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Content="All" Tag="All" IsChecked="True" Checked="LibraryFilter_Checked" Margin="0" />
+                            <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Content="Pictures" Tag="Pictures" Checked="LibraryFilter_Checked" />
+                            <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Content="GIFs" Tag="GIFs" Checked="LibraryFilter_Checked" />
+                            <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Content="Videos" Tag="Videos" Checked="LibraryFilter_Checked" />
+                            <TextBlock x:Name="LibraryCount" Style="{StaticResource Dim}" Margin="10,0,0,0" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource Btn}" Height="25" Click="CombineMode_Click" Margin="0,0,6,0"
+                                ToolTip="Pick several captures to copy, combine, convert, rename or delete together (or Ctrl+click a capture)">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcCheck}" Width="13" Height="13" Margin="0,0,6,0" />
+                                <TextBlock Text="Select" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource Btn}" Height="25" Width="30" Padding="0" Click="OpenFolder_Click" ToolTip="Open the screenshots folder">
+                            <local:Icon Data="{StaticResource IcFolderOpen}" Width="14" Height="14" />
+                        </Button>
+                        </StackPanel>
+                    </Grid>
+                    <Grid x:Name="LibrarySearchRow" Grid.Row="1" VerticalAlignment="Top" Margin="0,0,0,0" Panel.ZIndex="2">
+                        <TextBox x:Name="LibrarySearch" Style="{StaticResource TextField}" Height="30" Padding="30,0,30,0"
+                                 TextChanged="LibrarySearch_Changed"
+                                 ToolTip="Searches names, dates and the words inside your captures (read with Windows' built-in text reader, offline)" />
+                        <local:Icon Data="{StaticResource IcSearch}" Width="14" Height="14" Foreground="{DynamicResource TextDim}"
+                                    HorizontalAlignment="Left" Margin="10,0,0,0" IsHitTestVisible="False" />
+                        <TextBlock x:Name="LibrarySearchHint" Text="Search the text in your captures" Style="{StaticResource Dim}"
+                                   Foreground="{DynamicResource TextFaint}" Margin="31,0,0,0" IsHitTestVisible="False" />
+                        <TextBlock x:Name="LibraryIndexing" Style="{StaticResource Dim}" FontSize="11" Foreground="{DynamicResource TextFaint}"
+                                   HorizontalAlignment="Right" Margin="0,0,40,0" IsHitTestVisible="False" />
+                        <Button x:Name="LibrarySortButton" Style="{StaticResource BtnIcon}" HorizontalAlignment="Right" Margin="0,0,3,0"
+                                Click="LibrarySort_Click" ToolTip="Sort">
+                            <local:Icon Data="{StaticResource IcListFilter}" Width="14" Height="14" />
+                        </Button>
+                    </Grid>
+                    <Border x:Name="CombineBar" Grid.Row="1" Style="{StaticResource Card}" Padding="10,6" VerticalAlignment="Top"
+                            Visibility="Collapsed" Panel.ZIndex="1">
+                        <Grid>
+                            <TextBlock x:Name="CombineText" Style="{StaticResource Label}" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Style="{StaticResource BtnIcon}" Margin="0,0,2,0" Click="SelectAll_Click" ToolTip="Select everything shown">
+                                    <local:Icon Data="{StaticResource IcListOrdered}" Width="14" Height="14" />
+                                </Button>
+                                <Button Style="{StaticResource BtnIcon}" Margin="0,0,2,0" Click="SelectCopy_Click" ToolTip="Copy the files">
+                                    <local:Icon Data="{StaticResource IcCopy}" Width="14" Height="14" />
+                                </Button>
+                                <Button x:Name="SelectCombineButton" Style="{StaticResource Btn}" Height="25" Margin="4,0,4,0" Click="SelectCombine_Click"
+                                        ToolTip="Put the picked pictures side by side, stacked or in a grid">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcGrid2x2}" Width="13" Height="13" Margin="0,0,6,0" />
+                                        <TextBlock Text="Combine" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="SelectConvertButton" Style="{StaticResource Btn}" Height="25" Margin="0,0,4,0" Click="SelectConvert_Click"
+                                        ToolTip="Make copies in another format">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcRefreshCw}" Width="13" Height="13" Margin="0,0,6,0" />
+                                        <TextBlock Text="Convert" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource BtnIcon}" Margin="0,0,2,0" Click="SelectRename_Click" ToolTip="Rename them all">
+                                    <local:Icon Data="{StaticResource IcType}" Width="14" Height="14" />
+                                </Button>
+                                <Button Style="{StaticResource BtnIcon}" Margin="0,0,2,0" Click="SelectDelete_Click" ToolTip="Move them to the Recycle Bin">
+                                    <local:Icon Data="{StaticResource IcTrash}" Width="14" Height="14" />
+                                </Button>
+                                <Button Style="{StaticResource BtnIcon}" Click="CombineMode_Click" ToolTip="Done">
+                                    <local:Icon Data="{StaticResource IcX}" Width="13" Height="13" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <ScrollViewer x:Name="LibraryScroll" Grid.Row="1" Margin="0,42,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                        <ItemsControl x:Name="LibraryList" ItemTemplate="{StaticResource LibraryTile}" Margin="0,0,-8,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <StackPanel x:Name="LibraryEmpty" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,40">
+                        <local:Icon Data="{StaticResource IcCamera}" Width="30" Height="30" StrokeWidth="1.5" Foreground="{DynamicResource TextFaint}" />
+                        <TextBlock x:Name="LibraryEmptyTitle" Text="No captures yet" Style="{StaticResource Dim}" HorizontalAlignment="Center" Margin="0,11,0,0" />
+                        <TextBlock x:Name="LibraryEmptyHint" Style="{StaticResource Dim}" FontSize="11" Foreground="{DynamicResource TextFaint}"
+                                   HorizontalAlignment="Center" Margin="0,3,0,0" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- ============ pins: pictures and windows ============ -->
+                <Grid x:Name="PagePins" Grid.Row="1" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="14,12,14,0">
+                        <RadioButton x:Name="PinsPictures" Style="{StaticResource Seg}" Margin="0,0,6,0" GroupName="PinsView" Checked="PinsView_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcImages}" Width="13" Height="13" Margin="0,0,6,0" />
+                                <TextBlock Text="Pictures" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="PinsWindows" Style="{StaticResource Seg}" Margin="0" GroupName="PinsView" Checked="PinsView_Checked">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcAppWindow}" Width="13" Height="13" Margin="0,0,6,0" />
+                                <TextBlock Text="Windows" />
+                            </StackPanel>
+                        </RadioButton>
+                    </StackPanel>
+
+                <!-- ============ windows ============ -->
+                <Grid x:Name="PageWindows" Grid.Row="1" Margin="14,10,14,6" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid>
+                            <TextBox x:Name="FilterBox" Style="{StaticResource TextField}" Padding="29,0,44,0" TextChanged="Filter_Changed" />
+                            <local:Icon Data="{StaticResource IcSearch}" Width="14" Height="14" Foreground="{DynamicResource TextFaint}"
+                                        HorizontalAlignment="Left" Margin="10,0,0,0" />
+                            <TextBlock x:Name="FilterHint" Text="Filter windows" Style="{StaticResource Dim}" Foreground="{DynamicResource TextFaint}"
+                                       Margin="31,0,0,0" IsHitTestVisible="False" />
+                            <TextBlock x:Name="WindowCount" Style="{StaticResource Dim}" FontSize="11" Foreground="{DynamicResource TextFaint}"
+                                       HorizontalAlignment="Right" Margin="0,0,10,0" IsHitTestVisible="False" />
+                        </Grid>
+                        <Button x:Name="PickButton" Grid.Column="1" Style="{StaticResource Btn}" Margin="6,0,0,0"
+                                Click="Pick_Click" ToolTip="Then click any window on screen">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcMousePointerClick}" Width="14" Height="14" Margin="0,0,6,0" />
+                                <TextBlock x:Name="PickLabel" Text="Pick window" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="2" Style="{StaticResource BtnIcon}" Width="28" Height="28" Margin="4,0,0,0"
+                                ToolTip="Refresh the list" Click="Refresh_Click">
+                            <local:Icon Data="{StaticResource IcRefreshCw}" Width="14" Height="14" />
+                        </Button>
+                    </Grid>
+                    <ListBox x:Name="WindowList" Grid.Row="1" Style="{StaticResource List}"
+                             ItemContainerStyle="{StaticResource Row}" ItemTemplate="{StaticResource WindowRow}" />
+                    <StackPanel x:Name="WindowsEmpty" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                Margin="0,0,0,40" Visibility="Collapsed">
+                        <local:Icon Data="{StaticResource IcSearch}" Width="26" Height="26" StrokeWidth="1.5" Foreground="{DynamicResource TextFaint}" />
+                        <TextBlock Text="No window matches that filter" Style="{StaticResource Dim}" HorizontalAlignment="Center" Margin="0,10,0,0" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- ============ images ============ -->
+                <Grid x:Name="PageImage" Grid.Row="1" Margin="14,10,14,6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                            CornerRadius="{DynamicResource RadiusCard}" Padding="13,12,12,12" Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="40" Height="40" Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}"
+                                    BorderThickness="1" CornerRadius="{DynamicResource RadiusControl}" Margin="0,0,12,0">
+                                <local:Icon Data="{StaticResource IcImagePlus}" Width="18" Height="18" StrokeWidth="1.5"
+                                            Foreground="{DynamicResource Accent}" HorizontalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Pin an image" Style="{StaticResource Heading}" />
+                                <TextBlock Text="Drop a file, paste, or snip the screen" Style="{StaticResource Dim}" Margin="0,2,10,0" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="Snip_Click" ToolTip="Drag over part of the screen to pin a copy of it">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcScissors}" Width="14" Height="14" Margin="0,0,6,0" />
+                                        <TextBlock Text="Snip" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource BtnAccent}" Click="BrowseImage_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcFolderOpen}" Width="14" Height="14" StrokeWidth="1.6" Margin="0,0,6,0" />
+                                        <TextBlock Text="Browse" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid Margin="1,0,1,8">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcPin}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                <TextBlock Text="Pinned" Style="{StaticResource Heading}" />
+                                <TextBlock x:Name="ImageCount" Style="{StaticResource Dim}" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Grid>
+                        <ListBox x:Name="ImageList" Grid.Row="1" Style="{StaticResource List}"
+                                 ItemContainerStyle="{StaticResource Row}" ItemTemplate="{StaticResource ImageRow}" />
+                        <StackPanel x:Name="ImagesEmpty" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,24">
+                            <local:Icon Data="{StaticResource IcImages}" Width="30" Height="30" StrokeWidth="1.5" Foreground="{DynamicResource TextFaint}" />
+                            <TextBlock Text="Nothing pinned yet" Style="{StaticResource Dim}" HorizontalAlignment="Center" Margin="0,11,0,0" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- cheat sheet for the image windows themselves -->
+                    <Border Grid.Row="2" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="1,10,1,5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="24" />
+                                <RowDefinition Height="24" />
+                                <RowDefinition Height="24" />
+                                <RowDefinition Height="24" />
+                            </Grid.RowDefinitions>
+                            <Border Style="{StaticResource Key}"><TextBlock Text="Scroll" Style="{StaticResource KeyText}" /></Border>
+                            <TextBlock Grid.Column="1" Text="resize" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <Border Grid.Column="2" Style="{StaticResource Key}"><TextBlock Text="Ctrl+Scroll" Style="{StaticResource KeyText}" /></Border>
+                            <TextBlock Grid.Column="3" Text="opacity" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+
+                            <Border Grid.Row="1" Style="{StaticResource Key}"><TextBlock Text="Shift+Scroll" Style="{StaticResource KeyText}" /></Border>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="rotate" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource Key}"><TextBlock Text="Right-click" Style="{StaticResource KeyText}" /></Border>
+                            <TextBlock Grid.Row="1" Grid.Column="3" Text="menu" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+
+                            <Border Grid.Row="2" Style="{StaticResource Key}"><TextBlock x:Name="HintClickKey" Text="Ctrl+Alt+C" Style="{StaticResource KeyText}" /></Border>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="click-through" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <Border x:Name="HintGrabKey" Grid.Row="2" Grid.Column="2" Style="{StaticResource Key}"><TextBlock Text="Hold Ctrl+Alt" Style="{StaticResource KeyText}" /></Border>
+                            <TextBlock x:Name="HintGrabText" Grid.Row="2" Grid.Column="3" Text="grab through it" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+
+                            <Border Grid.Row="3" Style="{StaticResource Key}"><TextBlock x:Name="HintSnipKey" Text="Ctrl+Alt+S" Style="{StaticResource KeyText}" /></Border>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="snip and pin" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <Border Grid.Row="3" Grid.Column="2" Style="{StaticResource Key}"><TextBlock Text="Esc" Style="{StaticResource KeyText}" /></Border>
+                            <TextBlock Grid.Row="3" Grid.Column="3" Text="close the image" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                </Grid>
+
+                <!-- ============ auto-trace ============ -->
+                <Grid x:Name="PageTrace" Grid.Row="1" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <ScrollViewer x:Name="TraceScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                        <StackPanel Margin="14,12,6,2">
+
+                            <!-- preview -->
+                            <Border Style="{StaticResource Card}" Padding="0" Height="214">
+                                <Grid>
+                                    <local:PathPreview x:Name="Preview" Margin="12,12,12,30" Stroke="{DynamicResource Accent}" />
+                                    <StackPanel x:Name="TraceEmpty" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <local:Icon Data="{StaticResource IcPenTool}" Width="28" Height="28" StrokeWidth="1.5"
+                                                    Foreground="{DynamicResource TextFaint}" />
+                                        <TextBlock Text="Load an image to trace" Style="{StaticResource Dim}" HorizontalAlignment="Center" Margin="0,11,0,0" />
+                                        <TextBlock Text="or drop one here, or paste with Ctrl+V" Style="{StaticResource Dim}" FontSize="11"
+                                                   Foreground="{DynamicResource TextFaint}" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="TraceStats" Style="{StaticResource Dim}" FontSize="11" VerticalAlignment="Bottom"
+                                               HorizontalAlignment="Left" Margin="13,0,13,9" TextTrimming="CharacterEllipsis" />
+                                    <Button Style="{StaticResource Btn}" Height="25" VerticalAlignment="Top"
+                                            HorizontalAlignment="Right" Margin="0,9,9,0" Click="LoadTrace_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <local:Icon Data="{StaticResource IcFolderOpen}" Width="13" Height="13" Margin="0,0,6,0" />
+                                            <TextBlock Text="Load image" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                            <!-- catalog -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <Grid>
+                                        <StackPanel Orientation="Horizontal">
+                                            <local:Icon Data="{StaticResource IcImages}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                            <TextBlock Text="Catalog" Style="{StaticResource Heading}" />
+                                            <TextBlock x:Name="CatalogCount" Style="{StaticResource Dim}" Margin="8,0,0,0" />
+                                        </StackPanel>
+                                        <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="CatalogAdd_Click"
+                                                ToolTip="Add pictures to the catalog">
+                                            <StackPanel Orientation="Horizontal">
+                                                <local:Icon Data="{StaticResource IcImagePlus}" Width="13" Height="13" Margin="0,0,6,0" />
+                                                <TextBlock Text="Add" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <ScrollViewer x:Name="CatalogScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                                  Focusable="False" Margin="0,0,0,0" PreviewMouseWheel="CatalogScroll_Wheel">
+                                        <ItemsControl x:Name="CatalogList" ItemTemplate="{StaticResource CatalogTile}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                    <TextBlock x:Name="CatalogEmpty" Text="Pictures you trace are kept here, so you can come back to them in one click."
+                                               Style="{StaticResource Dim}" FontSize="11" Foreground="{DynamicResource TextFaint}" TextWrapping="Wrap" Margin="1,8,0,2" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- mode -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcPenTool}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Style" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <WrapPanel x:Name="ModeChoices" Margin="0,0,0,2">
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Outline" Tag="Outline" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Lines" Tag="Lines" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Sketch" Tag="Sketch" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Hatch" Tag="Hatch" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Shade" Tag="Shade" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Colour" Tag="Colour" Checked="Mode_Checked" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- game colours (Colour style only) -->
+                            <Border x:Name="PaletteCard" Style="{StaticResource Card}" Visibility="Collapsed">
+                                <StackPanel>
+                                    <Grid>
+                                        <StackPanel Orientation="Horizontal">
+                                            <local:Icon Data="{StaticResource IcPalette}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                            <TextBlock Text="Game colours" Style="{StaticResource Heading}" />
+                                            <TextBlock x:Name="PaletteCount" Style="{StaticResource Dim}" Margin="8,0,0,0" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button x:Name="PickColoursButton" Style="{StaticResource Btn}" Height="25" Click="PickColours_Click"
+                                                    ToolTip="Then click each colour in the game's palette">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <local:Icon Data="{StaticResource IcPipette}" Width="13" Height="13" Margin="0,0,6,0" />
+                                                    <TextBlock x:Name="PickColoursLabel" Text="Pick from screen" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Style="{StaticResource BtnIcon}" Width="25" Height="25" Margin="4,0,0,0" ToolTip="Remove all colours"
+                                                    Click="ClearPalette_Click">
+                                                <local:Icon Data="{StaticResource IcTrash}" Width="13" Height="13" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <WrapPanel x:Name="PaletteSwatches" />
+                                    <TextBlock x:Name="PaletteHint" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextFaint}" Margin="1,4,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- adjust -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcSlidersHorizontal}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Adjust" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+
+                                    <Grid x:Name="ThresholdRow" Height="27">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="ThresholdLabel" Text="Threshold" Style="{StaticResource Label}" />
+                                        <Slider x:Name="ThresholdSlider" Grid.Column="1" Minimum="0" Maximum="255" SmallChange="1" LargeChange="16"
+                                                Value="128" ValueChanged="TraceParam_Changed" />
+                                        <TextBlock x:Name="ThresholdText" Grid.Column="2" Style="{StaticResource Value}" />
+                                        <Button x:Name="AutoThresholdButton" Grid.Column="3" Style="{StaticResource Btn}" Height="22" Padding="8,0" Margin="8,0,0,0"
+                                                Content="Auto" FontSize="11" Click="AutoThreshold_Click" ToolTip="Pick the threshold that best splits this picture" />
+                                    </Grid>
+                                    <Grid Height="27" x:Name="ResolutionRow">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="52" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Detail" Style="{StaticResource Label}" />
+                                        <Slider x:Name="ScaleSlider" Grid.Column="1" Minimum="10" Maximum="200" SmallChange="5" LargeChange="10"
+                                                TickFrequency="5" IsSnapToTickEnabled="True" Value="100" ValueChanged="TraceParam_Changed" />
+                                        <TextBlock x:Name="ScaleText" Grid.Column="2" Style="{StaticResource Value}" />
+                                    </Grid>
+                                    <Grid x:Name="SpacingRow" Height="27" ToolTip="Gap between fill lines. Match it to the brush size you draw with.">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="52" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="SpacingLabel" Text="Line spacing" Style="{StaticResource Label}" />
+                                        <Slider x:Name="SpacingSlider" Grid.Column="1" Minimum="1" Maximum="40" SmallChange="1" LargeChange="2"
+                                                TickFrequency="1" IsSnapToTickEnabled="True" Value="4" ValueChanged="TraceParam_Changed" />
+                                        <TextBlock x:Name="SpacingText" Grid.Column="2" Style="{StaticResource Value}" />
+                                    </Grid>
+                                    <Grid x:Name="BucketRow" Height="31"
+                                          ToolTip="Outlines big areas, then fills each one with a single click of the game's paint bucket. Much faster than hatching.">
+                                        <TextBlock Text="Fill with bucket" Style="{StaticResource Label}" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button x:Name="PickToolsButton" Style="{StaticResource Btn}" Height="25" Margin="0,0,10,0" Click="PickTools_Click"
+                                                    ToolTip="Click the game's brush, then its bucket">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <local:Icon Data="{StaticResource IcPipette}" Width="13" Height="13" Margin="0,0,6,0" />
+                                                    <TextBlock x:Name="PickToolsLabel" Text="Pick brush and bucket" />
+                                                </StackPanel>
+                                            </Button>
+                                            <ToggleButton x:Name="BucketSwitch" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="BucketSwitch_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid x:Name="InvertRow" Height="29" ToolTip="Draw the light areas instead of the dark ones">
+                                        <TextBlock Text="Invert" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="InvertSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="TraceSwitch_Click" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- drawing -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <Grid>
+                                        <StackPanel Orientation="Horizontal">
+                                            <local:Icon Data="{StaticResource IcGauge}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                            <TextBlock Text="Drawing" Style="{StaticResource Heading}" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="EstimateText" Style="{StaticResource Dim}" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31">
+                                        <TextBlock Text="Speed" Style="{StaticResource Label}" />
+                                        <StackPanel x:Name="SpeedChoices" Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton Style="{StaticResource Seg}" GroupName="Speed" Content="Optimized" Tag="Optimized" Checked="Speed_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" GroupName="Speed" Content="Careful" Tag="Careful" Checked="Speed_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" GroupName="Speed" Content="Fast" Tag="Fast" Checked="Speed_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" GroupName="Speed" Content="Instant" Tag="Instant" Checked="Speed_Checked" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock x:Name="SpeedHint" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextFaint}" Margin="1,0,0,6" />
+                                    <Grid Height="31" ToolTip="Time to click into the drawing program after pressing Draw">
+                                        <TextBlock Text="Countdown" Style="{StaticResource Label}" />
+                                        <StackPanel x:Name="CountdownChoices" Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton Style="{StaticResource Seg}" GroupName="Countdown" Content="Off" Tag="0" Checked="Countdown_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" GroupName="Countdown" Content="1 s" Tag="1" Checked="Countdown_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" GroupName="Countdown" Content="3 s" Tag="3" Checked="Countdown_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" GroupName="Countdown" Content="5 s" Tag="5" Checked="Countdown_Checked" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- how to stop -->
+                            <Grid Margin="2,1,8,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <local:Icon Data="{StaticResource IcInfo}" Width="13" Height="13" Foreground="{DynamicResource TextFaint}"
+                                            VerticalAlignment="Top" Margin="0,2,7,0" />
+                                <TextBlock x:Name="SafetyText" Grid.Column="1" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextFaint}" />
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- action bar -->
+                    <Border Grid.Row="1" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="14,10,14,10">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="SetAreaButton" Style="{StaticResource Btn}" Click="SetArea_Click"
+                                        ToolTip="Drag a rectangle on screen where the drawing should go">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcSquareDashedMousePointer}" Width="14" Height="14" Margin="0,0,6,0" />
+                                        <TextBlock Text="Set area" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock x:Name="AreaText" Grid.Column="1" Text="No area chosen" Style="{StaticResource Dim}" Margin="10,0,6,0"
+                                           TextTrimming="CharacterEllipsis" />
+                                <Button x:Name="TestButton" Grid.Column="2" Style="{StaticResource Btn}" Margin="0,0,6,0"
+                                        Click="TestBox_Click" ToolTip="Draw only the border of the area, to check placement first">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcSquareDashed}" Width="14" Height="14" Margin="0,0,6,0" />
+                                        <TextBlock Text="Test box" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="PauseButton" Grid.Column="3" Style="{StaticResource Btn}" Margin="0,0,6,0" MinWidth="84"
+                                        Click="Pause_Click" Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon x:Name="PauseIcon" Data="{StaticResource IcPause}" Width="14" Height="14" Margin="0,0,6,0" />
+                                        <TextBlock x:Name="PauseLabel" Text="Pause" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="DrawButton" Grid.Column="4" Style="{StaticResource BtnAccent}" MinWidth="84" Click="Draw_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon x:Name="DrawIcon" Data="{StaticResource IcPencil}" Width="14" Height="14" StrokeWidth="1.6" Margin="0,0,6,0" />
+                                        <TextBlock x:Name="DrawLabel" Text="Draw" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <Grid x:Name="ProgressRow" Margin="0,10,0,0" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ProgressBar x:Name="DrawProgress" Minimum="0" Maximum="1" VerticalAlignment="Center" />
+                                <TextBlock x:Name="EtaText" Grid.Column="1" Style="{StaticResource Dim}" Margin="10,0,0,0" MinWidth="78"
+                                           TextAlignment="Right" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- ============ settings ============ -->
+                <ScrollViewer x:Name="PageSettings" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                    <StackPanel Margin="14,12,6,6">
+
+                        <!-- appearance -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcPalette}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                    <TextBlock Text="Appearance" Style="{StaticResource Heading}" />
+                                </StackPanel>
+                                <Border Style="{StaticResource Rule}" />
+                                <Grid Height="34">
+                                    <TextBlock Text="Accent" Style="{StaticResource Label}" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <StackPanel x:Name="AccentSwatches" Orientation="Horizontal" VerticalAlignment="Center" />
+                                        <RadioButton x:Name="WheelSwatch" Style="{StaticResource Swatch}" GroupName="Accent" ToolTip="Any colour"
+                                                     Click="WheelSwatch_Click" />
+                                        <Popup x:Name="WheelPopup" PlacementTarget="{Binding ElementName=WheelSwatch}" Placement="Bottom"
+                                               HorizontalOffset="-150" VerticalOffset="6" StaysOpen="False" AllowsTransparency="True"
+                                               PopupAnimation="Fade" Closed="WheelPopup_Closed">
+                                            <Grid Margin="10">
+                                                <Border Background="{DynamicResource Shadow}" CornerRadius="{DynamicResource RadiusCard}" Opacity="0.55">
+                                                    <Border.Effect>
+                                                        <BlurEffect Radius="12" />
+                                                    </Border.Effect>
+                                                </Border>
+                                                <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource LineStrong}" BorderThickness="1"
+                                                        CornerRadius="{DynamicResource RadiusCard}" Padding="14">
+                                                    <StackPanel Width="184">
+                                                        <local:ColorWheel x:Name="Wheel" Width="176" Height="176" HorizontalAlignment="Center" />
+                                                        <Grid Margin="0,14,0,0">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <local:Icon Data="{StaticResource IcContrast}" Width="13" Height="13"
+                                                                        Foreground="{DynamicResource TextDim}" Margin="0,0,10,0" ToolTip="Brightness" />
+                                                            <Slider x:Name="BrightnessSlider" Grid.Column="1" Minimum="20" Maximum="100" SmallChange="1"
+                                                                    LargeChange="10" Value="100" ValueChanged="Brightness_Changed" />
+                                                        </Grid>
+                                                        <Grid Margin="0,12,0,0">
+                                                            <Border x:Name="WheelPreview" Width="26" Height="26" CornerRadius="{DynamicResource RadiusSmall}"
+                                                                    HorizontalAlignment="Left" BorderBrush="{DynamicResource LineStrong}" BorderThickness="1" />
+                                                            <TextBlock x:Name="WheelHex" Style="{StaticResource Value}" FontSize="12.5" />
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+                                        </Popup>
+                                        <TextBox x:Name="AccentHexBox" Style="{StaticResource TextField}" Width="88" Height="26" MaxLength="7"
+                                                 Margin="3,0,0,0" ToolTip="Any colour, as hex. Press Enter to apply."
+                                                 KeyDown="AccentHex_KeyDown" LostKeyboardFocus="AccentHex_LostFocus" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Height="34">
+                                    <TextBlock Text="Mode" Style="{StaticResource Label}" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <RadioButton x:Name="ModeDark" Style="{StaticResource Seg}" GroupName="ThemeMode" Tag="Dark" Checked="ThemeMode_Checked" Content="Dark" />
+                                        <RadioButton x:Name="ModeLight" Style="{StaticResource Seg}" GroupName="ThemeMode" Tag="Light" Checked="ThemeMode_Checked" Content="Light" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Height="34">
+                                    <TextBlock Text="Theme" Style="{StaticResource Label}" />
+                                    <Button x:Name="ThemeButton" Style="{StaticResource Btn}" Height="26" MinWidth="190" HorizontalAlignment="Right"
+                                            HorizontalContentAlignment="Stretch" Padding="8,0" Click="ThemeButton_Click">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="ThemeName" Grid.Column="1" VerticalAlignment="Center" />
+                                            <local:Icon Grid.Column="2" Data="{StaticResource IcChevronRight}" Width="11" Height="11" Margin="10,0,0,0"
+                                                        RenderTransformOrigin="0.5,0.5">
+                                                <local:Icon.RenderTransform><RotateTransform Angle="90" /></local:Icon.RenderTransform>
+                                            </local:Icon>
+                                        </Grid>
+                                    </Button>
+                                </Grid>
+                                <Grid Height="34" ToolTip="Makes the whole window and its text bigger. Drag the bottom-right corner to resize the window itself.">
+                                    <TextBlock Text="Size" Style="{StaticResource Label}" />
+                                    <StackPanel x:Name="ScaleChoices" Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <RadioButton Style="{StaticResource Seg}" GroupName="Scale" Content="90%" Tag="90" Checked="Scale_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" GroupName="Scale" Content="100%" Tag="100" Checked="Scale_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" GroupName="Scale" Content="115%" Tag="115" Checked="Scale_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" GroupName="Scale" Content="130%" Tag="130" Checked="Scale_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" GroupName="Scale" Content="150%" Tag="150" Checked="Scale_Checked" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- hotkeys -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcKeyboard}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Hotkeys" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    
+                                </Grid>
+                                <Border Style="{StaticResource Rule}" />
+                                <Grid Height="31">
+                                    <TextBlock Text="Capture a region" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkRegionButton" Style="{StaticResource Btn}" Tag="HotkeyRegion" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Capture the active window" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkWindowButton" Style="{StaticResource Btn}" Tag="HotkeyWindow" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Capture the full screen" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkScreenButton" Style="{StaticResource Btn}" Tag="HotkeyScreen" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Record a GIF (press again to stop)" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkGifButton" Style="{StaticResource Btn}" Tag="HotkeyGif" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Text from screen" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkTextButton" Style="{StaticResource Btn}" Tag="HotkeyText" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Colour picker" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkColourButton" Style="{StaticResource Btn}" Tag="HotkeyColour" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Recent captures, to drag into other apps" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkRecentButton" Style="{StaticResource Btn}" Tag="HotkeyRecent" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Border Style="{StaticResource Rule}" Margin="0,4,0,4" />
+                                <Grid Height="31">
+                                    <TextBlock Text="Pin the window under the mouse" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkPinButton" Style="{StaticResource Btn}" Tag="HotkeyPin" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Raise opacity" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkUpButton" Style="{StaticResource Btn}" Tag="HotkeyOpacityUp" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Lower opacity" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkDownButton" Style="{StaticResource Btn}" Tag="HotkeyOpacityDown" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Toggle click-through" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkClickButton" Style="{StaticResource Btn}" Tag="HotkeyClickThrough" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Snip part of the screen and pin it" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkSnipButton" Style="{StaticResource Btn}" Tag="HotkeySnip" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Start drawing in the chosen area" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkDrawButton" Style="{StaticResource Btn}" Tag="HotkeyDraw" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Pause or resume drawing" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkPauseButton" Style="{StaticResource Btn}" Tag="HotkeyPause" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Stop drawing" Style="{StaticResource Label}" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Border Style="{StaticResource Key}"><TextBlock Text="Esc" Style="{StaticResource KeyText}" /></Border>
+                                        <TextBlock Text="or" Style="{StaticResource Dim}" Margin="0,0,8,0" />
+                                        <Button x:Name="HkAbortButton" Style="{StaticResource Btn}" Tag="HotkeyAbort" MinWidth="124" Height="25"
+                                                Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- general -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcSlidersHorizontal}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                    <TextBlock Text="General" Style="{StaticResource Heading}" />
+                                </StackPanel>
+                                <Border Style="{StaticResource Rule}" />
+                                <Grid Height="31">
+                                    <TextBlock Text="Keep running in the tray when closed" Style="{StaticResource Label}" />
+                                    <ToggleButton x:Name="CloseToTraySwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                                  Click="GeneralSwitch_Click" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Start with Windows, in the tray" Style="{StaticResource Label}" />
+                                    <ToggleButton x:Name="StartupSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                                  Click="StartupSwitch_Click" />
+                                </Grid>
+                                <Grid Height="31" ToolTip="Pinned images come back where they were the next time the app starts">
+                                    <TextBlock Text="Bring pinned images back on start" Style="{StaticResource Label}" />
+                                    <ToggleButton x:Name="RestoreImagesSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                                  Click="GeneralSwitch_Click" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Keep this window above others" Style="{StaticResource Label}" />
+                                    <ToggleButton x:Name="AlwaysOnTopSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                                  Click="GeneralSwitch_Click" />
+                                </Grid>
+                                <Grid Height="31" ToolTip="While held, click-through images can be dragged, scrolled and right-clicked">
+                                    <TextBlock Text="Hold Ctrl+Alt to grab click-through images" Style="{StaticResource Label}" />
+                                    <ToggleButton x:Name="GrabSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                                  Click="GeneralSwitch_Click" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Put every changed window back" Style="{StaticResource Label}" />
+                                    <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="RestoreAll_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <local:Icon Data="{StaticResource IcUndo2}" Width="13" Height="13" Margin="0,0,6,0" />
+                                            <TextBlock Text="Restore all" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Colours, hotkeys and sliders back to defaults" Style="{StaticResource Label}" />
+                                    <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="ResetSettings_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <local:Icon Data="{StaticResource IcRotateCcw}" Width="13" Height="13" Margin="0,0,6,0" />
+                                            <TextBlock Text="Reset" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- about -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcInfo}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="About" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="AboutVersion" Style="{StaticResource Dim}" HorizontalAlignment="Right" />
+                                </Grid>
+                                <Border Style="{StaticResource Rule}" />
+                                <TextBlock Text="Icons by Lucide (ISC License)." Style="{StaticResource Dim}" Margin="0,0,0,0" TextWrapping="Wrap" />
+                                <Grid Height="31" Margin="0,8,0,0" ToolTip="If Overskin ever crashes it saves a short report here: attach it to a bug report">
+                                    <TextBlock Text="Crash reports" Style="{StaticResource Label}" />
+                                    <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="OpenCrashLogs_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <local:Icon Data="{StaticResource IcFileText}" Width="13" Height="13" Margin="0,0,6,0" />
+                                            <TextBlock Text="Open folder" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="SettingsPathText" Style="{StaticResource Dim}" FontSize="10.5" TextTrimming="CharacterEllipsis"
+                                               Foreground="{DynamicResource TextFaint}" Margin="0,0,10,0" />
+                                    <Button Grid.Column="1" Style="{StaticResource Btn}" Height="25" Click="OpenSettingsFolder_Click"
+                                            ToolTip="Show the settings file in Explorer">
+                                        <StackPanel Orientation="Horizontal">
+                                            <local:Icon Data="{StaticResource IcFolderOpen}" Width="13" Height="13" Margin="0,0,6,0" />
+                                            <TextBlock Text="Open folder" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ============ status bar ============ -->
+                <Border Grid.Row="2" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0">
+                    <Grid Margin="16,0,16,1">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border x:Name="StatusDot" Width="6" Height="6" CornerRadius="{DynamicResource RadiusBar}"
+                                    Background="{DynamicResource TextFaint}" Margin="0,1,8,0" />
+                            <TextBlock x:Name="StatusText" Style="{StaticResource Dim}" FontSize="11" />
+                        </StackPanel>
+                        <TextBlock x:Name="VersionText" Style="{StaticResource Dim}" FontSize="11" Foreground="{DynamicResource TextFaint}"
+                                   HorizontalAlignment="Right" Margin="0,0,14,0" />
+                        <Thumb x:Name="ResizeGrip" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-12,2"
+                               Width="14" Height="14" Cursor="SizeNWSE" ToolTip="Drag to resize"
+                               DragDelta="ResizeGrip_DragDelta" DragCompleted="ResizeGrip_DragCompleted">
+                            <Thumb.Template>
+                                <ControlTemplate TargetType="Thumb">
+                                    <Grid Background="Transparent">
+                                        <Path Data="M 12 4 L 4 12 M 12 8 L 8 12" Stroke="{DynamicResource TextFaint}" StrokeThickness="1.2"
+                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                    </Grid>
+                                </ControlTemplate>
+                            </Thumb.Template>
+                        </Thumb>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
