@@ -399,6 +399,50 @@ public partial class App : Application
             };
             var got = Redaction.FindPrivate(more, Overskin.Shared.PrivateKinds.All);
             log.Add($"private details, harder: {string.Join(", ", got.Select(f => f.Kind))} (expect card number, expiry date, security code, IP address x2, folder path x2, street address, place(s), street address, place, country; not 12:30:45)");
+            // live text in the editor: select words, copy them, erase them
+            {
+                var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(300, 80, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                var dv = new System.Windows.Media.DrawingVisual();
+                using (var dc = dv.RenderOpen())
+                {
+                    dc.DrawRectangle(System.Windows.Media.Brushes.White, null, new Rect(0, 0, 300, 80));
+                    dc.DrawRectangle(System.Windows.Media.Brushes.Black, null, new Rect(20, 20, 60, 14));
+                    dc.DrawRectangle(System.Windows.Media.Brushes.Black, null, new Rect(90, 20, 60, 14));
+                    dc.DrawRectangle(System.Windows.Media.Brushes.Black, null, new Rect(20, 50, 80, 14));
+                }
+                rtb.Render(dv);
+                var livePage = ImageLoader.Normalize(rtb);
+                var ed = new EditorWindow(livePage, null, "test", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { }, Trace = _ => { } });
+                var text = ed.SelectWordsForTest(new List<OcrWord>
+                {
+                    new("Hello", new Rect(20, 20, 60, 14)), new("there", new Rect(90, 20, 60, 14)), new("friend", new Rect(20, 50, 80, 14)),
+                }, 0, 2);
+                var erase = ed.EraseSelectedForTest();
+                for (int spin = 0; !erase.IsCompleted && spin < 300; spin++) { DoEvents(); Thread.Sleep(20); }
+                var px = new byte[4];
+                ed.BaseForTest.CopyPixels(new Int32Rect(50, 27, 1, 1), px, 4, 0);
+                log.Add($"live text: selected \"{text.Replace("\n", " / ")}\" (expect Hello there / friend); erased pixel={px[0]},{px[1]},{px[2]} (expect near white); erase finished={erase.IsCompleted}");
+                ed.CloseForTest();
+            }
+            // the step recorder names what was clicked from the words there, for apps that don't say
+            {
+                var shopShot = new System.Windows.Media.Imaging.RenderTargetBitmap(500, 220, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                var sv = new System.Windows.Media.DrawingVisual();
+                using (var dc = sv.RenderOpen())
+                {
+                    dc.DrawRectangle(new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 40, 80)), null, new Rect(0, 0, 500, 220));
+                    dc.DrawRectangle(new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(250, 200, 40)), null, new Rect(180, 80, 140, 56));
+                    dc.DrawText(new System.Windows.Media.FormattedText("Shop", System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                        new System.Windows.Media.Typeface("Segoe UI Semibold"), 30, System.Windows.Media.Brushes.Black, 1), new Point(218, 88));
+                    dc.DrawText(new System.Windows.Media.FormattedText("Locker      Battle Pass", System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                        new System.Windows.Media.Typeface("Segoe UI"), 22, System.Windows.Media.Brushes.White, 1), new Point(40, 20));
+                }
+                shopShot.Render(sv);
+                var shotPlain = ImageLoader.Normalize(shopShot);
+                var said = Task.Run(() => StepRecorder.TextAt(shotPlain, new Point(250, 108))).GetAwaiter().GetResult();
+                var step = new RecordedStep { Shot = shotPlain, At = new Point(250, 108), Right = false, Window = "Fortnite", Target = said == null ? null : $"“{said}”", TargetIsText = said != null };
+                log.Add($"step named from the screen: \"{StepTutorial.Caption(step)}\" (expect Click “Shop” in Fortnite)");
+            }
             var noCard = Redaction.FindPrivate(new List<List<OcrWord>> { L(0, "Meeting", "12/28", "CVV", "123") }, Overskin.Shared.PrivateKinds.All);
             var off = Redaction.FindPrivate(more, Overskin.Shared.PrivateKinds.Emails);
             log.Add($"private details without a card: {noCard.Count} (expect 0); with only emails switched on: {off.Count} (expect 0)");

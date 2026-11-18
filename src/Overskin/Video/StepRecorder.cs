@@ -20,6 +20,10 @@ public sealed class RecordedStep
     public required bool Right { get; init; }
     public required string Window { get; init; }
     public string? Target { get; set; }
+    /// <summary>True when <see cref="Target"/> is text read off the screen rather than a control's name.</summary>
+    public bool TargetIsText { get; set; }
+    /// <summary>Finding out what was clicked, which can take a moment.</summary>
+    public Task? Naming { get; set; }
 }
 
 /// <summary>
@@ -79,6 +83,9 @@ public sealed class StepRecorder : IRecorder
         _clock.Stop();
         _bar?.Close();
         _bar = null;
+        // let the last steps finish finding out what was clicked
+        var naming = _steps.Select(s => s.Naming).OfType<Task>().ToArray();
+        if (keep && naming.Length > 0) Task.WaitAll(naming, TimeSpan.FromSeconds(4));
         Finished?.Invoke(keep && _steps.Count > 0 ? new List<RecordedStep>(_steps) : null);
     }
 
@@ -121,9 +128,63 @@ public sealed class StepRecorder : IRecorder
         };
         _steps.Add(step);
 
-        // what was clicked, looked up away from the hook (it can take a moment)
+        // what was clicked, looked up away from the hook (it can take a moment): the control's own
+        // name if the program gives one, otherwise the words on screen right where the click landed
+        // (games and custom-drawn apps only ever say their own name)
         var point = new Point(pt.X, pt.Y);
-        Task.Run(() => step.Target = ElementName(point));
+        step.Naming = Task.Run(async () =>
+        {
+            var (name, label) = ElementName(point);
+            bool useful = label != null && !SameAsWindow(name, step.Window);
+            if (useful) { step.Target = label; return; }
+            if (await TextAt(step.Shot, step.At) is { } text) { step.Target = $"“{text}”"; step.TargetIsText = true; }
+        });
+    }
+
+    private static bool SameAsWindow(string? name, string window) =>
+        string.IsNullOrWhiteSpace(name) || name.Contains(window, StringComparison.OrdinalIgnoreCase) || window.Contains(name, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The words under or right next to a click, read off the screenshot: the short line of text
+    /// the click is on (a button's label), or the nearest word on a longer line.
+    /// </summary>
+    public static async Task<string?> TextAt(BitmapSource shot, Point at)
+    {
+        try
+        {
+            // a strip around the click reads faster and better than the whole window
+            int w = Math.Min(shot.PixelWidth, 520), h = Math.Min(shot.PixelHeight, 200);
+            int x = (int)Math.Clamp(at.X - w / 2, 0, shot.PixelWidth - w), y = (int)Math.Clamp(at.Y - h / 2, 0, shot.PixelHeight - h);
+            var crop = new CroppedBitmap(shot, new Int32Rect(x, y, w, h));
+            crop.Freeze();
+            var lines = await TextRecognizer.RecognizeLinesAsync(crop);
+            if (lines == null || lines.Count == 0) return null;
+            var click = new Point(at.X - x, at.Y - y);
+
+            double Distance(Rect r)
+            {
+                double dx = click.X < r.Left ? r.Left - click.X : click.X > r.Right ? click.X - r.Right : 0;
+                double dy = click.Y < r.Top ? r.Top - click.Y : click.Y > r.Bottom ? click.Y - r.Bottom : 0;
+                return Math.Sqrt(dx * dx + dy * dy * 2);
+            }
+            var best = lines.Select(l =>
+            {
+                var r = Rect.Empty;
+                foreach (var word in l) r.Union(word.Bounds);
+                return (Words: l, Box: r, Distance: Distance(r));
+            }).OrderBy(l => l.Distance).First();
+            if (best.Distance > Math.Max(36, best.Box.Height * 2.2)) return null;
+
+            string text = best.Words.Count <= 5
+                ? string.Join(" ", best.Words.Select(word => word.Text))
+                : best.Words.OrderBy(word => Distance(word.Bounds)).First().Text;
+            text = text.Trim().Trim('.', ',', ':', ';', '|');
+            return text.Length is >= 2 and <= 48 && text.Any(char.IsLetterOrDigit) ? text : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static bool IsDesktopWindow(IntPtr h) => ClassName(h) is "Progman" or "WorkerW" or "Shell_TrayWnd";
@@ -139,14 +200,14 @@ public sealed class StepRecorder : IRecorder
         return title.Length == 0 ? "the window" : title;
     }
 
-    /// <summary>"the Save button", or null when the program doesn't say.</summary>
-    private static string? ElementName(Point screen)
+    /// <summary>The control's own name, and "“Save” button" for the caption; nulls when the program doesn't say.</summary>
+    private static (string? Name, string? Label) ElementName(Point screen)
     {
         try
         {
             var element = AutomationElement.FromPoint(screen);
             string name = element.Current.Name?.Trim() ?? "";
-            if (name.Length == 0 || name.Length > 60) return null;
+            if (name.Length == 0 || name.Length > 60) return (null, null);
             string type = element.Current.ControlType.ProgrammaticName.Replace("ControlType.", "");
             string kind = type switch
             {
@@ -154,11 +215,11 @@ public sealed class StepRecorder : IRecorder
                 "CheckBox" => "check box", "RadioButton" => "option", "ListItem" or "TreeItem" or "DataItem" => "item",
                 "Edit" or "Document" => "box", "ComboBox" => "list", _ => "",
             };
-            return kind.Length > 0 ? $"“{name}” {kind}" : $"“{name}”";
+            return (name, kind.Length > 0 ? $"“{name}” {kind}" : $"“{name}”");
         }
         catch
         {
-            return null;
+            return (null, null);
         }
     }
 
@@ -169,10 +230,21 @@ public sealed class StepRecorder : IRecorder
 /// <summary>Lays recorded steps out as one numbered tutorial picture.</summary>
 public static class StepTutorial
 {
+    /// <summary>A classic arrow pointer with its tip at (0, 0).</summary>
+    private static readonly Geometry PointerShape = MakePointer();
+
+    private static Geometry MakePointer()
+    {
+        var g = Geometry.Parse("M0,0 L0,19 L4.6,14.8 L7.8,22 L11,20.6 L7.9,13.6 L14,13.6 Z");
+        g.Freeze();
+        return g;
+    }
+
     public static string Caption(RecordedStep s)
     {
         string verb = s.Right ? "Right-click" : "Click";
-        return s.Target != null ? $"{verb} the {s.Target} in {s.Window}" : $"{verb} in {s.Window}";
+        if (s.Target == null) return $"{verb} in {s.Window}";
+        return s.TargetIsText ? $"{verb} {s.Target} in {s.Window}" : $"{verb} the {s.Target} in {s.Window}";
     }
 
     public static BitmapSource Build(IReadOnlyList<RecordedStep> steps, Color accent)
@@ -227,6 +299,10 @@ public static class StepTutorial
                 var at = new Point(rect.X + steps[i].At.X * scale, rect.Y + steps[i].At.Y * scale);
                 dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(0x40, accent.R, accent.G, accent.B)), null, at, 26, 26);
                 dc.DrawEllipse(null, new Pen(accentBrush, 3.5), at, 17, 17);
+                // and a pointer in the middle, its tip on the spot, as if someone is clicking it
+                dc.PushTransform(new TranslateTransform(at.X, at.Y));
+                dc.DrawGeometry(Brushes.White, new Pen(Brushes.Black, 1.4) { LineJoin = PenLineJoin.Round }, PointerShape);
+                dc.Pop();
             }
         }
         var rtb = new RenderTargetBitmap((int)Math.Ceiling(Width + 2 * Margin), (int)Math.Ceiling(height), 96, 96, PixelFormats.Pbgra32);

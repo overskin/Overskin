@@ -121,6 +121,7 @@ public partial class EditorWindow : Window
         Doc.Height = Shadow.Height = _base.PixelHeight;
         SizeText.Text = $"{_base.PixelWidth} × {_base.PixelHeight}";
         UpdateZoom();
+        if (_wordsFor != _base) PictureChanged();
     }
 
     private double _zoom = 1;
@@ -245,7 +246,7 @@ public partial class EditorWindow : Window
         };
         HintText.Text = tool switch
         {
-            Tool.Select => "Drag a mark to move it, or its white handles to resize. Right-click for more. Ctrl+scroll zooms.",
+            Tool.Select => "Drag over text to select it (Ctrl+C copies, Delete erases it). Drag a mark to move it. Right-click for more.",
             Tool.Arrow or Tool.Line => "Drag to draw. Hold Shift for straight angles.",
             Tool.Rectangle or Tool.Ellipse => "Drag to draw. Hold Shift for a square or circle.",
             Tool.Pen => "Drag to draw freehand.",
@@ -378,6 +379,13 @@ public partial class EditorWindow : Window
                     BeginText(hit.Points[0], hit);
                     return;
                 }
+                if (hit == null && TryBeginTextSelect(p))
+                {
+                    _selected = null;
+                    ShowSelection();
+                    return;
+                }
+                ClearTextSelection();
                 _selected = hit;
                 ShowSelection();
                 if (hit != null)
@@ -442,7 +450,13 @@ public partial class EditorWindow : Window
 
     private void Doc_MouseMove(object sender, MouseEventArgs e)
     {
-        if (!_down) return;
+        if (_textDragging) { DragTextSelect(e.GetPosition(Doc)); return; }
+        if (!_down)
+        {
+            // over a word, the Select tool shows the text cursor
+            if (_tool == Tool.Select) Doc.Cursor = WordAt(e.GetPosition(Doc)) >= 0 && HitTest(e.GetPosition(Doc)) == null ? Cursors.IBeam : Cursors.Arrow;
+            return;
+        }
         var p = e.GetPosition(Doc);
 
         if (_tool == Tool.Select)
@@ -506,6 +520,7 @@ public partial class EditorWindow : Window
 
     private void Doc_MouseUp(object sender, MouseButtonEventArgs e)
     {
+        if (_textDragging) { EndTextSelect(); return; }
         if (!_down) return;
         _down = false;
         Doc.ReleaseMouseCapture();
@@ -631,6 +646,7 @@ public partial class EditorWindow : Window
     {
         base.OnPreviewMouseRightButtonUp(e);
         if (!Doc.IsMouseOver) return;
+        if (ShowTextMenu(e.GetPosition(Doc))) { e.Handled = true; return; }
         var hit = HitTest(e.GetPosition(Doc));
         if (hit == null) return;
         e.Handled = true;
@@ -828,11 +844,15 @@ public partial class EditorWindow : Window
             Key.Z when ctrl && shift => Redo,
             Key.Z when ctrl => Undo,
             Key.Y when ctrl => Redo,
+            Key.C when ctrl && HasTextSelection => CopySelectedText,
+            Key.C when ctrl && shift => () => CopyAllText_Click(this, new RoutedEventArgs()),
             Key.C when ctrl => () => Copy_Click(this, new RoutedEventArgs()),
+            Key.A when ctrl && _tool == Tool.Select => SelectAllText,
+            Key.Delete or Key.Back when HasTextSelection && _selected == null => () => _ = EraseSelectedTextAsync(),
             Key.S when ctrl && shift => () => SaveAs_Click(this, new RoutedEventArgs()),
             Key.S when ctrl => () => Save_Click(this, new RoutedEventArgs()),
             Key.Delete or Key.Back when _selected != null => DeleteSelected,
-            Key.Escape => () => { _selected = null; ShowSelection(); },
+            Key.Escape => () => { _selected = null; ShowSelection(); ClearTextSelection(); },
             Key.D0 or Key.NumPad0 when ctrl => () => SetZoom(FitZoom, true),
             Key.D1 or Key.NumPad1 when ctrl => () => SetZoom(1, false),
             Key.OemPlus or Key.Add when ctrl => () => SetZoom(_zoom * 1.25, false),

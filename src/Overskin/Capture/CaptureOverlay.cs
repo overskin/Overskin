@@ -179,6 +179,13 @@ public sealed class CaptureOverlay : Window
             _toolbar.Changed += () => { Update(CursorPos()); Focus(); };
             _toolbar.UndoRequested += Undo;
             _toolbar.CloseRequested += Close;
+            _toolbar.PickFromScreenRequested += () =>
+            {
+                _pickingColour = true;
+                Cursor = Cursors.Cross;
+                Toast.Show("Click anywhere to take its colour");
+                Focus();
+            };
             _canvas.Children.Add(_toolbar);
         }
         Content = _canvas;
@@ -544,9 +551,21 @@ public sealed class CaptureOverlay : Window
 
     protected override void OnMouseMove(MouseEventArgs e) => Update(CursorPos());
 
+    private bool _pickingColour;
+
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         if (_toolbar?.IsMouseOver == true) return;
+        if (_pickingColour && _toolbar != null)
+        {
+            // the colour under the click, from the frozen screen
+            _pickingColour = false;
+            Toast.Hide();
+            _toolbar.SetColour(PixelAt(CursorPos()));
+            if (Tool == CaptureTool.None) _toolbar.SetTool(CaptureTool.Pen);
+            e.Handled = true;
+            return;
+        }
         _start = CursorPos();
         if (Tool != CaptureTool.None)
         {
@@ -621,8 +640,11 @@ public sealed class CaptureOverlay : Window
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        // typing a colour code in the colour popup isn't a shortcut
+        if (Keyboard.FocusedElement is TextBox) return;
         if (e.Key == Key.Escape)
         {
+            if (_pickingColour) { _pickingColour = false; Toast.Hide(); return; }
             Close();
             return;
         }

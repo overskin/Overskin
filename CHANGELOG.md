@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Live text in the editor**: with the Select tool (V), drag over the words in a screenshot to
+  select them like in a PDF. Ctrl+C copies them, Delete erases them (smart erase fills in from
+  around them), and right-click can also hide them. Ctrl+A selects all the text.
+- **Copy text** button in the editor (Ctrl+Shift+C): every word in the picture onto the
+  clipboard, with a message saying so.
+- **Opacity** slider next to size in the editor, for every mark (hidden areas stay solid).
+- **Capture toolbar colours**: the full palette, a colour wheel with brightness, a colour code
+  box, and Pick, which takes a colour from anywhere on the frozen screen.
+- **Step recorder**: each click shows a pointer in its circle, and in apps and games that don't
+  name their buttons the step reads the words where you clicked ("Click “Shop” in Fortnite").
 - **Auto-hide** finds more and misses less: card numbers that the text reader garbles
   (1s read as l or I, or a line it skips), the card's expiry date and security code when
   the number is there too, IPv6 addresses, folder paths, street addresses, cities, states,

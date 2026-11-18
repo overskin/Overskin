@@ -99,12 +99,17 @@ Capture → **Recording** has the Video and GIF buttons and every video setting.
 ## Edit
 
 Arrows, boxes, ellipses, lines, pen, highlighter, text, numbered steps, hide and crop. Nine
-colours, adjustable size, undo and redo, and keyboard shortcuts for every tool (A, R, E, L, P,
-H, T, N, B, X, C, V). Copy, save, pin or trace the result.
+colours plus a colour wheel, adjustable size and opacity, undo and redo, and keyboard shortcuts
+for every tool (A, R, E, L, P, H, T, N, B, X, C, V). Copy, save, pin or trace the result.
+
+- **Live text**: with the Select tool (V), drag over the words in a screenshot to select them,
+  like in a PDF. Ctrl+C copies them, Delete erases them (filled in from what's around them), and
+  right-click can also hide them. **Copy text** (Ctrl+Shift+C) copies every word in the picture.
 
 - **Hide** (B): blur, pixelate or mosaic, with the size slider setting how coarse it is.
-  **Auto-hide** reads the picture and hides every email, phone number, card number, IP
-  address and key it finds. Turn on *Hide private details automatically* (Capture page) to
+  **Auto-hide** reads the picture and hides every email, phone number, card number (with its
+  expiry date and security code), IP address, key, folder path and street address it finds;
+  right-click it to choose which, including cities, states, postcodes and countries. Turn on *Hide private details automatically* (Capture page) to
   do that to every screenshot before it's copied or saved.
 - **Smart erase** (X): paint over text, an icon or a person and it's filled in from what's
   around it. Best on plain or gently shaded backgrounds, which is most of a screenshot.

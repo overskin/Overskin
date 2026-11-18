@@ -154,16 +154,19 @@
                         </Popup>
 
                         <Border Style="{StaticResource ToolSep}" />
-                        <local:Icon Data="{StaticResource IcCircle}" Width="9" Height="9" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
-                        <Slider x:Name="SizeSlider" Width="96" Minimum="1" Maximum="12" SmallChange="1" LargeChange="1"
-                                TickFrequency="1" IsSnapToTickEnabled="True" Value="3" ValueChanged="Size_Changed" />
-                        <local:Icon Data="{StaticResource IcCircle}" Width="15" Height="15" Foreground="{DynamicResource TextDim}" Margin="8,0,0,0" />
-                        <local:Icon Data="{StaticResource IcDroplet}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="14,0,8,0"
+                        <!-- size and opacity stay together when the toolbar wraps -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <local:Icon Data="{StaticResource IcCircle}" Width="9" Height="9" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                            <Slider x:Name="SizeSlider" Width="96" Minimum="1" Maximum="12" SmallChange="1" LargeChange="1"
+                                    TickFrequency="1" IsSnapToTickEnabled="True" Value="3" ValueChanged="Size_Changed" />
+                            <local:Icon Data="{StaticResource IcCircle}" Width="15" Height="15" Foreground="{DynamicResource TextDim}" Margin="8,0,0,0" />
+                            <local:Icon Data="{StaticResource IcDroplet}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="14,0,8,0"
+                                        ToolTip="Opacity: how see-through new marks are (and the selected one)" />
+                            <Slider x:Name="OpacitySlider" Width="80" Minimum="10" Maximum="100" SmallChange="5" LargeChange="10"
+                                    TickFrequency="5" IsSnapToTickEnabled="True" Value="100" ValueChanged="Opacity_Changed"
                                     ToolTip="Opacity: how see-through new marks are (and the selected one)" />
-                        <Slider x:Name="OpacitySlider" Width="80" Minimum="10" Maximum="100" SmallChange="5" LargeChange="10"
-                                TickFrequency="5" IsSnapToTickEnabled="True" Value="100" ValueChanged="Opacity_Changed"
-                                ToolTip="Opacity: how see-through new marks are (and the selected one)" />
-                        <TextBlock x:Name="OpacityText" Text="100%" Width="34" Margin="6,0,0,0" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextDim}" />
+                            <TextBlock x:Name="OpacityText" Text="100%" Width="34" Margin="6,0,0,0" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextDim}" />
+                        </StackPanel>
 
                         <StackPanel x:Name="HideOptions" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                             <Border Style="{StaticResource ToolSep}" />
@@ -180,6 +183,13 @@
                         </StackPanel>
                     </WrapPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12,0,0,0">
+                        <Button x:Name="CopyTextButton" Style="{StaticResource Btn}" Height="30" Margin="0,0,6,0" Click="CopyAllText_Click"
+                                ToolTip="Copy all the text in the picture  (Ctrl+Shift+C). To copy just some, pick the Select tool (V) and drag over it.">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcScanText}" Width="14" Height="14" Margin="0,0,6,0" />
+                                <TextBlock Text="Copy text" />
+                            </StackPanel>
+                        </Button>
                         <Button x:Name="ImageMenuButton" Style="{StaticResource BtnIcon}" Width="32" Height="30" ToolTip="Rotate, flip or resize the picture"
                                 Click="ImageMenu_Click" Margin="0,0,6,0">
                             <local:Icon Data="{StaticResource IcRotateCw}" Width="15" Height="15" />
