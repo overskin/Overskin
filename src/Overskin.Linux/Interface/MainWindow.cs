@@ -111,8 +111,18 @@ public sealed class MainWindow : Window
         {
             Children =
             {
-                Docked(Ui.Button("Quit Overskin", App.Current.Quit), Dock.Right),
-                Ui.Label($"Version 0.1 for Linux  ·  {(ScreenGrabber.IsWayland ? "Wayland" : OperatingSystem.IsLinux() ? "X11" : "preview")}", "dim"),
+                Docked(new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 8,
+                    Children =
+                    {
+                        Ui.Button("Copy details for a bug report", () => _ = Desktop.CopyTextAsync(
+                            $"Overskin {typeof(App).Assembly.GetName().Version} · {Environment.OSVersion} · {Core.Log.Environment_()}\n\n{Core.Log.Tail()}", this)),
+                        Ui.Button("Quit Overskin", App.Current.Quit),
+                    },
+                }, Dock.Right),
+                Ui.Label($"Version 0.2 for Linux  ·  {ScreenGrabber.DesktopName}", "dim"),
             },
         };
 

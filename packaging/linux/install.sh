@@ -31,4 +31,13 @@ fi
 
 echo "Overskin is installed. Open it from your app menu, or run: overskin"
 echo "For a capture shortcut, bind a key in your keyboard settings to: $bin/overskin --capture"
+if [ -n "$WAYLAND_DISPLAY" ]; then
+    case "${XDG_CURRENT_DESKTOP:-}${HYPRLAND_INSTANCE_SIGNATURE:+Hyprland}${SWAYSOCK:+sway}" in
+        *[Hh]yprland*|*sway*|*river*|*niri*|*wayfire*|*labwc*)
+            command -v grim >/dev/null || echo "Install grim for screenshots on this desktop (Arch: sudo pacman -S grim)." ;;
+    esac
+    command -v wl-copy >/dev/null || echo "Install wl-clipboard so screenshots can go on the clipboard."
+elif ! command -v xclip >/dev/null; then
+    echo "Install xclip so screenshots can go on the clipboard."
+fi
 case ":$PATH:" in *":$bin:"*) ;; *) echo "(Add $bin to your PATH to run 'overskin' from a terminal.)" ;; esac

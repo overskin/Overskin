@@ -91,6 +91,13 @@ public sealed class App : Application
         }
 
         Settings = Settings.Load();
+        Log.Write($"start: Overskin {typeof(App).Assembly.GetName().Version} on {Environment.OSVersion}; {Log.Environment_()}");
+        Dispatcher.UIThread.UnhandledException += (_, e) =>
+        {
+            Log.Write("unhandled: " + e.Exception);
+            e.Handled = true;
+            MessageWindow.Show("Something went wrong", e.Exception.Message + "\n\nDetails are in " + Log.FilePath);
+        };
         SetUpTray();
         SingleInstance.Listen(a => Dispatcher.UIThread.Post(() => Handle(a, fromAnotherStart: true)), _stop.Token);
         Desktop.ShutdownRequested += (_, _) => _stop.Cancel();
@@ -181,11 +188,13 @@ public sealed class App : Application
             // let the window fade out (and the tray menu close) before reading the screen
             await Task.Delay(Math.Max(0, delaySeconds) * 1000 + 300);
 
+            Log.Write($"capture: {(area ? "area" : "screen")}, delay {delaySeconds}s");
             var screen = await ScreenGrabber.GrabAsync();
             Bitmap shot = screen;
             if (area)
             {
                 var picked = await CaptureOverlay.PickAsync(screen);
+                Log.Write("capture: picked " + (picked?.ToString() ?? "nothing (cancelled)"));
                 if (picked is not { } rect) return;
                 shot = rect == new PixelRect(screen.PixelSize) ? screen : Imaging.Crop(screen, rect);
             }
@@ -193,6 +202,7 @@ public sealed class App : Application
         }
         catch (Exception ex)
         {
+            Log.Write("capture failed: " + ex);
             MessageWindow.Show("Couldn't take the screenshot", ex.Message);
         }
         finally

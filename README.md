@@ -45,8 +45,11 @@ library, Trace and the rest are still Windows-only.
 
 Desktops keep global shortcuts to themselves on Linux, so bind a key in your keyboard settings
 to `overskin --capture` (or `--screen`, `--delay 3`). `overskin --help` lists everything.
-On Wayland the first capture may ask you to allow screenshots. For copying to the clipboard,
-install `wl-clipboard` (Wayland) or `xclip` (X11) if you don't have them already.
+On Wayland the first capture may ask you to allow screenshots. On Hyprland, Sway and other
+wlroots desktops, install `grim`, which Overskin uses to read the screen there. For copying to the
+clipboard, install `wl-clipboard` (Wayland) or `xclip` (X11) if you don't have them already.
+If something goes wrong, **Copy details for a bug report** at the bottom of the window copies
+what Overskin logged (`~/.cache/overskin/overskin.log`).
 
 <p align="center"><img src="docs/screenshots/linux-editor.png" width="760" alt="The Overskin editor on Linux"></p>
 
