@@ -11,7 +11,10 @@ public static class Program
           overskin                 open Overskin (or bring it forward)
           overskin --capture       pick an area of the screen
           overskin --screen        capture the whole screen
-          overskin --delay 3       wait before capturing (with --capture or --screen)
+          overskin --delay 3       wait first (with --capture, --screen, --record or --gif)
+          overskin --record        record a video of an area (again to stop)
+          overskin --gif           record a GIF of an area
+          overskin --stop          stop the recording
           overskin --open FILE     open a picture in the editor
           overskin --pin FILE      pin a picture on top of everything
           overskin --tray          start in the tray without opening the window

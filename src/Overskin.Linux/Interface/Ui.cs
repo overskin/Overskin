@@ -9,12 +9,12 @@ namespace Overskin.Linux.Interface;
 
 public static class Colours
 {
-    public static readonly Color Bg = Color.Parse("#121316");
-    public static readonly Color Panel = Color.Parse("#1B1D22");
-    public static readonly Color Raised = Color.Parse("#262930");
-    public static readonly Color Text = Color.Parse("#E7E8EB");
-    public static readonly Color Dim = Color.Parse("#9094A0");
-    public static readonly Color Accent = Color.Parse("#4F8CFF");
+    public static Color Bg { get; set; } = Color.Parse("#121316");
+    public static Color Panel { get; set; } = Color.Parse("#1B1D22");
+    public static Color Raised { get; set; } = Color.Parse("#262930");
+    public static Color Text { get; set; } = Color.Parse("#E7E8EB");
+    public static Color Dim { get; set; } = Color.Parse("#9094A0");
+    public static Color Accent { get; set; } = Color.Parse("#4F8CFF");
 
     public static void AddStyles(Application app) =>
         app.Styles.Add(new StyleInclude(new Uri("avares://overskin/"))

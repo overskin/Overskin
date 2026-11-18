@@ -15,7 +15,7 @@ public sealed class CaptureOverlay : Window
     private readonly TaskCompletionSource<PixelRect?> _result = new();
     private readonly SelectionSurface _surface;
 
-    public CaptureOverlay(Bitmap shot)
+    public CaptureOverlay(Bitmap shot, bool recording = false)
     {
         Title = "Overskin capture";
         SystemDecorations = SystemDecorations.None;
@@ -26,7 +26,7 @@ public sealed class CaptureOverlay : Window
         Cursor = new Cursor(StandardCursorType.Cross);
         WindowStartupLocation = WindowStartupLocation.Manual;
 
-        _surface = new SelectionSurface(shot);
+        _surface = new SelectionSurface(shot) { Recording = recording };
         _surface.Picked += r => Finish(r);
         Content = _surface;
 
@@ -61,9 +61,9 @@ public sealed class CaptureOverlay : Window
         Close();
     }
 
-    public static async Task<PixelRect?> PickAsync(Bitmap shot)
+    public static async Task<PixelRect?> PickAsync(Bitmap shot, bool recording = false)
     {
-        var overlay = new CaptureOverlay(shot);
+        var overlay = new CaptureOverlay(shot, recording);
         overlay.Show();
         overlay.Activate();
         overlay.Focus();
@@ -80,6 +80,7 @@ public sealed class SelectionSurface : Control
     private bool _pointerSeen;
 
     public event Action<PixelRect>? Picked;
+    public bool Recording { get; init; }
 
     private static readonly IBrush Shade = new SolidColorBrush(Color.FromArgb(120, 0, 0, 0));
     private static readonly IPen Edge = new Pen(new SolidColorBrush(Colours.Accent), 1.5);
@@ -170,7 +171,9 @@ public sealed class SelectionSurface : Control
                 ctx.DrawLine(Guide, new Point(_pointer.X, 0), new Point(_pointer.X, bounds.Height));
                 ctx.DrawLine(Guide, new Point(0, _pointer.Y), new Point(bounds.Width, _pointer.Y));
             }
-            var hint = "Drag to capture  ·  click for the whole screen  ·  Esc to cancel";
+            var hint = Recording
+                ? "Drag over the area to record  ·  click for the whole screen  ·  Esc to cancel"
+                : "Drag to capture  ·  click for the whole screen  ·  Esc to cancel";
             var text = Text(hint, 14, Brushes.White);
             DrawLabel(ctx, hint, new Point((bounds.Width - text.Width) / 2 - 12, 24));
         }

@@ -38,13 +38,21 @@ sudo). Add `--autostart` to start it with your desktop in the tray, or `--uninst
 it. It's one self-contained program and works on X11 and Wayland (GNOME, KDE, Sway, Hyprland
 and others).
 
-The Linux version is new and does the essentials so far: area and full-screen capture with a
-magnifier, the editor (arrows, boxes, circles, pen, highlighter, text, numbered steps,
-pixelate, undo), pins, the tray menu, auto-save and copy to the clipboard. Video, GIFs, the
-library, Trace and the rest are still Windows-only.
+The Linux version is new. It has area and screen capture with a magnifier; the editor
+(arrows, lines, boxes, circles, pen, highlighter, text, numbered steps, blur / pixelate /
+mosaic, smart erase, crop, turn, flip, resize, beautify, auto-hide, copying text, full undo);
+MP4 and GIF recording; the Library (search, sort, select several, rename, convert, combine,
+drag out, trash); pins; themes; and the tray menu. Scrolling capture, Trace, the step
+recorder, auto-zoom and the GIF editor are still Windows-only.
+
+Optional helpers it uses when they're installed: `ffmpeg` (recording on X11, GIFs,
+converting), `wf-recorder` (recording on Hyprland and Sway), GStreamer with its PipeWire
+plugin (recording on GNOME and KDE under Wayland), and `tesseract` (auto-hide, copying text,
+searching the text in pictures). Overskin says which one is missing when you need it.
 
 Desktops keep global shortcuts to themselves on Linux, so bind a key in your keyboard settings
-to `overskin --capture` (or `--screen`, `--delay 3`). `overskin --help` lists everything.
+to `overskin --capture` (or `--screen`, `--delay 3`, `--record`, `--gif`, `--stop`).
+`overskin --help` lists everything.
 On Wayland the first capture may ask you to allow screenshots. On Hyprland, Sway and other
 wlroots desktops, install `grim`, which Overskin uses to read the screen there. For copying to the
 clipboard, install `wl-clipboard` (Wayland) or `xclip` (X11) if you don't have them already.

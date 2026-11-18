@@ -9,54 +9,107 @@ using Overskin.Linux.Platform;
 
 namespace Overskin.Linux.Interface;
 
-/// <summary>The home window: the capture buttons, settings and how to set up a keyboard shortcut.</summary>
+/// <summary>The home window: Capture, Record, Library and Settings pages.</summary>
 public sealed class MainWindow : Window
 {
-    private readonly TextBox _folder;
+    private readonly ContentControl _page = new();
+    private readonly Dictionary<string, ToggleButton> _nav = new();
+    private string _current = "Capture";
+    private LibraryView? _library;
 
     public MainWindow()
     {
-        var s = App.Settings;
         Title = "Overskin";
         Icon = App.Icon;
-        Width = 720;
+        Width = 980;
         Height = 700;
-        MinWidth = 560;
-        MinHeight = 480;
+        MinWidth = 720;
+        MinHeight = 500;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        // header
-        var logo = new Image { Width = 40, Height = 40, Source = new Bitmap(AssetLoader.Open(new Uri("avares://overskin/Assets/overskin.png"))) };
-        var header = new StackPanel
+        Build();
+        Theming.Changed += () => { _library = null; Build(); };
+
+        // closing keeps Overskin running in the tray, ready for the shortcut
+        Closing += (_, e) =>
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 12,
+            App.Settings.Save();
+            if (e.CloseReason == WindowCloseReason.WindowClosing && !e.IsProgrammatic)
+            {
+                e.Cancel = true;
+                Hide();
+            }
+        };
+    }
+
+    private void Build()
+    {
+        var logo = new Image { Width = 30, Height = 30, Source = new Bitmap(AssetLoader.Open(new Uri("avares://overskin/Assets/overskin.png"))) };
+        var nav = new StackPanel
+        {
+            Width = 190,
+            Spacing = 4,
+            Margin = new Thickness(14, 16, 8, 16),
             Children =
             {
-                logo,
                 new StackPanel
                 {
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Children = { Ui.Label("Overskin", "h1"), Ui.Label("Screenshots, done right.", "dim") },
+                    Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(6, 0, 0, 18),
+                    Children = { logo, new TextBlock { Text = "Overskin", FontSize = 18, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center } },
                 },
             },
         };
+        _nav.Clear();
+        foreach (var (name, icon) in new[] { ("Capture", Icons.Area), ("Record", Icons.Record), ("Library", Icons.Library), ("Settings", Icons.Gear) })
+        {
+            var b = new ToggleButton
+            {
+                Classes = { "nav" },
+                Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Children = { Ui.Icon(icon, 16), new TextBlock { Text = name } } },
+            };
+            b.Click += (_, _) => Go(name);
+            _nav[name] = b;
+            nav.Children.Add(b);
+        }
 
-        // capture tiles
+        if (_page.Parent is Decorator old) old.Child = null; // rebuilt for a new theme: move the page across
+        var side = new Border { Background = new SolidColorBrush(Colours.Panel), Child = nav };
+        DockPanel.SetDock(side, Dock.Left);
+        Content = new DockPanel { Children = { side, new Border { Padding = new Thickness(26, 22, 26, 20), Child = _page } } };
+        Go(_current);
+    }
+
+    public void Go(string page)
+    {
+        _current = page;
+        foreach (var (name, b) in _nav) b.IsChecked = name == page;
+        _page.Content = page switch
+        {
+            "Record" => RecordPage(),
+            "Library" => _library ??= new LibraryView(),
+            "Settings" => SettingsPage(),
+            _ => CapturePage(),
+        };
+    }
+
+    private static Control Page(string title, string subtitle, params Control[] parts)
+    {
+        var stack = new StackPanel { Spacing = 16 };
+        stack.Children.Add(new StackPanel { Children = { Ui.Label(title, "h1"), Ui.Label(subtitle, "dim") } });
+        foreach (var p in parts) stack.Children.Add(p);
+        return new ScrollViewer { Content = stack };
+    }
+
+    private Control CapturePage()
+    {
+        var s = App.Settings;
         var tiles = new UniformGrid { Columns = 3, ColumnSpacing = 10, RowSpacing = 10 };
         tiles.Children.Add(Tile(Icons.Area, "Capture area", "Drag out any part of the screen", () => _ = App.Current.CaptureAsync(true, 0), primary: true));
-        tiles.Children.Add(Tile(Icons.Screen, "Capture screen", "Everything on every monitor", () => _ = App.Current.CaptureAsync(false, 0)));
+        tiles.Children.Add(Tile(Icons.Screen, "Capture screen", "The whole screen", () => _ = App.Current.CaptureAsync(false, 0)));
         tiles.Children.Add(Tile(Icons.Timer, "In 3 seconds", "Time to open a menu first", () => _ = App.Current.CaptureAsync(true, 3)));
         tiles.Children.Add(Tile(Icons.Picture, "Open a picture", "Mark up any image", () => _ = App.Current.OpenPictureAsync(pin: false)));
         tiles.Children.Add(Tile(Icons.Pin, "Pin a picture", "Keep it on top of everything", () => _ = App.Current.OpenPictureAsync(pin: true)));
         tiles.Children.Add(Tile(Icons.Folder, "Screenshots folder", "Everything you've saved", App.Current.OpenFolder));
-
-        // settings
-        _folder = new TextBox { Text = s.SaveFolder, IsReadOnly = true };
-        var browse = Ui.Button("Change…", () => _ = ChangeFolderAsync());
-        var folderRow = new DockPanel { Children = { browse, _folder } };
-        DockPanel.SetDock(browse, Dock.Right);
-        browse.Margin = new Thickness(8, 0, 0, 0);
 
         var after = new ComboBox
         {
@@ -70,31 +123,145 @@ public sealed class MainWindow : Window
             s.Save();
         };
 
-        var settings = new StackPanel
+        var autoHide = Check("Hide private details automatically", s.AutoHide, v => s.AutoHide = v,
+            "Reads the text in every screenshot and hides what's private before it's copied or saved. Right-click to choose which details." +
+            (Ocr.IsAvailable ? "" : " Needs Tesseract."));
+        autoHide.ContextMenu = PrivateMenu.Build();
+
+        var options = Ui.Card(new StackPanel
         {
             Spacing = 10,
             Children =
             {
-                Ui.Label("Settings", "h2"),
-                Ui.Label("Save screenshots to", "dim"),
-                folderRow,
-                Check("Save every screenshot automatically", s.SaveAutomatically, v => s.SaveAutomatically = v),
-                Check("Copy every screenshot to the clipboard", s.CopyToClipboard, v => s.CopyToClipboard = v),
-                Check("Open this window when Overskin starts", s.ShowWindowOnStart, v => s.ShowWindowOnStart = v),
-                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Children = { Ui.Label("After a capture"), after } },
+                Ui.Label("After a capture", "h2"),
+                Check("Save it automatically", s.SaveAutomatically, v => s.SaveAutomatically = v),
+                Check("Copy it to the clipboard", s.CopyToClipboard, v => s.CopyToClipboard = v),
+                autoHide,
+                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Children = { Ui.Label("Then"), after } },
             },
+        });
+        return Page("Capture", "Screenshots, done right.", tiles, options);
+    }
+
+    private Control RecordPage()
+    {
+        var s = App.Settings;
+        var tiles = new UniformGrid { Columns = 3, ColumnSpacing = 10, RowSpacing = 10 };
+        tiles.Children.Add(Tile(Icons.Record, "Record a video", "MP4, sharp and small", () => _ = App.Current.RecordAsync(false, 0), primary: true));
+        tiles.Children.Add(Tile(Icons.Picture, "Record a GIF", "Plays anywhere, loops", () => _ = App.Current.RecordAsync(true, 0)));
+        tiles.Children.Add(Tile(Icons.Stop, "Stop recording", "Or use the bar, or overskin --stop", () => _ = App.Current.StopRecordingAsync(keep: true)));
+
+        ComboBox Pick(string[] items, int selected, Action<int> set)
+        {
+            var c = new ComboBox { ItemsSource = items, SelectedIndex = Math.Max(0, selected), MinWidth = 160 };
+            c.SelectionChanged += (_, _) => { set(c.SelectedIndex); s.Save(); };
+            return c;
+        }
+        int[] fps = { 24, 30, 60 }, gifFps = { 10, 15, 20, 25 }, gifWidths = { 480, 720, 960, 0 };
+        var options = Ui.Card(new StackPanel
+        {
+            Spacing = 10,
+            Children =
+            {
+                Ui.Label("Recording", "h2"),
+                Check("Show the mouse pointer", s.RecordPointer, v => s.RecordPointer = v),
+                Row("Video frame rate", Pick(fps.Select(f => $"{f} frames a second").ToArray(), Array.IndexOf(fps, s.RecordFps), i => s.RecordFps = fps[i])),
+                Row("GIF frame rate", Pick(gifFps.Select(f => $"{f} frames a second").ToArray(), Array.IndexOf(gifFps, s.GifFps), i => s.GifFps = gifFps[i])),
+                Row("GIF size", Pick(new[] { "Up to 480 wide", "Up to 720 wide", "Up to 960 wide", "As recorded" }, Array.IndexOf(gifWidths, s.GifMaxWidth), i => s.GifMaxWidth = gifWidths[i])),
+            },
+        });
+
+        var how = !OperatingSystem.IsLinux() ? "Recording runs on Linux."
+            : !ScreenGrabber.IsWayland ? "On X11 Overskin records with ffmpeg."
+            : ScreenGrabber.IsWlroots ? "On this desktop Overskin records with wf-recorder."
+            : "On this desktop the system asks which screen or window to share (once), and Overskin records it with GStreamer.";
+        var missing = Recorder.Missing(gif: true);
+        var info = Ui.Card(new StackPanel
+        {
+            Spacing = 8,
+            Children =
+            {
+                Ui.Label("How it records here", "h2"),
+                Ui.Label(how + " GIFs are made from the video with ffmpeg.", "dim"),
+                Ui.Label(missing ?? "Everything it needs is installed.", "dim"),
+                Ui.Label("Keyboard shortcuts: bind overskin --record, overskin --gif and overskin --stop in your system's keyboard settings.", "dim"),
+            },
+        });
+        return Page("Record", "Videos and GIFs of any area.", tiles, options, info);
+    }
+
+    private Control SettingsPage()
+    {
+        var s = App.Settings;
+        var folder = new TextBox { Text = s.SaveFolder, IsReadOnly = true };
+        var browse = Ui.Button("Change…", async () =>
+        {
+            var chosen = await Ui.PickFolderAsync(this, "Where should screenshots go?");
+            if (chosen == null) return;
+            s.SaveFolder = chosen;
+            s.Save();
+            folder.Text = chosen;
+            App.Current.NotifyLibraryChanged();
+        });
+        browse.Margin = new Thickness(8, 0, 0, 0);
+        DockPanel.SetDock(browse, Dock.Right);
+
+        var dark = Theming.Themes.Where(t => !t.Light).Select(t => t.Name).ToList();
+        var light = Theming.Themes.Where(t => t.Light).Select(t => t.Name).ToList();
+        var mode = new ComboBox { ItemsSource = new[] { "Dark", "Light" }, SelectedIndex = Theming.Find(s.Theme).Light ? 1 : 0, MinWidth = 120 };
+        var theme = new ComboBox { MinWidth = 220 };
+        void FillThemes()
+        {
+            var list = mode.SelectedIndex == 1 ? light : dark;
+            theme.ItemsSource = list;
+            theme.SelectedIndex = Math.Max(0, list.IndexOf(s.Theme));
+        }
+        FillThemes();
+        mode.SelectionChanged += (_, _) =>
+        {
+            FillThemes();
+            if (theme.SelectedItem is string name && name != s.Theme) { s.Theme = name; s.Save(); Theming.Apply(name); }
+        };
+        theme.SelectionChanged += (_, _) =>
+        {
+            if (theme.SelectedItem is not string name || name == s.Theme) return;
+            s.Theme = name;
+            s.Save();
+            Theming.Apply(name);
         };
 
-        // shortcut help
-        const string command = "overskin --capture";
-        var shortcut = new StackPanel
+        var pattern = new TextBox { Text = s.FileNamePattern, MinWidth = 300 };
+        pattern.LostFocus += (_, _) => { s.FileNamePattern = pattern.Text ?? s.FileNamePattern; s.Save(); };
+
+        var general = Ui.Card(new StackPanel
         {
             Spacing = 10,
             Children =
             {
-                Ui.Label("Keyboard shortcut", "h2"),
-                Ui.Label("Linux desktops keep global shortcuts to themselves, so add one in your system's keyboard settings " +
-                         "(GNOME: Settings → Keyboard → Custom Shortcuts; KDE: System Settings → Shortcuts) that runs:", "dim"),
+                Ui.Label("General", "h2"),
+                Ui.Label("Save screenshots and recordings to", "dim"),
+                new DockPanel { Children = { browse, folder } },
+                Row("File names", pattern),
+                Ui.Label("{0:yyyy-MM-dd_HH-mm-ss} is the date and time.", "dim"),
+                Check("Open this window when Overskin starts", s.ShowWindowOnStart, v => s.ShowWindowOnStart = v),
+                Check("Start Overskin with the desktop (in the tray)", Autostart.IsOn, v => Autostart.Set(v)),
+            },
+        });
+        var look = Ui.Card(new StackPanel
+        {
+            Spacing = 10,
+            Children = { Ui.Label("Look", "h2"), Row("Mode", mode), Row("Theme", theme) },
+        });
+
+        const string command = "overskin --capture";
+        var shortcuts = Ui.Card(new StackPanel
+        {
+            Spacing = 10,
+            Children =
+            {
+                Ui.Label("Keyboard shortcuts", "h2"),
+                Ui.Label("Linux desktops keep global shortcuts to themselves, so add them in your system's keyboard settings " +
+                         "(GNOME: Settings → Keyboard → Custom Shortcuts; KDE: System Settings → Shortcuts; Hyprland: bind = , Print, exec, overskin --capture). Each runs a command:", "dim"),
                 new DockPanel
                 {
                     Children =
@@ -103,11 +270,11 @@ public sealed class MainWindow : Window
                         new TextBox { Text = command, IsReadOnly = true, FontFamily = new FontFamily("monospace") },
                     },
                 },
-                Ui.Label("Also: --screen for the whole screen, --delay 3 to wait first, --pin FILE to pin a picture.", "dim"),
+                Ui.Label("--capture an area · --screen the whole screen · --delay 3 wait first · --record a video · --gif a GIF · --stop the recording · --pin FILE · --open FILE", "dim"),
             },
-        };
+        });
 
-        var footer = new DockPanel
+        var about = new DockPanel
         {
             Children =
             {
@@ -122,31 +289,14 @@ public sealed class MainWindow : Window
                         Ui.Button("Quit Overskin", App.Current.Quit),
                     },
                 }, Dock.Right),
-                Ui.Label($"Version 0.2 for Linux  ·  {ScreenGrabber.DesktopName}", "dim"),
+                Ui.Label($"Version {typeof(App).Assembly.GetName().Version?.ToString(2)} for Linux  ·  {ScreenGrabber.DesktopName}", "dim"),
             },
         };
-
-        Content = new ScrollViewer
-        {
-            Content = new StackPanel
-            {
-                Margin = new Thickness(24, 20, 24, 20),
-                Spacing = 16,
-                Children = { header, tiles, Ui.Card(settings), Ui.Card(shortcut), footer },
-            },
-        };
-
-        // closing keeps Overskin running in the tray, ready for the shortcut
-        Closing += (_, e) =>
-        {
-            s.Save();
-            if (e.CloseReason == WindowCloseReason.WindowClosing && !e.IsProgrammatic)
-            {
-                e.Cancel = true;
-                Hide();
-            }
-        };
+        return Page("Settings", "Where things go, how it looks, and shortcuts.", general, look, shortcuts, about);
     }
+
+    private static Control Row(string label, Control control) =>
+        new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Children = { new TextBlock { Text = label, MinWidth = 130, VerticalAlignment = VerticalAlignment.Center }, control } };
 
     private static Control Docked(Control c, Dock dock, Thickness? margin = null)
     {
@@ -167,10 +317,10 @@ public sealed class MainWindow : Window
                 {
                     new Border
                     {
-                        Width = 36, Height = 36, CornerRadius = new CornerRadius(10),
+                        Width = 36, Height = 36, CornerRadius = new CornerRadius(10, 2, 10, 2),
                         Background = new SolidColorBrush(primary ? Colours.Accent : Colours.Raised),
                         HorizontalAlignment = HorizontalAlignment.Left,
-                        Child = new PathIcon { Data = StreamGeometry.Parse(icon), Width = 18, Height = 18, Foreground = Brushes.White },
+                        Child = new PathIcon { Data = StreamGeometry.Parse(icon), Width = 18, Height = 18, Foreground = primary ? Brushes.White : new SolidColorBrush(Colours.Text) },
                     },
                     new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 14 },
                     new TextBlock { Text = body, Classes = { "dim" }, FontSize = 12, FontWeight = FontWeight.Normal },
@@ -181,9 +331,10 @@ public sealed class MainWindow : Window
         return b;
     }
 
-    private static CheckBox Check(string text, bool value, Action<bool> set)
+    private static CheckBox Check(string text, bool value, Action<bool> set, string? tip = null)
     {
         var c = new CheckBox { Content = text, IsChecked = value };
+        if (tip != null) ToolTip.SetTip(c, tip);
         c.IsCheckedChanged += (_, _) =>
         {
             set(c.IsChecked == true);
@@ -191,13 +342,25 @@ public sealed class MainWindow : Window
         };
         return c;
     }
+}
 
-    private async Task ChangeFolderAsync()
+/// <summary>Starting with the desktop: a file in ~/.config/autostart.</summary>
+public static class Autostart
+{
+    private static string FilePath => Path.Combine(Core.Settings.ConfigFolder, "..", "autostart", "overskin.desktop");
+
+    public static bool IsOn => File.Exists(FilePath);
+
+    public static void Set(bool on)
     {
-        var folder = await Ui.PickFolderAsync(this, "Where should screenshots go?");
-        if (folder == null) return;
-        App.Settings.SaveFolder = folder;
-        App.Settings.Save();
-        _folder.Text = folder;
+        try
+        {
+            if (!on) { File.Delete(FilePath); return; }
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            File.WriteAllText(FilePath,
+                "[Desktop Entry]\nType=Application\nName=Overskin\nComment=Screenshots, done right\n" +
+                $"Exec=\"{Environment.ProcessPath}\" --tray\nIcon=overskin\nTerminal=false\nX-GNOME-Autostart-enabled=true\n");
+        }
+        catch (Exception ex) { Core.Log.Write("autostart: " + ex.Message); }
     }
 }

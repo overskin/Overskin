@@ -22,9 +22,29 @@ public static class Snapshots
             Directory.CreateDirectory(outDir);
             Settings.FilePath = Path.Combine(Path.GetTempPath(), "overskin-snapshots.json");
             var demo = ScreenGrabber.DemoFile != null ? new Bitmap(ScreenGrabber.DemoFile) : SelfTest.Quarters(1200, 900);
-            App.Settings.SaveFolder = "/home/you/Pictures/Overskin";
+            // a library of made-up pictures, in a temporary folder
+            var library = Path.Combine(Path.GetTempPath(), "overskin-snapshot-library");
+            if (Directory.Exists(library)) Directory.Delete(library, true);
+            Directory.CreateDirectory(library);
+            Imaging.SavePng(demo, Path.Combine(library, "Overskin_2026-11-17_10-24-03.png"));
+            Imaging.SavePng(Effects.Rotate(demo, true), Path.Combine(library, "Overskin_2026-11-16_18-02-11.png"));
+            Imaging.SavePng(Beautify.Render(Effects.Resize(demo, 600, 450), new BeautifyOptions { Background = "Sunset" }), Path.Combine(library, "Launch post.png"));
+            Imaging.SavePng(SelfTest.Quarters(800, 500), Path.Combine(library, "Colours test.png"));
+            Imaging.SavePng(Effects.Flip(demo, true), Path.Combine(library, "Overskin_2026-11-15_09-41-55.png"));
+            App.Settings.SaveFolder = library;
 
-            await Shoot(new MainWindow(), Path.Combine(outDir, "linux-main.png"));
+            var main = new MainWindow();
+            foreach (var page in new[] { "Capture", "Record", "Library", "Settings" })
+            {
+                main.Go(page);
+                await Shoot(main, Path.Combine(outDir, $"linux-{page.ToLowerInvariant()}.png"), close: false);
+            }
+            Theming.Apply("Catppuccin Latte");
+            main.Go("Capture");
+            await Shoot(main, Path.Combine(outDir, "linux-light.png"), close: false);
+            Theming.Apply("Graphite");
+            main.Hide();
+            App.Settings.SaveFolder = "/home/you/Pictures/Overskin";
 
             var editor = new EditorWindow(demo, "/home/you/Pictures/Overskin/Overskin_2026-11-17_10-24-03.png") { Width = 1100, Height = 820 };
             var c = editor.Canvas;
@@ -54,7 +74,7 @@ public static class Snapshots
         }
     }
 
-    private static async Task Shoot(Window window, string path)
+    private static async Task Shoot(Window window, string path, bool close = true)
     {
         window.WindowStartupLocation = WindowStartupLocation.Manual;
         window.Position = new PixelPoint(-30000, -30000); // drawn off screen, never visible
@@ -71,6 +91,7 @@ public static class Snapshots
             rtb.Render(window);
             rtb.Save(path);
         }
+        if (!close) return;
         if (window is MainWindow) window.Hide(); else window.Close();
     }
 }

@@ -8,6 +8,8 @@ public sealed class Settings
     public string SaveFolder { get; set; } = DefaultSaveFolder();
     public bool SaveAutomatically { get; set; } = true;
     public bool CopyToClipboard { get; set; } = true;
+    /// <summary>Hide private details in every screenshot before it's saved or copied.</summary>
+    public bool AutoHide { get; set; }
     /// <summary>"editor", "notice" or "nothing".</summary>
     public string AfterCapture { get; set; } = "editor";
     public string FileNamePattern { get; set; } = "Overskin_{0:yyyy-MM-dd_HH-mm-ss}";
@@ -16,6 +18,19 @@ public sealed class Settings
     public double PenWidth { get; set; } = 4;
     /// <summary>What auto-hide looks for.</summary>
     public Overskin.Shared.PrivateKinds AutoHideKinds { get; set; } = Overskin.Shared.PrivateKinds.Default;
+
+    // recording
+    public bool RecordPointer { get; set; } = true;
+    public int RecordFps { get; set; } = 30;
+    public int GifFps { get; set; } = 15;
+    /// <summary>GIFs are scaled down to at most this wide (0 = as recorded).</summary>
+    public int GifMaxWidth { get; set; } = 960;
+    /// <summary>The desktop's permission to record again without asking (Wayland portal).</summary>
+    public string? ScreenCastToken { get; set; }
+
+    // library
+    public string LibrarySort { get; set; } = "newest";
+    public string Theme { get; set; } = "Graphite";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 

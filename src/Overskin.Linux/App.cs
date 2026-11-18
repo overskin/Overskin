@@ -51,21 +51,9 @@ public sealed class App : Application
     {
         Name = "Overskin";
         RequestedThemeVariant = ThemeVariant.Dark;
-        Styles.Add(new FluentTheme
-        {
-            Palettes =
-            {
-                [ThemeVariant.Dark] = new ColorPaletteResources
-                {
-                    Accent = Colours.Accent,
-                    RegionColor = Colours.Bg,
-                    AltHigh = Colours.Bg,
-                    BaseHigh = Colours.Text,
-                    ChromeMediumLow = Colours.Panel,
-                },
-            },
-        });
+        Styles.Add(new FluentTheme());
         Colours.AddStyles(this);
+        Theming.Apply(Theming.Themes[0].Name);
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -91,6 +79,7 @@ public sealed class App : Application
         }
 
         Settings = Settings.Load();
+        Theming.Apply(Settings.Theme);
         Log.Write($"start: Overskin {typeof(App).Assembly.GetName().Version} on {Environment.OSVersion}; {Log.Environment_()}");
         Dispatcher.UIThread.UnhandledException += (_, e) =>
         {
@@ -118,6 +107,9 @@ public sealed class App : Application
         }
 
         if (args.Contains("--quit")) { Quit(); return; }
+        if (args.Contains("--stop")) { _ = StopRecordingAsync(keep: true); return; }
+        if (args.Contains("--record")) { _ = RecordAsync(gif: false, delay); return; }
+        if (args.Contains("--gif")) { _ = RecordAsync(gif: true, delay); return; }
         if (args.Contains("--capture")) { _ = CaptureAsync(area: true, delay); return; }
         if (args.Contains("--screen")) { _ = CaptureAsync(area: false, delay); return; }
         if (After("--open") is { } open) { OpenInEditor(open); return; }
@@ -140,6 +132,10 @@ public sealed class App : Application
         Item("Capture screen", () => _ = CaptureAsync(false, 0));
         Item("Capture area in 3 seconds", () => _ = CaptureAsync(true, 3));
         menu.Items.Add(new NativeMenuItemSeparator());
+        Item("Record a video", () => _ = RecordAsync(false, 0));
+        Item("Record a GIF", () => _ = RecordAsync(true, 0));
+        Item("Stop recording", () => _ = StopRecordingAsync(keep: true));
+        menu.Items.Add(new NativeMenuItemSeparator());
         Item("Open a picture…", () => _ = OpenPictureAsync(pin: false));
         Item("Pin a picture…", () => _ = OpenPictureAsync(pin: true));
         Item("Open the screenshots folder", () => OpenFolder());
@@ -154,6 +150,80 @@ public sealed class App : Application
             TrayIcon.SetIcons(this, new TrayIcons { _tray });
         }
         catch { _tray = null; } // no tray on this desktop; the window is the way in
+    }
+
+    // ---- recording -----------------------------------------------------------------------------
+
+    private Recorder? _recorder;
+    private RecordBar? _recordBar;
+    public bool IsRecording => _recorder != null;
+    public event Action? LibraryChanged;
+    public void NotifyLibraryChanged() => LibraryChanged?.Invoke();
+
+    /// <summary>Starts a video or GIF recording of an area (or, pressed again, stops it).</summary>
+    public async Task RecordAsync(bool gif, int delaySeconds)
+    {
+        if (_recorder != null) { await StopRecordingAsync(keep: true); return; }
+        if (_capturing) return;
+        if (Recorder.Missing(gif) is { } missing) { MessageWindow.Show("Can't record yet", missing); return; }
+        _capturing = true;
+        bool mainWasOpen = _main?.IsVisible == true;
+        try
+        {
+            if (mainWasOpen) _main!.Hide();
+            await Task.Delay(300);
+
+            // pick the area on a still of the screen, where the desktop allows it; GNOME and KDE
+            // under Wayland ask which screen or window in their own dialog instead
+            PixelRect? area = null;
+            if (!ScreenGrabber.IsWayland || ScreenGrabber.IsWlroots)
+            {
+                var still = await ScreenGrabber.GrabAsync();
+                var picked = await CaptureOverlay.PickAsync(still, recording: true);
+                if (picked is not { } rect) return;
+                if (rect != new PixelRect(still.PixelSize)) area = rect;
+            }
+            if (delaySeconds > 0) await Task.Delay(delaySeconds * 1000);
+
+            var path = Settings.NewFilePath(gif ? ".gif" : ".mp4");
+            _recorder = await Recorder.StartAsync(area, path, gif, Settings.RecordPointer, Settings.RecordFps);
+            if (_recorder == null) return; // cancelled in the desktop's dialog
+            _recordBar = new RecordBar(gif, () => _ = StopRecordingAsync(keep: true), () => _ = StopRecordingAsync(keep: false));
+            _recordBar.Show();
+        }
+        catch (Exception ex)
+        {
+            Log.Write("record failed: " + ex);
+            _recorder = null;
+            MessageWindow.Show("Couldn't start recording", ex.Message);
+        }
+        finally
+        {
+            _capturing = false;
+        }
+    }
+
+    public async Task StopRecordingAsync(bool keep)
+    {
+        var recorder = _recorder;
+        if (recorder == null) return;
+        _recorder = null;
+        _recordBar?.Close();
+        _recordBar = null;
+        try
+        {
+            if (recorder.Gif && keep) Platform.Desktop.Notify("Making the GIF…", "This takes a moment for long recordings.", IconFile);
+            var file = await recorder.StopAsync(keep, Settings.GifFps, Settings.GifMaxWidth);
+            if (file == null) return;
+            LibraryChanged?.Invoke();
+            Platform.Desktop.Notify(recorder.Gif ? "GIF saved" : "Video saved", Path.GetFileName(file), IconFile);
+            if (Settings.CopyToClipboard) await Platform.Desktop.CopyFilesAsync(new[] { file }, _main);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("record stop failed: " + ex);
+            MessageWindow.Show("The recording didn't save", ex.Message);
+        }
     }
 
     public void ShowMain()
@@ -214,11 +284,28 @@ public sealed class App : Application
 
     private async Task FinishAsync(Bitmap shot)
     {
+        if (Settings.AutoHide && Ocr.IsAvailable)
+        {
+            try
+            {
+                var found = await PrivateMenu.FindAsync(shot);
+                if (found.Count > 0)
+                {
+                    var marks = found.Select(f => new PatchMark { Area = new Rect(f.X, f.Y, f.Width, f.Height), Mode = HideMode.Pixelate, Strength = 4 }).ToList();
+                    var canvas = new EditorCanvas(shot);
+                    canvas.AddRange(marks);
+                    shot = canvas.Export();
+                    Log.Write("capture: auto-hid " + Overskin.Shared.PrivateDetails.Describe(found.Select(f => f.Kind)));
+                }
+            }
+            catch (Exception ex) { Log.Write("auto-hide failed: " + ex.Message); }
+        }
         string? path = null;
         if (Settings.SaveAutomatically)
         {
             path = Settings.NewFilePath();
             Imaging.SavePng(shot, path);
+            LibraryChanged?.Invoke();
         }
 
         var anyWindow = _main ?? (TopLevel?)Desktop.Windows.FirstOrDefault();

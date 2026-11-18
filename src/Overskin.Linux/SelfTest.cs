@@ -184,6 +184,37 @@ public static class SelfTest
             Check("beautify", b.PixelSize == new PixelSize(280, 280) && corner.B > 200 && corner.R < 120, $"{b.PixelSize} corner {corner}");
         });
 
+        Try("combine pictures", () =>
+        {
+            var a = Quarters(100, 60);
+            var b = Quarters(80, 40);
+            var side = Converter.Combine(new[] { a, b }, Converter.Layout.SideBySide, 10, Colors.White);
+            var stack = Converter.Combine(new[] { a, b }, Converter.Layout.Stacked, 10, Colors.White);
+            var grid = Converter.Combine(new[] { a, b, a }, Converter.Layout.Grid, 10, Colors.White);
+            Check("combine pictures", side.PixelSize == new PixelSize(210, 80) && stack.PixelSize == new PixelSize(120, 130) && grid.PixelSize == new PixelSize(210, 150),
+                  $"{side.PixelSize} {stack.PixelSize} {grid.PixelSize}");
+        });
+
+        Try("rename several files", () =>
+        {
+            var folder = Path.Combine(Path.GetTempPath(), "overskin-rename-" + Guid.NewGuid().ToString("N")[..6]);
+            Directory.CreateDirectory(folder);
+            var files = new[] { "b.png", "a.png" }.Select(n => Path.Combine(folder, n)).ToList();
+            foreach (var f in files) File.WriteAllText(f, "x");
+            var tempNames = files.Select(f => f + ".overskin-rename").ToList();
+            for (int i = 0; i < files.Count; i++) File.Move(files[i], tempNames[i]);
+            for (int i = 0; i < files.Count; i++) File.Move(tempNames[i], Path.Combine(folder, $"Trip {i + 1}.png"));
+            Check("rename several files", File.Exists(Path.Combine(folder, "Trip 1.png")) && File.Exists(Path.Combine(folder, "Trip 2.png")));
+            Directory.Delete(folder, true);
+        });
+
+        Try("themes", () =>
+        {
+            foreach (var t in Theming.Themes) Theming.Apply(t.Name);
+            Theming.Apply("Graphite");
+            Check("themes", Colours.Bg == Color.Parse("#121316"), $"{Theming.Themes.Length} applied");
+        });
+
         Try("auto-hide finds a card and its details", () =>
         {
             const string tsv = "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n" +

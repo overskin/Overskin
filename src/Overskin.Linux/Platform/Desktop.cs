@@ -40,6 +40,42 @@ public static class Desktop
         catch { return false; }
     }
 
+    /// <summary>
+    /// Puts files on the clipboard the way file managers do, so pasting into a chat or a folder gives
+    /// the real file (a GIF stays a GIF). A single picture also goes on as a picture.
+    /// </summary>
+    public static async Task<bool> CopyFilesAsync(IReadOnlyList<string> paths, TopLevel? top)
+    {
+        if (paths.Count == 0) return false;
+        var uris = string.Join("\r\n", paths.Select(p => new Uri(Path.GetFullPath(p)).AbsoluteUri));
+        var bytes = System.Text.Encoding.UTF8.GetBytes(uris + "\r\n");
+        if (OperatingSystem.IsLinux())
+        {
+            if (paths.Count == 1 && Converter.IsPicture(paths[0]) && Path.GetExtension(paths[0]).ToLowerInvariant() == ".png")
+            {
+                // pasting a single PNG into an app wants the picture itself
+                if (ScreenGrabber.IsWayland && ScreenGrabber.HasCommand("wl-copy") && await PipeAsync("wl-copy", "--type image/png", await File.ReadAllBytesAsync(paths[0])))
+                    return true;
+            }
+            if (ScreenGrabber.IsWayland && ScreenGrabber.HasCommand("wl-copy") && await PipeAsync("wl-copy", "--type text/uri-list", bytes))
+                return true;
+            if (ScreenGrabber.HasCommand("xclip") && await PipeAsync("xclip", "-selection clipboard -t text/uri-list -i", bytes))
+                return true;
+        }
+        var clipboard = top?.Clipboard;
+        if (clipboard == null) return false;
+        try
+        {
+            var data = new DataObject();
+            data.Set("text/uri-list", bytes);
+            data.Set(DataFormats.Text, string.Join("\n", paths));
+            await clipboard.SetDataObjectAsync(data);
+            await clipboard.FlushAsync();
+            return true;
+        }
+        catch { return false; }
+    }
+
     public static async Task CopyTextAsync(string text, TopLevel? top)
     {
         if (top?.Clipboard is { } clipboard) await clipboard.SetTextAsync(text);
@@ -75,6 +111,38 @@ public static class Desktop
         args.Add(title);
         args.Add(body);
         Start("notify-send", args);
+    }
+
+    /// <summary>Shows the file selected in the file manager (or opens its folder).</summary>
+    public static void ShowInFolder(string path)
+    {
+        if (OperatingSystem.IsLinux() && ScreenGrabber.HasCommand("dbus-send"))
+        {
+            Start("dbus-send", new[] { "--session", "--dest=org.freedesktop.FileManager1", "--type=method_call",
+                "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1.ShowItems",
+                "array:string:" + new Uri(Path.GetFullPath(path)).AbsoluteUri, "string:" });
+            return;
+        }
+        Open(Path.GetDirectoryName(path)!);
+    }
+
+    /// <summary>Into the desktop's trash (gio), so it can be got back; deleted for good only where there's no trash.</summary>
+    public static async Task TrashAsync(IEnumerable<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            if (OperatingSystem.IsLinux() && ScreenGrabber.HasCommand("gio"))
+            {
+                var (ok, _) = await ScreenGrabber.RunAsync("gio", $"trash \"{path}\"");
+                if (ok) continue;
+            }
+            if (OperatingSystem.IsLinux() && ScreenGrabber.HasCommand("trash-put"))
+            {
+                var (ok, _) = await ScreenGrabber.RunAsync("trash-put", $"\"{path}\"");
+                if (ok) continue;
+            }
+            File.Delete(path);
+        }
     }
 
     public static void Open(string pathOrFolder)

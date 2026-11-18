@@ -10,6 +10,11 @@
 - Linux: smart erase, blur / pixelate / mosaic, crop, line tool, turn, flip, resize,
   beautify, auto-hide and copying text (with Tesseract); screenshots on Hyprland and
   Sway (grim); a log for bug reports.
+- Linux: MP4 and GIF recording (ffmpeg on X11, wf-recorder on wlroots desktops, the
+  screen-cast portal with GStreamer on GNOME and KDE), the Library (search including text in
+  pictures, sort, rename and bulk rename, convert, combine, drag out, trash), every colour
+  theme, auto-hide on capture, start with the desktop, and Capture / Record / Library /
+  Settings pages.
 - **Overskin for Linux (preview)**: a new Avalonia app for X11 and Wayland with area and
   screen capture, the editor, pins, a tray menu, auto-save and clipboard copy. Download
   `overskin-linux-x64.tar.gz` and run `install.sh`; bind `overskin --capture` to a key.
