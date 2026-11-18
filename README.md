@@ -2,6 +2,10 @@
 
 # Overskin
 
+**Screenshots, done right.**
+
+<p align="center"><img src="docs/screenshots/hero.png" alt="The Overskin editor and main window"></p>
+
 A free, open-source screenshot and screen-recording tool for Windows. Capture any area,
 window or scrolling page; record MP4 videos with smooth auto-zoom or GIFs; mark it up, hide
 private details, beautify it and drag it straight into any app. Plus the extras artists and
@@ -9,8 +13,6 @@ tinkerers want: pin anything on top of your screen, trace over it, or let Oversk
 you in skribbl.io and Gartic Phone.
 
 One installer, no administrator rights, no account, and nothing leaves your PC.
-
-<p align="center"><img src="docs/screenshots/hero.png" alt="The Overskin editor and main window"></p>
 
 ## Download
 
