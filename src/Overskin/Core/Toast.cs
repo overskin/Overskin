@@ -33,6 +33,9 @@ public static class Toast
     /// <summary>True when the message window is being kept out of captures.</summary>
     public static bool IsGuarded => _window?.IsGuarded == true;
 
+    /// <summary>True when the message window has its leaf-shaped corners.</summary>
+    public static bool IsShaped => _window?.IsShaped == true;
+
     /// <summary>Gone this instant, without fading: used right before taking a screenshot.</summary>
     public static void HideNow() => _window?.HideNow();
 
@@ -87,6 +90,7 @@ public static class Toast
             // resource references rather than fixed brushes, so the toast follows a style change
             box.SetResourceReference(Border.BackgroundProperty, "Panel");
             box.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
+            box.CornerRadius = Corners = (CornerRadius)Application.Current.Resources["RadiusPill"];
             _text.SetResourceReference(TextBlock.ForegroundProperty, "Text");
             Content = box;
 

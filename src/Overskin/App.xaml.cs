@@ -301,6 +301,7 @@ public partial class App : Application
             {
                 Left = 300, Top = 200, Width = 120, Height = 120,
                 Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 0, 255)),
+                Corners = new CornerRadius(16, 3, 16, 3), // shaped windows must stay hidden too
             };
             guarded.Show();
             var plain = Box(450, false, false);
@@ -309,7 +310,8 @@ public partial class App : Application
             bar.Show();
             for (int i = 0; i < 10; i++) { DoEvents(); Thread.Sleep(30); }
             log.Add($"capture guard: guarded window seen={Count(guarded)} (expect 0) ordinary seen={Count(plain)} (expect >3000) " +
-                    $"toast hidden from captures={Toast.IsGuarded} record bar={bar.IsGuarded} (expect True True)");
+                    $"toast hidden from captures={Toast.IsGuarded} record bar={bar.IsGuarded} (expect True True); " +
+                    $"leaf corners: toast={Toast.IsShaped} record bar={bar.IsShaped} test window={guarded.IsShaped} (expect True True True)");
             Toast.HideNow();
             bar.Close(); guarded.Close(); plain.Close();
         }

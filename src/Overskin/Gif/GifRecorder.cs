@@ -257,7 +257,9 @@ internal sealed class RecordBarWindow : GuardedWindow
             BorderBrush = (Brush)FindResource("LineStrong"),
             BorderThickness = new Thickness(1),
             Padding = new Thickness(12, 6, 6, 6),
+            CornerRadius = (CornerRadius)FindResource("RadiusCard"),
         };
+        Corners = (CornerRadius)FindResource("RadiusCard");
 
         _tick.Tick += (_, _) => UpdateTime();
         UpdateTime();
