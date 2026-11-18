@@ -21,6 +21,9 @@ public sealed class Settings
 
     // recording
     public bool RecordPointer { get; set; } = true;
+    /// <summary>Videos glide in on clicks and follow the pointer, with a large smoothed pointer.</summary>
+    public bool AutoZoom { get; set; }
+    public double ZoomLevel { get; set; } = 1.8;
     public int RecordFps { get; set; } = 30;
     public int GifFps { get; set; } = 15;
     /// <summary>GIFs are scaled down to at most this wide (0 = as recorded).</summary>

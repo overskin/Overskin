@@ -50,7 +50,7 @@ jobs:
       - name: Self-test (on a virtual X11 screen, so the screen grab is tested too)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libice6 libsm6 libfontconfig1 >/dev/null
+          sudo apt-get install -y -qq xvfb libice6 libsm6 libfontconfig1 libxtst6 ffmpeg >/dev/null
           xvfb-run -a -s "-screen 0 1280x800x24" build/linux/overskin/overskin --selftest
 
       - uses: actions/upload-artifact@v4

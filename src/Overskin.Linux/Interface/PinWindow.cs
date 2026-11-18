@@ -16,6 +16,22 @@ public sealed class PinWindow : Window
 {
     private readonly Bitmap _picture;
     private double _zoom = 1;
+    private bool _through;
+
+    /// <summary>Every pin that's open, for "make pins clickable again".</summary>
+    public static readonly List<PinWindow> All = new();
+
+    /// <summary>Lets clicks pass through to whatever is under the pin, for tracing over it.</summary>
+    public bool ClickThrough
+    {
+        get => _through;
+        set
+        {
+            _through = value;
+            if (!Input.SetClickThrough(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero, value) && value)
+                Desktop.Notify("Can't let clicks through here", "This desktop doesn't allow it for Overskin's windows.", App.IconFile);
+        }
+    }
 
     public PinWindow(Bitmap picture)
     {
@@ -58,9 +74,18 @@ public sealed class PinWindow : Window
         Item("100% opaque", () => Opacity = 1);
         Item("75% opaque", () => Opacity = 0.75);
         Item("50% opaque", () => Opacity = 0.5);
+        Item("25% opaque", () => Opacity = 0.25);
+        Item("Let clicks through, to trace over it", () =>
+        {
+            if (Opacity > 0.8) Opacity = 0.5;
+            ClickThrough = true;
+            Desktop.Notify("Clicks now pass through the pin", "To move or close it again: tray menu → Make pins clickable again.", App.IconFile);
+        });
         menu.Items.Add(new Separator());
         Item("Close", Close);
         ContextMenu = menu;
+        Opened += (_, _) => All.Add(this);
+        Closed += (_, _) => All.Remove(this);
 
         PointerPressed += (_, e) =>
         {

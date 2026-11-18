@@ -52,6 +52,8 @@ public static class Icons
     public const string Library = "M3,3 h8 v8 h-8 z M13,3 h8 v8 h-8 z M3,13 h8 v8 h-8 z M13,13 h8 v8 h-8 z";
     public const string Gear = "M10,2 h4 l0.6,2.6 l2.2,0.9 l2.3,-1.4 l2.8,2.8 l-1.4,2.3 l0.9,2.2 l2.6,0.6 v4 l-2.6,0.6 l-0.9,2.2 l1.4,2.3 l-2.8,2.8 l-2.3,-1.4 l-2.2,0.9 l-0.6,2.6 h-4 l-0.6,-2.6 l-2.2,-0.9 l-2.3,1.4 l-2.8,-2.8 l1.4,-2.3 l-0.9,-2.2 l-2.6,-0.6 v-4 l2.6,-0.6 l0.9,-2.2 l-1.4,-2.3 l2.8,-2.8 l2.3,1.4 l2.2,-0.9 z M12,8.5 a3.5,3.5 0 1 0 0.01,0 z";
     public const string Window = "M2,4 h20 v16 h-20 z M4,8 v10 h16 v-10 z";
+    public const string Scroll = "M6,2 h12 v20 h-12 z M8,4 v16 h8 v-16 z M12,6 l3,3 h-6 z M12,18 l3,-3 h-6 z";
+    public const string Steps = "M3,4 h4 v4 h-4 z M10,5 h11 v2 h-11 z M3,10 h4 v4 h-4 z M10,11 h11 v2 h-11 z M3,16 h4 v4 h-4 z M10,17 h11 v2 h-11 z";
     public const string Close = "M5,6.5 l1.5,-1.5 l5.5,5.5 l5.5,-5.5 l1.5,1.5 l-5.5,5.5 l5.5,5.5 l-1.5,1.5 l-5.5,-5.5 l-5.5,5.5 l-1.5,-1.5 l5.5,-5.5 z";
 }
 

@@ -16,6 +16,7 @@ public sealed class MainWindow : Window
     private readonly Dictionary<string, ToggleButton> _nav = new();
     private string _current = "Capture";
     private LibraryView? _library;
+    private TracePage? _trace;
 
     public MainWindow()
     {
@@ -28,7 +29,7 @@ public sealed class MainWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         Build();
-        Theming.Changed += () => { _library = null; Build(); };
+        Theming.Changed += () => { _library = null; _trace = null; Build(); };
 
         // closing keeps Overskin running in the tray, ready for the shortcut
         Closing += (_, e) =>
@@ -60,7 +61,7 @@ public sealed class MainWindow : Window
             },
         };
         _nav.Clear();
-        foreach (var (name, icon) in new[] { ("Capture", Icons.Area), ("Record", Icons.Record), ("Library", Icons.Library), ("Settings", Icons.Gear) })
+        foreach (var (name, icon) in new[] { ("Capture", Icons.Area), ("Record", Icons.Record), ("Library", Icons.Library), ("Trace", Icons.Pen), ("Settings", Icons.Gear) })
         {
             var b = new ToggleButton
             {
@@ -87,6 +88,7 @@ public sealed class MainWindow : Window
         {
             "Record" => RecordPage(),
             "Library" => _library ??= new LibraryView(),
+            "Trace" => _trace ??= new TracePage(),
             "Settings" => SettingsPage(),
             _ => CapturePage(),
         };
@@ -110,6 +112,9 @@ public sealed class MainWindow : Window
         tiles.Children.Add(Tile(Icons.Picture, "Open a picture", "Mark up any image", () => _ = App.Current.OpenPictureAsync(pin: false)));
         tiles.Children.Add(Tile(Icons.Pin, "Pin a picture", "Keep it on top of everything", () => _ = App.Current.OpenPictureAsync(pin: true)));
         tiles.Children.Add(Tile(Icons.Folder, "Screenshots folder", "Everything you've saved", App.Current.OpenFolder));
+        tiles.Children.Add(Tile(Icons.Scroll, "Scrolling capture", "A whole long page in one picture", () => _ = App.Current.ScrollCaptureAsync()));
+        tiles.Children.Add(Tile(Icons.Steps, "Record steps", Steps.SeesClicks ? "Every click becomes a how-to step" : "A how-to guide, a key press per step", () => _ = Steps.ToggleAsync()));
+        tiles.Children.Add(Tile(Icons.Library, "Recent captures", "Copy or drag the latest ones", () => new RecentStrip().Show()));
 
         var after = new ComboBox
         {
@@ -165,6 +170,9 @@ public sealed class MainWindow : Window
             {
                 Ui.Label("Recording", "h2"),
                 Check("Show the mouse pointer", s.RecordPointer, v => s.RecordPointer = v),
+                Check("Auto-zoom: glide in on clicks and follow the pointer (videos)", s.AutoZoom, v => s.AutoZoom = v,
+                    ScreenGrabber.IsWayland ? "On Wayland Overskin can't see clicks, so it zooms in where the pointer comes to rest (Hyprland only)." : "Zooms in on each click, follows the pointer, eases back out."),
+                Row("Zoom", Pick(new[] { "A little (1.5×)", "Medium (1.8×)", "Close (2.2×)" }, Array.IndexOf(new[] { 1.5, 1.8, 2.2 }, s.ZoomLevel), i => s.ZoomLevel = new[] { 1.5, 1.8, 2.2 }[i])),
                 Row("Video frame rate", Pick(fps.Select(f => $"{f} frames a second").ToArray(), Array.IndexOf(fps, s.RecordFps), i => s.RecordFps = fps[i])),
                 Row("GIF frame rate", Pick(gifFps.Select(f => $"{f} frames a second").ToArray(), Array.IndexOf(gifFps, s.GifFps), i => s.GifFps = gifFps[i])),
                 Row("GIF size", Pick(new[] { "Up to 480 wide", "Up to 720 wide", "Up to 960 wide", "As recorded" }, Array.IndexOf(gifWidths, s.GifMaxWidth), i => s.GifMaxWidth = gifWidths[i])),

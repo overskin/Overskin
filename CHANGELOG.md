@@ -15,6 +15,10 @@
   pictures, sort, rename and bulk rename, convert, combine, drag out, trash), every colour
   theme, auto-hide on capture, start with the desktop, and Capture / Record / Library /
   Settings pages.
+- Linux: window picking and drawing on the screen before a capture, scrolling capture, the
+  step recorder, the GIF editor, auto-zoom for videos, recent captures, click-through pins
+  and Trace (it draws a picture with the mouse). The trace engine and the auto-zoom camera
+  are now shared with the Windows app.
 - **Overskin for Linux (preview)**: a new Avalonia app for X11 and Wayland with area and
   screen capture, the editor, pins, a tray menu, auto-save and clipboard copy. Download
   `overskin-linux-x64.tar.gz` and run `install.sh`; bind `overskin --capture` to a key.

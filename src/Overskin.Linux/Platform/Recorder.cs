@@ -14,6 +14,8 @@ public sealed class Recorder
 {
     private Process? _process;
     private Portal.ScreenCast? _cast;
+    private PointerTrack? _track;
+    private PixelRect _trackArea;
     private readonly string _videoPath;
     public string OutputPath { get; }
     public bool Gif { get; }
@@ -53,7 +55,7 @@ public sealed class Recorder
     /// picked on (null for the whole screen); on GNOME and KDE under Wayland the desktop asks which
     /// screen or window instead.
     /// </summary>
-    public static async Task<Recorder?> StartAsync(PixelRect? area, string outputPath, bool gif, bool pointer, int fps)
+    public static async Task<Recorder?> StartAsync(PixelRect? area, string outputPath, bool gif, bool pointer, int fps, PixelRect? whole = null, double autoZoom = 0)
     {
         var r = new Recorder(outputPath, gif);
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
@@ -86,6 +88,13 @@ public sealed class Recorder
             r.Method = "screen-cast portal + GStreamer";
         }
         r.Started = DateTime.Now;
+        if (autoZoom > 1 && (area ?? whole) is { } followed && ScreenGrabber.HasCommand("ffmpeg"))
+        {
+            r._track = await PointerTrack.StartAsync();
+            r._trackArea = followed;
+            if (r._track == null) Log.Write("record: auto-zoom off, the desktop doesn't say where the pointer is");
+        }
+        r._zoom = autoZoom;
         Log.Write($"record: started with {r.Method} to {r.OutputPath}");
         await Task.Delay(400);
         if (r._process is { HasExited: true } p)
@@ -96,6 +105,8 @@ public sealed class Recorder
         }
         return r;
     }
+
+    private double _zoom;
 
     private void Start(string tool, string args)
     {
@@ -129,6 +140,7 @@ public sealed class Recorder
         }
         _cast?.Dispose();
         _cast = null;
+        _track?.Stop();
         Log.Write($"record: stopped after {(DateTime.Now - Started).TotalSeconds:0.0}s, keep={keep}");
 
         if (!keep || !File.Exists(_videoPath) || new FileInfo(_videoPath).Length == 0)
@@ -136,6 +148,15 @@ public sealed class Recorder
             try { File.Delete(_videoPath); } catch { }
             if (keep) throw new InvalidOperationException("The recording came out empty. Details are in " + Log.FilePath);
             return null;
+        }
+        if (_track != null && keep)
+        {
+            try
+            {
+                Desktop.Notify("Adding the auto-zoom…", "This takes a little while for long recordings.", App.IconFile);
+                await AutoZoom.ApplyAsync(_videoPath, _track, _trackArea, _zoom, 0.25);
+            }
+            catch (Exception ex) { Log.Write("auto-zoom failed, keeping the plain recording: " + ex.Message); }
         }
         if (!Gif) return OutputPath;
 

@@ -108,6 +108,10 @@ public sealed class App : Application
 
         if (args.Contains("--quit")) { Quit(); return; }
         if (args.Contains("--stop")) { _ = StopRecordingAsync(keep: true); return; }
+        if (args.Contains("--recent")) { new RecentStrip().Show(); return; }
+        if (args.Contains("--scroll")) { _ = ScrollCaptureAsync(); return; }
+        if (args.Contains("--step")) { _ = Steps.AddStepAsync(); return; }
+        if (args.Contains("--steps")) { _ = Steps.ToggleAsync(); return; }
         if (args.Contains("--record")) { _ = RecordAsync(gif: false, delay); return; }
         if (args.Contains("--gif")) { _ = RecordAsync(gif: true, delay); return; }
         if (args.Contains("--capture")) { _ = CaptureAsync(area: true, delay); return; }
@@ -135,6 +139,12 @@ public sealed class App : Application
         Item("Record a video", () => _ = RecordAsync(false, 0));
         Item("Record a GIF", () => _ = RecordAsync(true, 0));
         Item("Stop recording", () => _ = StopRecordingAsync(keep: true));
+        Item("Scrolling capture", () => _ = ScrollCaptureAsync());
+        Item("Record steps (a how-to guide)", () => _ = Steps.ToggleAsync());
+        menu.Items.Add(new NativeMenuItemSeparator());
+        Item("Recent captures", () => new RecentStrip().Show());
+        Item("Make pins clickable again", () => { foreach (var pin in PinWindow.All.ToList()) pin.ClickThrough = false; });
+        Item("Close all pins", () => { foreach (var pin in PinWindow.All.ToList()) pin.Close(); });
         menu.Items.Add(new NativeMenuItemSeparator());
         Item("Open a picture…", () => _ = OpenPictureAsync(pin: false));
         Item("Pin a picture…", () => _ = OpenPictureAsync(pin: true));
@@ -175,18 +185,21 @@ public sealed class App : Application
 
             // pick the area on a still of the screen, where the desktop allows it; GNOME and KDE
             // under Wayland ask which screen or window in their own dialog instead
-            PixelRect? area = null;
+            PixelRect? area = null, whole = null;
             if (!ScreenGrabber.IsWayland || ScreenGrabber.IsWlroots)
             {
                 var still = await ScreenGrabber.GrabAsync();
+                whole = new PixelRect(still.PixelSize);
                 var picked = await CaptureOverlay.PickAsync(still, recording: true);
-                if (picked is not { } rect) return;
-                if (rect != new PixelRect(still.PixelSize)) area = rect;
+                if (picked is not { } pick) return;
+                if (pick.Area != new PixelRect(still.PixelSize)) area = pick.Area;
             }
             if (delaySeconds > 0) await Task.Delay(delaySeconds * 1000);
 
             var path = Settings.NewFilePath(gif ? ".gif" : ".mp4");
-            _recorder = await Recorder.StartAsync(area, path, gif, Settings.RecordPointer, Settings.RecordFps);
+            // with auto-zoom Overskin draws its own big pointer, so the real one is left out
+            bool zoom = Settings.AutoZoom && !gif;
+            _recorder = await Recorder.StartAsync(area, path, gif, Settings.RecordPointer && !zoom, Settings.RecordFps, whole, zoom ? Settings.ZoomLevel : 0);
             if (_recorder == null) return; // cancelled in the desktop's dialog
             _recordBar = new RecordBar(gif, () => _ = StopRecordingAsync(keep: true), () => _ = StopRecordingAsync(keep: false));
             _recordBar.Show();
@@ -196,6 +209,29 @@ public sealed class App : Application
             Log.Write("record failed: " + ex);
             _recorder = null;
             MessageWindow.Show("Couldn't start recording", ex.Message);
+        }
+        finally
+        {
+            _capturing = false;
+        }
+    }
+
+    public async Task ScrollCaptureAsync()
+    {
+        if (_capturing) return;
+        _capturing = true;
+        bool mainWasOpen = _main?.IsVisible == true;
+        try
+        {
+            if (mainWasOpen) _main!.Hide();
+            await Task.Delay(300);
+            var page = await ScrollCapture.RunAsync();
+            if (page != null) await FinishAsync(page);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("scroll capture failed: " + ex);
+            MessageWindow.Show("Scrolling capture didn't work", ex.Message);
         }
         finally
         {
@@ -264,9 +300,16 @@ public sealed class App : Application
             if (area)
             {
                 var picked = await CaptureOverlay.PickAsync(screen);
-                Log.Write("capture: picked " + (picked?.ToString() ?? "nothing (cancelled)"));
-                if (picked is not { } rect) return;
-                shot = rect == new PixelRect(screen.PixelSize) ? screen : Imaging.Crop(screen, rect);
+                Log.Write("capture: picked " + (picked?.Area.ToString() ?? "nothing (cancelled)"));
+                if (picked is not { } pick) return;
+                if (pick.Marks.Count > 0)
+                {
+                    // what was drawn on the screen first becomes part of the picture
+                    var drawn = new EditorCanvas(screen);
+                    drawn.AddRange(pick.Marks);
+                    screen = drawn.Export();
+                }
+                shot = pick.Area == new PixelRect(screen.PixelSize) ? screen : Imaging.Crop(screen, pick.Area);
             }
             await FinishAsync(shot);
         }

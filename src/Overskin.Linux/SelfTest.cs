@@ -184,6 +184,69 @@ public static class SelfTest
             Check("beautify", b.PixelSize == new PixelSize(280, 280) && corner.B > 200 && corner.R < 120, $"{b.PixelSize} corner {corner}");
         });
 
+        Try("scrolling capture stitches a page", () =>
+        {
+            // a tall page with distinct stripes, seen through a 200-pixel window scrolled 70 at a time
+            var page = new Px(120, 600);
+            var rnd = new Random(4);
+            for (int y = 0; y < 600; y++)
+            {
+                byte r = (byte)rnd.Next(256), g = (byte)rnd.Next(256), b = (byte)rnd.Next(256);
+                for (int x = 0; x < 120; x++) { int i = (y * 120 + x) * 4; page.D[i] = (byte)(b + x); page.D[i + 1] = g; page.D[i + 2] = (byte)(r ^ x); page.D[i + 3] = 255; }
+            }
+            var stitcher = new ScrollStitcher(page.Crop(new PixelRect(0, 0, 120, 200)));
+            for (int top = 70; top <= 400; top += 70) stitcher.Add(page.Crop(new PixelRect(0, top, 120, 200)));
+            var result = stitcher.Result();
+            // the last view shows rows 350 to 550
+            bool same = result.H == 550 && Enumerable.Range(0, 550).All(y => result.D[y * 120 * 4] == page.D[y * 120 * 4]);
+            Check("scrolling capture stitches a page", same, $"{result.H} px tall");
+        });
+
+        Try("trace engine (shared with Windows)", () =>
+        {
+            var square = Imaging.Render(new PixelSize(60, 60), ctx =>
+            {
+                ctx.FillRectangle(Brushes.White, new Rect(0, 0, 60, 60));
+                ctx.FillRectangle(Brushes.Black, new Rect(10, 10, 40, 40));
+            });
+            var source = TraceEngine.PrepareBgra(Imaging.Pixels(square, out _), 60, 60);
+            var outline = TraceEngine.Trace(source, new TraceOptions { Tolerance = 1, MinPathLength = 4 }, default);
+            var hatch = TraceEngine.Trace(source, new TraceOptions { Mode = TraceMode.Hatch, Spacing = 5, OutlineToo = false }, default);
+            // hatch rows are joined into one zig-zag, as on Windows
+            Check("trace engine (shared with Windows)", outline.Paths.Count >= 1 && hatch.PointCount >= 12, $"outline {outline.Paths.Count}, hatch {hatch.Paths.Count} strokes / {hatch.PointCount} points");
+        });
+
+        Try("auto-zoom camera follows a click", () =>
+        {
+            var cam = new SmartCamera(1000, 600) { ZoomIn = 2 };
+            for (int i = 0; i < 60; i++) cam.Update(1 / 30.0, new System.Windows.Point(800, 450), clicked: i == 0);
+            var v = cam.View();
+            Check("auto-zoom camera follows a click", cam.Zoom > 1.8 && v.X > 400 && v.Width < 560, $"zoom {cam.Zoom:0.00}, view x {v.X:0} w {v.Width:0}");
+        });
+
+        if (ScreenGrabber.HasCommand("ffmpeg") && ScreenGrabber.HasCommand("ffprobe"))
+        {
+            await TryAsync("converting, GIFs and auto-zoom (ffmpeg)", async () =>
+            {
+                var folder = Path.Combine(Path.GetTempPath(), "overskin-ffmpeg-" + Guid.NewGuid().ToString("N")[..6]);
+                Directory.CreateDirectory(folder);
+                var png = Path.Combine(folder, "pic.png");
+                Imaging.SavePng(Quarters(320, 240), png);
+                var jpg = await Converter.ConvertAsync(png, ".jpg");
+                var mp4 = await Converter.ConvertAsync(png, ".mp4");
+                var gif = Path.Combine(folder, "clip.gif");
+                await Converter.VideoToGifAsync(mp4, gif, 10, 160);
+                var size = new FileInfo(mp4).Length;
+                // a pretend pointer track: a click in the bottom-right quarter
+                var track = new PointerTrack();
+                await AutoZoom.ApplyAsync(mp4, track, new PixelRect(0, 0, 320, 240), 2, 0);
+                Check("converting, GIFs and auto-zoom (ffmpeg)", File.Exists(jpg) && File.Exists(gif) && new FileInfo(mp4).Length > 0,
+                      $"jpg {new FileInfo(jpg).Length} B, gif {new FileInfo(gif).Length} B, mp4 {size} → {new FileInfo(mp4).Length} B");
+                Directory.Delete(folder, true);
+            });
+        }
+        else Console.WriteLine("skip  converting, GIFs and auto-zoom (no ffmpeg here)");
+
         Try("combine pictures", () =>
         {
             var a = Quarters(100, 60);

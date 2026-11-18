@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Media;
+#if !OVERSKIN_LINUX
 using System.Windows.Media.Imaging;
+#endif
 
 namespace Overskin;
 
@@ -97,6 +99,7 @@ public static class TraceEngine
     //  preparation
     // ===================================================================================
 
+#if !OVERSKIN_LINUX
     /// <summary>Flattens any bitmap onto white and splits it into grey and colour. Call on the UI thread.</summary>
     public static TraceSource Prepare(BitmapSource source)
     {
@@ -112,7 +115,13 @@ public static class TraceEngine
         int w = bgra.PixelWidth, h = bgra.PixelHeight, stride = w * 4;
         byte[] px = new byte[stride * h];
         bgra.CopyPixels(px, stride, 0);
+        return PrepareBgra(px, w, h);
+    }
+#endif
 
+    /// <summary>The same from straight BGRA pixels (already no bigger than <see cref="MaxSourceSide"/>).</summary>
+    public static TraceSource PrepareBgra(byte[] px, int w, int h)
+    {
         byte[] gray = new byte[w * h];
         byte[] rgb = new byte[w * h * 3];
         for (int i = 0, p = 0; i < gray.Length; i++, p += 4)
@@ -1539,6 +1548,7 @@ public static class TraceEngine
         return px;
     }
 
+#if !OVERSKIN_LINUX
     /// <summary>Frozen geometry of the paths, in working coordinates. With a colour, only that colour's paths.</summary>
     public static Geometry BuildGeometry(TraceResult result, int colour = -1)
     {
@@ -1574,4 +1584,5 @@ public static class TraceEngine
         bmp.Freeze();
         return bmp;
     }
+#endif
 }

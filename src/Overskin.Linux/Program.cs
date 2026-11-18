@@ -15,6 +15,10 @@ public static class Program
           overskin --record        record a video of an area (again to stop)
           overskin --gif           record a GIF of an area
           overskin --stop          stop the recording
+          overskin --scroll        scrolling capture of a long page
+          overskin --steps         start or finish recording steps (a how-to guide)
+          overskin --step          add a step now (for Wayland, where clicks can't be seen)
+          overskin --recent        the latest captures, to copy or drag
           overskin --open FILE     open a picture in the editor
           overskin --pin FILE      pin a picture on top of everything
           overskin --tray          start in the tray without opening the window

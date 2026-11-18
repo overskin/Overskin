@@ -297,6 +297,7 @@ public sealed class LibraryView : DockPanel
             Item(Converter.IsPicture(one) ? "Edit" : "Play", () => Open(one, edit: true));
             if (Converter.IsPicture(one)) Item("Pin on top", () => App.Current.PinFile(one));
             Item("Open with the default app", () => Desktop.Open(one));
+            if (Converter.IsMoving(one)) Item("Edit as a GIF (trim, speed, caption)", () => _ = GifEditor.OpenAsync(one));
         }
         Item(sel.Count == 1 ? "Copy" : $"Copy {sel.Count} files", () => _ = CopyAsync());
         Item(sel.Count == 1 ? "Copy the path" : "Copy the paths", () => _ = Desktop.CopyTextAsync(string.Join("\n", sel), TopLevel.GetTopLevel(this)));

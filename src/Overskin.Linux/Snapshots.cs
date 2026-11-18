@@ -34,7 +34,7 @@ public static class Snapshots
             App.Settings.SaveFolder = library;
 
             var main = new MainWindow();
-            foreach (var page in new[] { "Capture", "Record", "Library", "Settings" })
+            foreach (var page in new[] { "Capture", "Record", "Library", "Trace", "Settings" })
             {
                 main.Go(page);
                 await Shoot(main, Path.Combine(outDir, $"linux-{page.ToLowerInvariant()}.png"), close: false);
@@ -62,7 +62,7 @@ public static class Snapshots
                 Content = new SelectionSurface(demo),
             };
             overlay.Opened += (_, _) => ((SelectionSurface)overlay.Content!).Pretend(new Point(600, 200), new Point(1080, 740));
-            await Shoot(overlay, Path.Combine(outDir, "linux-capture.png"));
+            await Shoot(overlay, Path.Combine(outDir, "linux-overlay.png"));
 
             Console.WriteLine("snapshots saved to " + Path.GetFullPath(outDir));
             return 0;

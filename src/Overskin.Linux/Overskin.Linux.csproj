@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>$(DefineConstants);OVERSKIN_LINUX</DefineConstants>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 
     <AssemblyName>overskin</AssemblyName>
@@ -35,6 +36,9 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+    <!-- the trace engine is shared with the Windows app; WpfShim.cs stands in for the WPF types it uses -->
+    <Compile Include="..\Overskin\Trace\TraceEngine.cs" LinkBase="Shared" />
+    <Compile Include="..\Overskin\Video\SmartCamera.cs" LinkBase="Shared" />
   </ItemGroup>
 
 </Project>
