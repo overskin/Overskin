@@ -2249,7 +2249,7 @@ public partial class MainWindow : Window
                 ed.AddForTest(new Annotation { Kind = AnnotationKind.Arrow, Points = { new Point(80, 820), new Point(330, 600) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 5 });
                 ed.AddForTest(new Annotation { Kind = AnnotationKind.Rectangle, Points = { new Point(600, 200), new Point(1080, 740) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 5 });
                 ed.AddForTest(new Annotation { Kind = AnnotationKind.Step, Points = { new Point(600, 200) }, Color = Color.FromRgb(0x3B, 0x82, 0xF6), Size = 6, Number = 1 });
-                ed.AddForTest(new Annotation { Kind = AnnotationKind.Text, Points = { new Point(620, 760) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 6, Text = "the house" });
+                ed.AddForTest(new Annotation { Kind = AnnotationKind.Text, Points = { new Point(620, 760) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 6, Text = "five tools in one" });
                 ed.AddForTest(new Annotation { Kind = AnnotationKind.Highlighter, Points = { new Point(560, 120), new Point(900, 120) }, Color = Color.FromRgb(0xFA, 0xCC, 0x15), Size = 8 });
                 await Task.Delay(500);
                 var edShot = new RenderTargetBitmap((int)(ed.ActualWidth * 1.5), (int)(ed.ActualHeight * 1.5), 144, 144, PixelFormats.Pbgra32);
@@ -2282,7 +2282,7 @@ public partial class MainWindow : Window
                 var ge = new GifEditorWindow(gclip, "Recording 14.03.22  ·  2 frames", new GifEditorHost { Folder = folder, Saved = _ => { } });
                 ge.Show();
                 await Task.Delay(500);
-                ge.TopBox.Text = "me when the house finally loads";
+                ge.TopBox.Text = "me when the screenshot is already on my clipboard";
                 await Task.Delay(400);
                 var geShot = new RenderTargetBitmap((int)(ge.ActualWidth * 1.5), (int)(ge.ActualHeight * 1.5), 144, 144, PixelFormats.Pbgra32);
                 geShot.Render((FrameworkElement)ge.Content);
