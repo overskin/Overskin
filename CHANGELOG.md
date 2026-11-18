@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.5.0
 
 - **Live text in the editor**: with the Select tool (V), drag over the words in a screenshot to
   select them like in a PDF. Ctrl+C copies them, Delete erases them (smart erase fills in from
