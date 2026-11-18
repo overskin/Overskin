@@ -198,7 +198,7 @@ public static class Input
             for (int i = 0; i < (int)n; i++) windows[i] = ((IntPtr*)data)[i];
             XFree(data);
 
-            foreach (var w in windows.Reverse()) // the list runs bottom to top
+            foreach (var w in Enumerable.Reverse(windows)) // the list runs bottom to top
             {
                 if (XGetWindowAttributes(d, w, out var a) == 0 || a.map_state != 2) continue; // not viewable
                 if (HasAtom(d, w, state, hidden)) continue;
