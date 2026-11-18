@@ -7,21 +7,7 @@
   the number is there too, IPv6 addresses, folder paths, street addresses, cities, states,
   postcodes and countries. Right-click the Auto-hide button (or its setting) to choose
   which of them it hides.
-- Linux: smart erase, blur / pixelate / mosaic, crop, line tool, turn, flip, resize,
-  beautify, auto-hide and copying text (with Tesseract); screenshots on Hyprland and
-  Sway (grim); a log for bug reports.
-- Linux: MP4 and GIF recording (ffmpeg on X11, wf-recorder on wlroots desktops, the
-  screen-cast portal with GStreamer on GNOME and KDE), the Library (search including text in
-  pictures, sort, rename and bulk rename, convert, combine, drag out, trash), every colour
-  theme, auto-hide on capture, start with the desktop, and Capture / Record / Library /
-  Settings pages.
-- Linux: window picking and drawing on the screen before a capture, scrolling capture, the
-  step recorder, the GIF editor, auto-zoom for videos, recent captures, click-through pins
-  and Trace (it draws a picture with the mouse). The trace engine and the auto-zoom camera
-  are now shared with the Windows app.
-- **Overskin for Linux (preview)**: a new Avalonia app for X11 and Wayland with area and
-  screen capture, the editor, pins, a tray menu, auto-save and clipboard copy. Download
-  `overskin-linux-x64.tar.gz` and run `install.sh`; bind `overskin --capture` to a key.
+- Overskin is Windows-only for now; Linux and macOS versions are planned.
 
 ## 2.4.0
 

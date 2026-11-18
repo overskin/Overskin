@@ -35,6 +35,8 @@ public partial class EditorWindow : Window
     // remembered for the next editor in this session
     private static string _lastColour = "#EF4444";
     private static double _lastSize = 3;
+    private static double _lastOpacity = 1;
+    private double _opacity = 1;
     private static Tool _lastTool = Tool.Arrow;
     private static HideMode _lastHide = HideMode.Pixelate;
 
@@ -80,8 +82,11 @@ public partial class EditorWindow : Window
 
         _syncing = true;
         SizeSlider.Value = _lastSize;
+        OpacitySlider.Value = Math.Round(_lastOpacity * 100);
+        OpacityText.Text = $"{OpacitySlider.Value:0}%";
         _syncing = false;
         _size = _lastSize;
+        _opacity = _lastOpacity;
         SetColour(_lastColour);
         SelectTool(_lastTool);
         ApplyBase();
@@ -270,6 +275,20 @@ public partial class EditorWindow : Window
         }
     }
 
+    private void Opacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!IsInitialized) return;
+        OpacityText.Text = $"{OpacitySlider.Value:0}%";
+        if (_syncing) return;
+        _opacity = _lastOpacity = OpacitySlider.Value / 100.0;
+        if (_selected != null && _selected.Kind != AnnotationKind.Pixelate && !_down)
+        {
+            PushUndo();
+            _selected.Opacity = _opacity;
+            Render();
+        }
+    }
+
     private void Size_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_syncing || !IsInitialized) return;
@@ -377,7 +396,7 @@ public partial class EditorWindow : Window
             {
                 PushUndo();
                 int next = _items.Where(a => a.Kind == AnnotationKind.Step).Select(a => a.Number).DefaultIfEmpty(0).Max() + 1;
-                _items.Add(new Annotation { Kind = AnnotationKind.Step, Points = { p }, Color = _colour, Size = _size, Number = next });
+                _items.Add(new Annotation { Kind = AnnotationKind.Step, Points = { p }, Color = _colour, Size = _size, Number = next, Opacity = _opacity });
                 Render();
                 return;
             }
@@ -411,7 +430,7 @@ public partial class EditorWindow : Window
             Tool.Line => AnnotationKind.Line, Tool.Pen => AnnotationKind.Pen, Tool.Highlighter => AnnotationKind.Highlighter,
             _ => AnnotationKind.Pixelate,
         };
-        _drawing = new Annotation { Kind = kind, Color = kind == AnnotationKind.Highlighter && _colour == Colors.Red ? _colour : _colour, Size = _size };
+        _drawing = new Annotation { Kind = kind, Color = _colour, Size = _size, Opacity = _opacity };
         _drawing.Points.Add(p);
         if (kind is not (AnnotationKind.Pen or AnnotationKind.Highlighter)) _drawing.Points.Add(p);
         if (kind == AnnotationKind.Pixelate)
@@ -631,7 +650,7 @@ public partial class EditorWindow : Window
         if (hit.Kind is AnnotationKind.Rectangle or AnnotationKind.Ellipse)
             Item("Filled", () => { PushUndo(); hit.Filled = !hit.Filled; Render(); }, hit.Filled);
         if (hit.Kind != AnnotationKind.Pixelate)
-            Item("Use the current colour and size", () => { PushUndo(); hit.Color = _colour; hit.Size = _size; Render(); ShowSelection(); });
+            Item("Use the current colour, size and opacity", () => { PushUndo(); hit.Color = _colour; hit.Size = _size; hit.Opacity = _opacity; Render(); ShowSelection(); });
         Item("Duplicate", () =>
         {
             PushUndo();
@@ -775,7 +794,7 @@ public partial class EditorWindow : Window
         if (text.Length > 0)
         {
             if (_textOriginal == null) PushUndo();
-            _items.Add(new Annotation { Kind = AnnotationKind.Text, Points = { _start }, Color = colour, Size = size, Text = text });
+            _items.Add(new Annotation { Kind = AnnotationKind.Text, Points = { _start }, Color = colour, Size = size, Text = text, Opacity = _textOriginal?.Opacity ?? _opacity });
         }
         _textOriginal = null;
         Render();

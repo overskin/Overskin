@@ -19,3 +19,9 @@ staging/
 overskin.settings.json
 onionskin.settings.json
 overlay.settings.json
+
+# the Linux version: kept on this PC while it is worked on, not published yet
+src/Overskin.Linux/
+packaging/linux/
+build-linux.sh
+docs/screenshots/linux-*.png

@@ -158,6 +158,12 @@
                         <Slider x:Name="SizeSlider" Width="96" Minimum="1" Maximum="12" SmallChange="1" LargeChange="1"
                                 TickFrequency="1" IsSnapToTickEnabled="True" Value="3" ValueChanged="Size_Changed" />
                         <local:Icon Data="{StaticResource IcCircle}" Width="15" Height="15" Foreground="{DynamicResource TextDim}" Margin="8,0,0,0" />
+                        <local:Icon Data="{StaticResource IcDroplet}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="14,0,8,0"
+                                    ToolTip="Opacity: how see-through new marks are (and the selected one)" />
+                        <Slider x:Name="OpacitySlider" Width="80" Minimum="10" Maximum="100" SmallChange="5" LargeChange="10"
+                                TickFrequency="5" IsSnapToTickEnabled="True" Value="100" ValueChanged="Opacity_Changed"
+                                ToolTip="Opacity: how see-through new marks are (and the selected one)" />
+                        <TextBlock x:Name="OpacityText" Text="100%" Width="34" Margin="6,0,0,0" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextDim}" />
 
                         <StackPanel x:Name="HideOptions" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                             <Border Style="{StaticResource ToolSep}" />

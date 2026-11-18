@@ -28,6 +28,8 @@ public sealed class Annotation
     public bool Filled { get; set; }
     /// <summary>Hidden areas: blurred, pixelated or mosaic.</summary>
     public HideMode Mode { get; set; } = HideMode.Pixelate;
+    /// <summary>0.1 to 1: how see-through the mark is. Hidden areas always stay solid.</summary>
+    public double Opacity { get; set; } = 1;
 
     public Annotation Clone() => new()
     {
@@ -40,6 +42,7 @@ public sealed class Annotation
         Pixels = Pixels,
         Filled = Filled,
         Mode = Mode,
+        Opacity = Opacity,
     };
 
     public void Translate(double dx, double dy)
@@ -95,6 +98,14 @@ public sealed class Annotation
     };
 
     public UIElement ToElement()
+    {
+        var element = Build();
+        // a see-through blur would let what it hides show, so hidden areas ignore it
+        if (Kind != AnnotationKind.Pixelate) element.Opacity *= Math.Clamp(Opacity, 0.05, 1);
+        return element;
+    }
+
+    private UIElement Build()
     {
         var brush = new SolidColorBrush(Color);
         brush.Freeze();

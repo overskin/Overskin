@@ -6,7 +6,7 @@
 
 <p align="center"><img src="docs/screenshots/hero.png" alt="The Overskin editor and main window"></p>
 
-A free, open-source screenshot and screen-recording tool for Windows. Capture any area,
+A free, open-source screenshot and screen-recording tool for Windows (Linux and macOS are planned). Capture any area,
 window or scrolling page; record MP4 videos with smooth auto-zoom or GIFs; mark it up, hide
 private details, beautify it and drag it straight into any app. Plus the extras artists and
 tinkerers want: pin anything on top of your screen, trace over it, or let Overskin draw it for
@@ -25,47 +25,9 @@ updates it in place and keeps your settings.
 It needs Windows 10 1809 or later (64-bit). Windows SmartScreen may warn about an unsigned
 app the first time: choose **More info → Run anyway**.
 
-### Linux (preview)
+### Platforms
 
-Download **`overskin-linux-x64.tar.gz`** from the [latest release](../../releases/latest), then:
-
-```bash
-tar -xzf overskin-linux-x64.tar.gz && ./overskin/install.sh
-```
-
-That puts `overskin` in `~/.local/bin` and adds it to your app menu, for your user only (no
-sudo). Add `--autostart` to start it with your desktop in the tray, or `--uninstall` to remove
-it. It's one self-contained program and works on X11 and Wayland (GNOME, KDE, Sway, Hyprland
-and others).
-
-The Linux version is new and has nearly everything: area, window, screen and scrolling
-capture, with drawing on the screen first and a magnifier; the editor (arrows, lines, boxes,
-circles, pen, highlighter, text, numbered steps, blur / pixelate / mosaic, smart erase, crop,
-turn, flip, resize, beautify, auto-hide, copying text, full undo); MP4 and GIF recording with
-auto-zoom; the GIF editor; the step recorder; the Library (search, sort, select several,
-rename, convert, combine, drag out, trash); recent captures; pins, including see-through and
-click-through for tracing; Trace, which draws a picture with the mouse; themes; and the tray
-menu. What Wayland itself doesn't allow is noted where it matters: on GNOME and KDE under
-Wayland, window picking, scrolling by itself, seeing clicks and moving the mouse aren't open to
-apps (Hyprland and Sway allow more, and ydotool can move the mouse).
-
-Optional helpers it uses when they're installed: `ffmpeg` (recording on X11, GIFs,
-converting), `wf-recorder` (recording on Hyprland and Sway), GStreamer with its PipeWire
-plugin (recording on GNOME and KDE under Wayland), and `tesseract` (auto-hide, copying text,
-searching the text in pictures), and `ydotool` (moving the mouse on Wayland, for scrolling capture
-and Trace). Overskin says which one is missing when you need it.
-
-Desktops keep global shortcuts to themselves on Linux, so bind a key in your keyboard settings
-to `overskin --capture` (or `--screen`, `--delay 3`, `--record`, `--gif`, `--stop`).
-`--scroll`, `--steps`, `--step` and `--recent` work the same way; `overskin --help` lists
-everything.
-On Wayland the first capture may ask you to allow screenshots. On Hyprland, Sway and other
-wlroots desktops, install `grim`, which Overskin uses to read the screen there. For copying to the
-clipboard, install `wl-clipboard` (Wayland) or `xclip` (X11) if you don't have them already.
-If something goes wrong, **Copy details for a bug report** at the bottom of the window copies
-what Overskin logged (`~/.cache/overskin/overskin.log`).
-
-<p align="center"><img src="docs/screenshots/linux-editor.png" width="760" alt="The Overskin editor on Linux"></p>
+Overskin runs on **Windows** today. **Linux** and **macOS** versions are planned for the future.
 
 ## Screenshots
 
@@ -254,11 +216,6 @@ That writes `dist/OverskinSetup.exe`, the installer with the app inside it (the 
 is built into `build/app` on the way). Open `Overskin.sln` to work on either in Visual Studio or
 Rider.
 
-For Linux, `./build-linux.sh` (on Linux, with the .NET 8 SDK) writes
-`dist/overskin-linux-x64.tar.gz`. `overskin --selftest` checks it, and `dotnet run --project
-src/Overskin.Linux -- --demo picture.png` runs it on any system with a picture standing in for
-the screen.
-
 `OverskinSetup.exe` also takes `--quiet` with `--dir PATH`, `--no-startmenu`, `--desktop`,
 `--startup` / `--no-startup` and `--launch`. `Uninstall.exe --uninstall --quiet` removes it
 again (add `--remove-settings` to delete its settings too).
@@ -284,8 +241,7 @@ unless you choose another folder.
 | `src/Overskin/Themes/` | Control styles, palette and icons |
 | `src/Overskin/Assets/` | App icon and logo |
 | `src/Installer/` | `OverskinSetup.exe`: the per-user installer and uninstaller |
-| `src/Overskin.Linux/` | The Linux version (Avalonia): capture, editor, pins, tray |
-| `packaging/linux/` | The Linux install script and menu entry |
+| `src/Shared/` | Code that doesn't depend on Windows, kept apart for the planned Linux and macOS versions |
 | `docs/screenshots/` | The pictures in this README |
 
 ## Known limitations
