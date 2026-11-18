@@ -31,4 +31,8 @@
     <Resource Include="Assets\overskin.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+  </ItemGroup>
+
 </Project>

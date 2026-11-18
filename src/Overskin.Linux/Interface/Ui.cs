@@ -44,6 +44,14 @@ public static class Icons
     public const string Redo = "M16,5 v-3 l6,5 l-6,5 v-3 h-6 a5,5 0 0 0 0,10 h6 v3 h-6 a8,8 0 0 1 0,-16 z";
     public const string Copy = "M8,2 h12 v14 h-12 z M10,4 v10 h8 v-10 z M4,6 h2 v14 h10 v2 h-12 z";
     public const string Save = "M4,3 h13 l4,4 v14 h-17 z M7,5 v4 h9 v-4 z M12,12 a3,3 0 1 0 0.01,0 z";
+    public const string Line = "M4,18.6 l14.6,-14.6 l1.4,1.4 l-14.6,14.6 z";
+    public const string Eraser = "M15,3 l6,6 l-10,10 h-6 l-3,-3 z M14,6 l-8,8 l2,2 h2.5 l6.5,-6.5 z M11,21 h10 v-2 h-8 z";
+    public const string Crop = "M6,2 h2 v14 h14 v2 h-4 v4 h-2 v-4 h-10 z M10,6 h8 v8 h-2 v-6 h-6 z M2,6 h4 v2 h-4 z";
+    public const string Record = "M12,4 A8,8 0 1 1 11.99,4 z";
+    public const string Stop = "M6,6 h12 v12 h-12 z";
+    public const string Library = "M3,3 h8 v8 h-8 z M13,3 h8 v8 h-8 z M3,13 h8 v8 h-8 z M13,13 h8 v8 h-8 z";
+    public const string Gear = "M10,2 h4 l0.6,2.6 l2.2,0.9 l2.3,-1.4 l2.8,2.8 l-1.4,2.3 l0.9,2.2 l2.6,0.6 v4 l-2.6,0.6 l-0.9,2.2 l1.4,2.3 l-2.8,2.8 l-2.3,-1.4 l-2.2,0.9 l-0.6,2.6 h-4 l-0.6,-2.6 l-2.2,-0.9 l-2.3,1.4 l-2.8,-2.8 l1.4,-2.3 l-0.9,-2.2 l-2.6,-0.6 v-4 l2.6,-0.6 l0.9,-2.2 l-1.4,-2.3 l2.8,-2.8 l2.3,1.4 l2.2,-0.9 z M12,8.5 a3.5,3.5 0 1 0 0.01,0 z";
+    public const string Window = "M2,4 h20 v16 h-20 z M4,8 v10 h16 v-10 z";
     public const string Close = "M5,6.5 l1.5,-1.5 l5.5,5.5 l5.5,-5.5 l1.5,1.5 l-5.5,5.5 l5.5,5.5 l-1.5,1.5 l-5.5,-5.5 l-5.5,5.5 l-1.5,-1.5 l5.5,-5.5 z";
 }
 

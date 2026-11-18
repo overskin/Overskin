@@ -380,6 +380,29 @@ public partial class App : Application
             var found = Redaction.FindPrivate(words);
             log.Add($"private details: {string.Join(", ", found.Select(f => f.Kind))} (expect email, phone number, card number, IP address; not the order number or version)");
 
+            // the cases from testing: a Visa read with l for 1, its expiry and code, IPv6, folders, addresses
+            List<OcrWord> L(double y, params string[] ws)
+            {
+                var list = new List<OcrWord>();
+                double x = 0;
+                foreach (var w in ws) { list.Add(new(w, new Rect(x, y, w.Length * 7, 10))); x += w.Length * 7 + 5; }
+                return list;
+            }
+            var more = new List<List<OcrWord>>
+            {
+                L(0, "Visa", "4lll", "1111", "1lI1", "1111"),
+                L(20, "Expires", "12/28", "CVV", "123"),
+                L(40, "Host", "2001:db8:85a3::8a2e:370:7334", "and", "fe80::1", "at", "12:30:45"),
+                L(60, "Saved", "to", @"C:\Users\sam\Documents\taxes", "and", "/home/sam/notes"),
+                L(80, "1600", "Pennsylvania", "Avenue", "NW,", "Washington,", "DC", "20500"),
+                L(100, "Hauptstraße", "12,", "10115", "Berlin,", "Germany"),
+            };
+            var got = Redaction.FindPrivate(more, Overskin.Shared.PrivateKinds.All);
+            log.Add($"private details, harder: {string.Join(", ", got.Select(f => f.Kind))} (expect card number, expiry date, security code, IP address x2, folder path x2, street address, place(s), street address, place, country; not 12:30:45)");
+            var noCard = Redaction.FindPrivate(new List<List<OcrWord>> { L(0, "Meeting", "12/28", "CVV", "123") }, Overskin.Shared.PrivateKinds.All);
+            var off = Redaction.FindPrivate(more, Overskin.Shared.PrivateKinds.Emails);
+            log.Add($"private details without a card: {noCard.Count} (expect 0); with only emails switched on: {off.Count} (expect 0)");
+
             var page = Picture(900, 200, dc =>
             {
                 dc.DrawRectangle(System.Windows.Media.Brushes.White, null, new Rect(0, 0, 900, 200));
@@ -389,6 +412,19 @@ public partial class App : Application
                 Line("Contact: sam.taylor@example.org", 20);
                 Line("Phone (020) 7946 0958, server 10.0.0.42", 80);
             });
+            var cardPage = Picture(900, 260, dc =>
+            {
+                dc.DrawRectangle(System.Windows.Media.Brushes.White, null, new Rect(0, 0, 900, 260));
+                var face = new System.Windows.Media.Typeface("Segoe UI");
+                void Line(string s, double y) => dc.DrawText(new System.Windows.Media.FormattedText(s, System.Globalization.CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight, face, 26, System.Windows.Media.Brushes.Black, 1), new Point(20, y));
+                Line("Card number 4111 1111 1111 1111", 20);
+                Line("Expires 09/27    CVV 737", 70);
+                Line("Router fe80::1ff:fe23:4567:890a", 120);
+                Line(@"Saved in C:\Users\sam\Documents", 170);
+            });
+            var cardReal = Task.Run(() => Redaction.FindPrivateAsync(cardPage)).GetAwaiter().GetResult();
+            log.Add($"card read off a picture: {(cardReal == null ? "no text reader" : string.Join(", ", cardReal.Select(f => f.Kind)))} (expect card number, IP address, folder path, expiry date, security code)");
             var real = Task.Run(() => Redaction.FindPrivateAsync(page)).GetAwaiter().GetResult();
             log.Add($"private details read off a picture: {(real == null ? "no text reader" : string.Join(", ", real.Select(f => f.Kind)))} (expect email, phone number, IP address)");
 

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Auto-hide** finds more and misses less: card numbers that the text reader garbles
+  (1s read as l or I, or a line it skips), the card's expiry date and security code when
+  the number is there too, IPv6 addresses, folder paths, street addresses, cities, states,
+  postcodes and countries. Right-click the Auto-hide button (or its setting) to choose
+  which of them it hides.
+- Linux: smart erase, blur / pixelate / mosaic, crop, line tool, turn, flip, resize,
+  beautify, auto-hide and copying text (with Tesseract); screenshots on Hyprland and
+  Sway (grim); a log for bug reports.
 - **Overskin for Linux (preview)**: a new Avalonia app for X11 and Wayland with area and
   screen capture, the editor, pins, a tray menu, auto-save and clipboard copy. Download
   `overskin-linux-x64.tar.gz` and run `install.sh`; bind `overskin --capture` to a key.

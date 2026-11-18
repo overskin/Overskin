@@ -14,6 +14,8 @@ public sealed class Settings
     public bool ShowWindowOnStart { get; set; } = true;
     public string PenColour { get; set; } = "#EF4444";
     public double PenWidth { get; set; } = 4;
+    /// <summary>What auto-hide looks for.</summary>
+    public Overskin.Shared.PrivateKinds AutoHideKinds { get; set; } = Overskin.Shared.PrivateKinds.Default;
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 

@@ -30,17 +30,17 @@ public static class TextRecognizer
     }
 
     /// <summary>Every line as its words with their boxes, or null when no OCR language is installed.</summary>
-    public static async Task<List<List<OcrWord>>?> RecognizeLinesAsync(BitmapSource image)
+    public static async Task<List<List<OcrWord>>?> RecognizeLinesAsync(BitmapSource image, double? forceScale = null, double stretchX = 1)
     {
         var engine = Engine();
         if (engine == null) return null;
 
         // small text reads much better enlarged; the engine's limit is 10 000 px per side
-        double scale = Math.Clamp(1600.0 / Math.Max(image.PixelWidth, image.PixelHeight), 1, 3);
+        double scale = forceScale ?? Math.Clamp(1600.0 / Math.Max(image.PixelWidth, image.PixelHeight), 1, 3);
         if (Math.Max(image.PixelWidth, image.PixelHeight) * scale > OcrEngine.MaxImageDimension)
             scale = (double)OcrEngine.MaxImageDimension / Math.Max(image.PixelWidth, image.PixelHeight);
-        BitmapSource source = Math.Abs(scale - 1) > 0.01
-            ? new TransformedBitmap(image, new System.Windows.Media.ScaleTransform(scale, scale))
+        BitmapSource source = Math.Abs(scale - 1) > 0.01 || stretchX != 1
+            ? new TransformedBitmap(image, new System.Windows.Media.ScaleTransform(scale * stretchX, scale))
             : image;
 
         using var memory = new MemoryStream();
@@ -61,7 +61,7 @@ public static class TextRecognizer
             foreach (var word in line.Words)
             {
                 var r = word.BoundingRect;
-                words.Add(new OcrWord(word.Text, new Rect(r.X / scale, r.Y / scale, r.Width / scale, r.Height / scale)));
+                words.Add(new OcrWord(word.Text, new Rect(r.X / (scale * stretchX), r.Y / scale, r.Width / (scale * stretchX), r.Height / scale)));
             }
             if (words.Count > 0) lines.Add(words);
         }

@@ -62,6 +62,8 @@ public partial class MainWindow : Window
     {
         Theming.Apply(_settings.AccentColor, _settings.BackgroundTone); // before any control looks up its colours
         InitializeComponent();
+        AutoHideRow.ContextMenu = Redaction.KindsMenu();
+        Redaction.KindsChanged += () => { _settings.AutoHideKinds = Redaction.Kinds; _settings.Save(); };
 
         WindowList.ItemsSource = _windows;
         System.Windows.Data.CollectionViewSource.GetDefaultView(_windows).Filter = MatchesFilter;

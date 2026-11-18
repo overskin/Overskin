@@ -129,12 +129,79 @@ public static class SelfTest
         Try("pixelate mark hides the original", () =>
         {
             var pic = Quarters(100, 100);
-            var canvas = new EditorCanvas(pic) { PixelBlock = 100 };
-            canvas.Add(new PatchMark { Area = new Rect(0, 0, 100, 100) });
+            var canvas = new EditorCanvas(pic);
+            // strength 12 makes 38 px blocks: one block over the middle covers all four colours
+            canvas.Add(new PatchMark { Area = new Rect(31, 31, 38, 38), Mode = HideMode.Pixelate, Strength = 12 });
             var result = canvas.Export();
-            var a = PixelAt(result, 5, 5);
-            var b = PixelAt(result, 95, 95);
+            var a = PixelAt(result, 32, 32);
+            var b = PixelAt(result, 67, 67);
             Check("pixelate mark hides the original", a == b && a != (0, 0, 255, 255), $"{a} vs {b}");
+
+            var blurred = new EditorCanvas(pic);
+            blurred.Add(new PatchMark { Area = new Rect(30, 30, 40, 40), Mode = HideMode.Blur, Strength = 6 });
+            var mid = PixelAt(blurred.Export(), 50, 50);
+            Check("blur mixes the colours", mid.R is > 60 and < 240 && mid.B is > 30, $"{mid}");
+        });
+
+        Try("smart erase fills from around", () =>
+        {
+            // a black bar on a blue top half and a light bottom half disappears into them
+            var pic = Imaging.Render(new PixelSize(200, 120), ctx =>
+            {
+                ctx.FillRectangle(new SolidColorBrush(Color.FromRgb(40, 90, 200)), new Rect(0, 0, 200, 60));
+                ctx.FillRectangle(new SolidColorBrush(Color.FromRgb(240, 240, 240)), new Rect(0, 60, 200, 60));
+                ctx.FillRectangle(Brushes.Black, new Rect(60, 20, 80, 12));
+            });
+            var canvas = new EditorCanvas(pic) { Tool = Tool.Erase, PenWidth = 3 };
+            var mask = Effects.StrokeMask(new[] { new Point(60, 26), new Point(140, 26) }, 10, 200, 120);
+            canvas.ReplacePicture(p => Effects.Inpaint(p, mask), flatten: false);
+            var p = PixelAt(canvas.Picture, 100, 26);
+            Check("smart erase fills from around", p.B > 150 && p.R < 90, $"{p}");
+            canvas.Undo();
+            Check("smart erase can be undone", PixelAt(canvas.Picture, 100, 26) == (0, 0, 0, 255));
+        });
+
+        Try("crop, turn and flip", () =>
+        {
+            var canvas = new EditorCanvas(Quarters(200, 100));
+            canvas.Add(new ShapeMark { Kind = Tool.Rectangle, From = new Point(10, 10), To = new Point(50, 40), Colour = Colors.Black, Width = 4 });
+            canvas.Crop(new Rect(100, 0, 100, 50));
+            Check("crop keeps the part", canvas.PixelSize == new PixelSize(100, 50) && canvas.Marks.Count == 0 && PixelAt(canvas.Picture, 10, 10).G == 255);
+            canvas.ReplacePicture(p => Effects.Rotate(p, clockwise: true), flatten: true);
+            Check("turn", canvas.PixelSize == new PixelSize(50, 100));
+            canvas.Undo();
+            canvas.Undo();
+            Check("undo crop and turn", canvas.PixelSize == new PixelSize(200, 100) && canvas.Marks.Count == 1);
+            var flipped = Effects.Flip(Quarters(200, 100), horizontal: true);
+            Check("flip", PixelAt(flipped, 10, 10).G == 255 && PixelAt(flipped, 10, 10).R == 0);
+        });
+
+        Try("beautify", () =>
+        {
+            var pic = Quarters(200, 100);
+            var b = Beautify.Render(pic, new BeautifyOptions { Padding = 40, Aspect = 1 });
+            var corner = PixelAt(b, 2, 2);
+            Check("beautify", b.PixelSize == new PixelSize(280, 280) && corner.B > 200 && corner.R < 120, $"{b.PixelSize} corner {corner}");
+        });
+
+        Try("auto-hide finds a card and its details", () =>
+        {
+            const string tsv = "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n" +
+                               "5\t1\t1\t1\t1\t1\t10\t10\t40\t20\t96\tCard\n" +
+                               "5\t1\t1\t1\t1\t2\t60\t10\t40\t20\t91\t4lll\n" +
+                               "5\t1\t1\t1\t1\t3\t110\t10\t40\t20\t93\t1111\n" +
+                               "5\t1\t1\t1\t1\t4\t160\t10\t40\t20\t92\t1111\n" +
+                               "5\t1\t1\t1\t1\t5\t210\t10\t40\t20\t95\t1111\n" +
+                               "5\t1\t1\t1\t2\t1\t10\t40\t40\t20\t96\tExp\n" +
+                               "5\t1\t1\t1\t2\t2\t60\t40\t50\t20\t96\t09/27\n" +
+                               "5\t1\t1\t1\t2\t3\t120\t40\t40\t20\t96\tCVC\n" +
+                               "5\t1\t1\t1\t2\t4\t170\t40\t30\t20\t96\t737\n" +
+                               "5\t1\t1\t1\t3\t1\t10\t70\t200\t20\t96\t2001:db8::7334\n";
+            var lines = Ocr.Parse(tsv);
+            var words = lines.Select(l => (IReadOnlyList<Overskin.Shared.TextWord>)l.Select(w => new Overskin.Shared.TextWord(w.Text, w.Bounds.X, w.Bounds.Y, w.Bounds.Width, w.Bounds.Height)).ToList()).ToList();
+            var found = Overskin.Shared.PrivateDetails.Find(words);
+            var kinds = string.Join(", ", found.Select(f => f.Kind));
+            Check("auto-hide finds a card and its details", kinds == "card number, IP address, expiry date, security code", kinds);
         });
 
         Try("selection maps to picture pixels", () =>

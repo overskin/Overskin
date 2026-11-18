@@ -46,7 +46,14 @@ public sealed class EditorWindow : Window
             PenWidth = App.Settings.PenWidth,
         };
         _canvas.TextRequested += BeginText;
-        _canvas.Changed += () => { _savedSinceChange = false; UpdateButtons(); };
+        _canvas.Changed += () =>
+        {
+            _savedSinceChange = false;
+            _textLayer.Width = _canvas.Width;
+            _textLayer.Height = _canvas.Height;
+            _status.Text = $"{_canvas.PixelSize.Width} × {_canvas.PixelSize.Height}";
+            UpdateButtons();
+        };
 
         // tools
         var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
@@ -59,13 +66,16 @@ public sealed class EditorWindow : Window
             tools.Children.Add(b);
         }
         AddTool(Tool.Arrow, Icons.Arrow, "Arrow (A)");
+        AddTool(Tool.Line, Icons.Line, "Line (L)");
         AddTool(Tool.Rectangle, Icons.Rectangle, "Box (R)");
         AddTool(Tool.Ellipse, Icons.Ellipse, "Circle (E)");
         AddTool(Tool.Pen, Icons.Pen, "Pen (P)");
         AddTool(Tool.Highlighter, Icons.Highlighter, "Highlighter (H)");
         AddTool(Tool.Text, Icons.Text, "Text (T)");
         AddTool(Tool.Counter, Icons.Counter, "Numbered steps (N)");
-        AddTool(Tool.Pixelate, Icons.Pixelate, "Pixelate (X)");
+        AddTool(Tool.Hide, Icons.Pixelate, "Hide: blur, pixelate or mosaic (B)");
+        AddTool(Tool.Erase, Icons.Eraser, "Smart erase: paint over something to remove it (S)");
+        AddTool(Tool.Crop, Icons.Crop, "Crop (C)");
 
         // colours
         var colours = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
@@ -89,10 +99,18 @@ public sealed class EditorWindow : Window
         {
             if (e.Property != RangeBase.ValueProperty) return;
             _canvas.PenWidth = width.Value;
-            _canvas.PixelBlock = (int)Math.Round(4 + width.Value * 1.5);
+            _canvas.HideStrength = Math.Clamp(width.Value * 0.6, 1, 12);
             App.Settings.PenWidth = width.Value;
+            _canvas.InvalidateVisual();
         };
-        ToolTip.SetTip(width, "Thickness (and pixel size)");
+        ToolTip.SetTip(width, "Thickness (also how strong Hide is and how big the eraser is)");
+        _canvas.HideStrength = Math.Clamp(width.Value * 0.6, 1, 12);
+
+        _hideMode = new ComboBox { ItemsSource = new[] { "Pixelate", "Blur", "Mosaic" }, SelectedIndex = 0, IsVisible = false, VerticalAlignment = VerticalAlignment.Center };
+        _hideMode.SelectionChanged += (_, _) => _canvas.HideMode = _hideMode.SelectedIndex switch { 1 => HideMode.Blur, 2 => HideMode.Mosaic, _ => HideMode.Pixelate };
+        var autoHide = Ui.Button("Auto-hide", () => _ = AutoRedactAsync(), Icons.Text);
+        ToolTip.SetTip(autoHide, "Finds private details and hides them. Right-click to choose which.");
+        autoHide.ContextMenu = PrivateMenu.Build();
 
         _undo = Ui.IconButton(Icons.Undo, "Undo (Ctrl+Z)", _canvas.Undo);
         _redo = Ui.IconButton(Icons.Redo, "Redo (Ctrl+Y)", _canvas.Redo);
@@ -103,6 +121,8 @@ public sealed class EditorWindow : Window
             Spacing = 6,
             Children =
             {
+                autoHide,
+                ImageMenu(),
                 Ui.Button("Pin", PinIt, Icons.Pin),
                 Ui.Button("Save as…", () => _ = SaveAsAsync(), null),
                 Ui.Button("Save", () => SaveQuick(), Icons.Save),
@@ -112,7 +132,7 @@ public sealed class EditorWindow : Window
 
         var bar = new WrapPanel { Orientation = Orientation.Horizontal, ItemSpacing = 14, LineSpacing = 8 };
         bar.Children.Add(tools);
-        bar.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Children = { colours, width } });
+        bar.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Children = { colours, width, _hideMode } });
         bar.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Children = { _undo, _redo } });
 
         var top = new DockPanel { Margin = new Thickness(12, 10) };
@@ -154,11 +174,65 @@ public sealed class EditorWindow : Window
         Closing += (_, _) => App.Settings.Save();
     }
 
+    private readonly ComboBox _hideMode;
+
     private void Pick(Tool tool)
     {
         _canvas.Tool = tool;
         foreach (var (t, b) in _tools) b.IsChecked = t == tool;
+        _hideMode.IsVisible = tool == Tool.Hide;
+        if (tool == Tool.Crop) _status.Text = "Drag over the part to keep";
+        if (tool == Tool.Erase) _status.Text = "Paint over what should disappear: it's filled in from what's around it";
         CommitText();
+    }
+
+    private Button ImageMenu()
+    {
+        var menu = new MenuFlyout();
+        void Item(string text, Action click)
+        {
+            var m = new MenuItem { Header = text };
+            m.Click += (_, _) => click();
+            menu.Items.Add(m);
+        }
+        Item("Beautify…", () => _ = BeautifyAsync());
+        Item("Copy the text in the picture", () => _ = CopyTextAsync());
+        menu.Items.Add(new Separator());
+        Item("Turn left", () => _canvas.ReplacePicture(p => Effects.Rotate(p, clockwise: false), flatten: true));
+        Item("Turn right", () => _canvas.ReplacePicture(p => Effects.Rotate(p, clockwise: true), flatten: true));
+        Item("Flip left to right", () => _canvas.ReplacePicture(p => Effects.Flip(p, horizontal: true), flatten: true));
+        Item("Flip upside down", () => _canvas.ReplacePicture(p => Effects.Flip(p, horizontal: false), flatten: true));
+        Item("Half size", () => _canvas.ReplacePicture(p => Effects.Resize(p, p.PixelSize.Width / 2, p.PixelSize.Height / 2), flatten: true));
+        Item("Double size", () => _canvas.ReplacePicture(p => Effects.Resize(p, p.PixelSize.Width * 2, p.PixelSize.Height * 2), flatten: true));
+        return new Button { Content = "Image", Flyout = menu };
+    }
+
+    private async Task BeautifyAsync()
+    {
+        CommitText();
+        var dialog = new BeautifyWindow(_canvas.Export());
+        await dialog.ShowDialog(this);
+        if (dialog.Result is { } result) _canvas.ReplacePicture(_ => result, flatten: true);
+    }
+
+    private async Task AutoRedactAsync()
+    {
+        if (!Ocr.IsAvailable) { _status.Text = Ocr.InstallHint; return; }
+        _status.Text = "Looking for private details…";
+        var found = await PrivateMenu.FindAsync(_canvas.Picture);
+        if (found.Count == 0) { _status.Text = "Nothing private found. Right-click Auto-hide to choose what it looks for."; return; }
+        _canvas.AddRange(found.Select(f => new PatchMark { Area = new Rect(f.X, f.Y, f.Width, f.Height), Mode = _canvas.HideMode, Strength = Math.Max(4, _canvas.HideStrength) }));
+        _status.Text = $"Hid {Overskin.Shared.PrivateDetails.Describe(found.Select(f => f.Kind))}. Undo brings them back.";
+    }
+
+    private async Task CopyTextAsync()
+    {
+        if (!Ocr.IsAvailable) { _status.Text = Ocr.InstallHint; return; }
+        _status.Text = "Reading the text…";
+        var text = await Ocr.ReadTextAsync(_canvas.Export());
+        if (string.IsNullOrWhiteSpace(text)) { _status.Text = "No text found"; return; }
+        await Desktop.CopyTextAsync(text, this);
+        _status.Text = $"Copied {text.Split('\n').Length} lines of text";
     }
 
     private void SetColour(string hex)
@@ -195,7 +269,10 @@ public sealed class EditorWindow : Window
             case Key.H: Pick(Tool.Highlighter); break;
             case Key.T: Pick(Tool.Text); break;
             case Key.N: Pick(Tool.Counter); break;
-            case Key.X: Pick(Tool.Pixelate); break;
+            case Key.B: Pick(Tool.Hide); break;
+            case Key.L: Pick(Tool.Line); break;
+            case Key.S: Pick(Tool.Erase); break;
+            case Key.C: Pick(Tool.Crop); break;
             default: return;
         }
         e.Handled = true;

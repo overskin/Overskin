@@ -421,6 +421,7 @@ public partial class MainWindow
     {
         AfterCopySwitch.IsChecked = _settings.AfterCopy;
         AutoHideSwitch.IsChecked = _settings.AutoHide;
+        Redaction.Kinds = _settings.AutoHideKinds;
         WindowAlphaSwitch.IsChecked = _settings.WindowAlpha;
         SyncVideoControls();
         AfterSaveSwitch.IsChecked = _settings.AfterSave;

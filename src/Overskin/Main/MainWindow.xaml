@@ -679,7 +679,7 @@
                                         <TextBlock Text="Show the mouse pointer" Style="{StaticResource Label}" />
                                         <ToggleButton x:Name="AfterCursorSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
                                     </Grid>
-                                    <Grid Height="31" ToolTip="Reads the text in every screenshot and hides emails, phone numbers, card numbers, IP addresses and keys before it's copied or saved">
+                                    <Grid x:Name="AutoHideRow" Height="31" Background="Transparent" ToolTip="Reads the text in every screenshot and hides private details before it's copied or saved. Right-click to choose which.">
                                         <TextBlock Text="Hide private details automatically" Style="{StaticResource Label}" />
                                         <ToggleButton x:Name="AutoHideSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
                                     </Grid>

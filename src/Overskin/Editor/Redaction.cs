@@ -1,5 +1,6 @@
-using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Controls;
+using Overskin.Shared;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -137,16 +138,11 @@ public static class Redaction
 
     // ---- finding private details ------------------------------------------------------------
 
-    private static readonly (string Kind, Regex Pattern)[] Patterns =
-    {
-        ("email", new Regex(@"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", RegexOptions.Compiled)),
-        ("card number", new Regex(@"\b(?:\d[ \-]?){13,19}\b", RegexOptions.Compiled)),
-        ("phone number", new Regex(@"(?:\+\d{1,3}[ .\-]?)?(?:\(\d{2,4}\)[ .\-]?|\d{2,4}[ .\-])\d{3,4}[ .\-]?\d{3,4}\b", RegexOptions.Compiled)),
-        ("IP address", new Regex(@"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b", RegexOptions.Compiled)),
-        ("IP address", new Regex(@"\b(?:[0-9A-Fa-f]{1,4}:){4,7}[0-9A-Fa-f]{1,4}\b", RegexOptions.Compiled)),
-        ("key", new Regex(@"\b(?:sk|pk|ghp|gho|xox[bap]|AKIA|AIza)[A-Za-z0-9_\-]{12,}\b", RegexOptions.Compiled)),
-        ("key", new Regex(@"\b(?=[A-Za-z0-9_\-]*\d)(?=[A-Za-z0-9_\-]*[A-Za-z])[A-Za-z0-9_\-]{32,}\b", RegexOptions.Compiled)),
-    };
+    /// <summary>What auto-hide looks for; chosen from the Auto-hide button's right-click menu.</summary>
+    public static PrivateKinds Kinds { get; set; } = PrivateKinds.Default;
+
+    /// <summary>Raised when <see cref="Kinds"/> is changed from a menu, so it can be saved.</summary>
+    public static event Action? KindsChanged;
 
     /// <summary>
     /// Areas of the picture that hold private details, and what each one is. Empty when there
@@ -154,71 +150,85 @@ public static class Redaction
     /// </summary>
     public static async Task<List<(Rect Area, string Kind)>?> FindPrivateAsync(BitmapSource image)
     {
+        // Windows' text reader skips some lines outright, such as a card number full of 1s (to it,
+        // they look like a barcode). Reading the picture again larger, and again stretched sideways,
+        // catches those; everything found is put together.
         var lines = await TextRecognizer.RecognizeLinesAsync(image);
         if (lines == null) return null;
-        return FindPrivate(lines);
-    }
-
-    public static List<(Rect Area, string Kind)> FindPrivate(List<List<OcrWord>> lines)
-    {
-        var found = new List<(Rect, string)>();
-        foreach (var words in lines)
+        var all = new List<List<OcrWord>>(lines);
+        foreach (var (scale, stretch) in new (double?, double)[] { (2, 1), (1, 2) })
         {
-            // the line as text, remembering where each word starts
-            var starts = new List<int>();
-            var text = new System.Text.StringBuilder();
-            foreach (var w in words)
+            try
             {
-                if (text.Length > 0) text.Append(' ');
-                starts.Add(text.Length);
-                text.Append(w.Text);
+                if (await TextRecognizer.RecognizeLinesAsync(image, scale, stretch) is { } more) all.AddRange(more);
             }
-            string line = text.ToString();
-            var taken = new bool[line.Length];
-
-            foreach (var (kind, pattern) in Patterns)
+            catch
             {
-                foreach (Match m in pattern.Matches(line))
-                {
-                    if (kind == "card number" && !Luhn(m.Value)) continue;
-                    if (kind == "phone number" && m.Value.Count(char.IsDigit) < 7) continue;
-                    if (Enumerable.Range(m.Index, m.Length).Any(i => taken[i])) continue;
-                    for (int i = m.Index; i < m.Index + m.Length; i++) taken[i] = true;
-
-                    Rect area = Rect.Empty;
-                    for (int i = 0; i < words.Count; i++)
-                    {
-                        int s = starts[i], e = s + words[i].Text.Length;
-                        if (e > m.Index && s < m.Index + m.Length) area.Union(words[i].Bounds);
-                    }
-                    if (area.IsEmpty) continue;
-                    double pad = Math.Max(2, area.Height * 0.18);
-                    area.Inflate(pad, pad);
-                    found.Add((area, kind));
-                }
+                // the extra readings only add; the first one stands on its own
             }
         }
-        return found;
+        return Merge(FindPrivate(all));
     }
 
-    private static bool Luhn(string digits)
+    /// <summary>One entry per detail when several readings found the same thing, covering all of them.</summary>
+    private static List<(Rect Area, string Kind)> Merge(List<(Rect Area, string Kind)> found)
     {
-        var d = digits.Where(char.IsDigit).Select(c => c - '0').ToList();
-        if (d.Count < 13 || d.Count > 19) return false;
-        int sum = 0;
-        for (int i = 0; i < d.Count; i++)
+        var merged = new List<(Rect Area, string Kind)>();
+        foreach (var f in found)
         {
-            int v = d[d.Count - 1 - i];
-            if (i % 2 == 1) { v *= 2; if (v > 9) v -= 9; }
-            sum += v;
+            int same = merged.FindIndex(m => Overlap(m.Area, f.Area) > 0.4);
+            if (same < 0) { merged.Add(f); continue; }
+            var area = merged[same].Area;
+            area.Union(f.Area);
+            merged[same] = (area, merged[same].Kind);
         }
-        return sum % 10 == 0;
+        return merged;
+    }
+
+    private static double Overlap(Rect a, Rect b)
+    {
+        var i = Rect.Intersect(a, b);
+        if (i.IsEmpty) return 0;
+        return i.Width * i.Height / Math.Max(1, Math.Min(a.Width * a.Height, b.Width * b.Height));
+    }
+
+    public static List<(Rect Area, string Kind)> FindPrivate(List<List<OcrWord>> lines, PrivateKinds? kinds = null)
+    {
+        var words = lines.Select(l => (IReadOnlyList<TextWord>)l.Select(w => new TextWord(w.Text, w.Bounds.X, w.Bounds.Y, w.Bounds.Width, w.Bounds.Height)).ToList()).ToList();
+        return PrivateDetails.Find(words, kinds ?? Kinds).Select(d => (new Rect(d.X, d.Y, d.Width, d.Height), d.Kind)).ToList();
     }
 
     /// <summary>"2 emails and 1 phone number".</summary>
-    public static string Describe(IEnumerable<string> kinds)
+    public static string Describe(IEnumerable<string> kinds) => PrivateDetails.Describe(kinds);
+
+    /// <summary>A right-click menu that switches each kind of detail on or off.</summary>
+    public static ContextMenu KindsMenu()
     {
-        var parts = kinds.GroupBy(k => k).Select(g => g.Count() == 1 ? $"1 {g.Key}" : $"{g.Count()} {g.Key}{(g.Key.EndsWith("s") ? "es" : "s")}").ToList();
-        return parts.Count <= 1 ? parts.FirstOrDefault() ?? "nothing" : string.Join(", ", parts.Take(parts.Count - 1)) + " and " + parts[^1];
+        var menu = new ContextMenu();
+        menu.Items.Add(new MenuItem { Header = "Hide these:", IsEnabled = false });
+        foreach (var (kind, label) in PrivateDetails.Choices)
+        {
+            var item = new MenuItem { Header = label, IsCheckable = true, StaysOpenOnClick = true };
+            item.Click += (_, _) =>
+            {
+                Kinds = item.IsChecked ? Kinds | kind : Kinds & ~kind;
+                KindsChanged?.Invoke();
+            };
+            menu.Items.Add(item);
+        }
+        menu.Items.Add(new Separator());
+        var all = new MenuItem { Header = "Everything" };
+        all.Click += (_, _) => { Kinds = PrivateKinds.All; KindsChanged?.Invoke(); };
+        menu.Items.Add(all);
+        var reset = new MenuItem { Header = "Back to the defaults" };
+        reset.Click += (_, _) => { Kinds = PrivateKinds.Default; KindsChanged?.Invoke(); };
+        menu.Items.Add(reset);
+        // ticks reflect the current choice each time it opens
+        menu.Opened += (_, _) =>
+        {
+            int i = 1;
+            foreach (var (kind, _) in PrivateDetails.Choices) ((MenuItem)menu.Items[i++]).IsChecked = (Kinds & kind) != 0;
+        };
+        return menu;
     }
 }

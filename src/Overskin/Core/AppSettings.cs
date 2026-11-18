@@ -62,6 +62,8 @@ public sealed class AppSettings
     public bool AfterCursor { get; set; }
     /// <summary>Find emails, phone numbers, card numbers, IPs and keys in every screenshot and hide them.</summary>
     public bool AutoHide { get; set; }
+    /// <summary>What auto-hide looks for.</summary>
+    public Overskin.Shared.PrivateKinds AutoHideKinds { get; set; } = Overskin.Shared.PrivateKinds.Default;
     /// <summary>Window shots: just the window, on a transparent background with a shadow.</summary>
     public bool WindowAlpha { get; set; }
     public string SaveFolder { get; set; } = DefaultSaveFolder();

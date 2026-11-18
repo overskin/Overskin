@@ -165,7 +165,7 @@
                             <RadioButton x:Name="HidePixelate" Style="{StaticResource Seg}" GroupName="HideMode" Tag="Pixelate" Content="Pixelate" Checked="HideMode_Checked" />
                             <RadioButton x:Name="HideMosaic" Style="{StaticResource Seg}" GroupName="HideMode" Tag="Mosaic" Content="Mosaic" Checked="HideMode_Checked" />
                             <Button x:Name="AutoHideButton" Style="{StaticResource Btn}" Height="25" Margin="8,0,0,0" Click="AutoHide_Click"
-                                    ToolTip="Finds emails, phone numbers, card numbers, IP addresses and keys, and hides them">
+                                    ToolTip="Finds private details and hides them. Right-click to choose which: emails, phone numbers, cards, IP addresses, keys, folder paths, addresses">
                                 <StackPanel Orientation="Horizontal">
                                     <local:Icon Data="{StaticResource IcScanText}" Width="13" Height="13" Margin="0,0,6,0" />
                                     <TextBlock Text="Auto-hide" />

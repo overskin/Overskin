@@ -5,7 +5,7 @@ using Avalonia.Media.Imaging;
 
 namespace Overskin.Linux.Interface;
 
-public enum Tool { Pen, Highlighter, Arrow, Rectangle, Ellipse, Text, Pixelate, Counter }
+public enum Tool { Pen, Highlighter, Arrow, Line, Rectangle, Ellipse, Text, Hide, Counter, Erase, Crop }
 
 /// <summary>Something drawn on the picture. Drawn in picture pixels.</summary>
 public abstract class Mark
@@ -63,6 +63,9 @@ public sealed class ShapeMark : Mark
                 break;
             case Tool.Arrow:
                 DrawArrow(ctx);
+                break;
+            case Tool.Line:
+                ctx.DrawLine(Stroke(), From, To);
                 break;
         }
     }
@@ -123,10 +126,12 @@ public sealed class CounterMark : Mark
     }
 }
 
-/// <summary>A blocky patch hiding what's under it, made from the original picture when it was added.</summary>
+/// <summary>A blurred, pixelated or mosaic patch hiding what's under it, made from the picture when it was added.</summary>
 public sealed class PatchMark : Mark
 {
     public Rect Area { get; init; }
+    public Overskin.Linux.Core.HideMode Mode { get; init; } = Overskin.Linux.Core.HideMode.Pixelate;
+    public double Strength { get; init; } = 4;
     public Bitmap? Pixels { get; set; }
 
     public override void Draw(DrawingContext ctx)

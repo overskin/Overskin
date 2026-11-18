@@ -64,6 +64,7 @@ public partial class EditorWindow : Window
     public EditorWindow(BitmapSource image, string? path, string name, EditorHost host)
     {
         InitializeComponent();
+        AutoHideButton.ContextMenu = Redaction.KindsMenu();
         _host = host;
         _base = image;
         FilePath = path;
