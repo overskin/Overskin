@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Overskin for Linux (preview)**: a new Avalonia app for X11 and Wayland with area and
+  screen capture, the editor, pins, a tray menu, auto-save and clipboard copy. Download
+  `overskin-linux-x64.tar.gz` and run `install.sh`; bind `overskin --capture` to a key.
+
 ## 2.4.0
 
 - `OverskinSetup.exe`: a per-user installer (no administrator rights) with Start

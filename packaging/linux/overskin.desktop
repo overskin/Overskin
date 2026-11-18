@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Overskin
+GenericName=Screenshot tool
+Comment=Screenshots, done right
+Exec=overskin
+Icon=overskin
+Terminal=false
+Categories=Utility;Graphics;
+Keywords=screenshot;capture;screen;annotate;pin;
+StartupWMClass=overskin
+Actions=Capture;Screen;
+
+[Desktop Action Capture]
+Name=Capture area
+Exec=overskin --capture
+
+[Desktop Action Screen]
+Name=Capture screen
+Exec=overskin --screen

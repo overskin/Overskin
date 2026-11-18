@@ -25,6 +25,31 @@ updates it in place and keeps your settings.
 It needs Windows 10 1809 or later (64-bit). Windows SmartScreen may warn about an unsigned
 app the first time: choose **More info → Run anyway**.
 
+### Linux (preview)
+
+Download **`overskin-linux-x64.tar.gz`** from the [latest release](../../releases/latest), then:
+
+```bash
+tar -xzf overskin-linux-x64.tar.gz && ./overskin/install.sh
+```
+
+That puts `overskin` in `~/.local/bin` and adds it to your app menu, for your user only (no
+sudo). Add `--autostart` to start it with your desktop in the tray, or `--uninstall` to remove
+it. It's one self-contained program and works on X11 and Wayland (GNOME, KDE, Sway, Hyprland
+and others).
+
+The Linux version is new and does the essentials so far: area and full-screen capture with a
+magnifier, the editor (arrows, boxes, circles, pen, highlighter, text, numbered steps,
+pixelate, undo), pins, the tray menu, auto-save and copy to the clipboard. Video, GIFs, the
+library, Trace and the rest are still Windows-only.
+
+Desktops keep global shortcuts to themselves on Linux, so bind a key in your keyboard settings
+to `overskin --capture` (or `--screen`, `--delay 3`). `overskin --help` lists everything.
+On Wayland the first capture may ask you to allow screenshots. For copying to the clipboard,
+install `wl-clipboard` (Wayland) or `xclip` (X11) if you don't have them already.
+
+<p align="center"><img src="docs/screenshots/linux-editor.png" width="760" alt="The Overskin editor on Linux"></p>
+
 ## Screenshots
 
 | | |
@@ -212,6 +237,11 @@ That writes `dist/OverskinSetup.exe`, the installer with the app inside it (the 
 is built into `build/app` on the way). Open `Overskin.sln` to work on either in Visual Studio or
 Rider.
 
+For Linux, `./build-linux.sh` (on Linux, with the .NET 8 SDK) writes
+`dist/overskin-linux-x64.tar.gz`. `overskin --selftest` checks it, and `dotnet run --project
+src/Overskin.Linux -- --demo picture.png` runs it on any system with a picture standing in for
+the screen.
+
 `OverskinSetup.exe` also takes `--quiet` with `--dir PATH`, `--no-startmenu`, `--desktop`,
 `--startup` / `--no-startup` and `--launch`. `Uninstall.exe --uninstall --quiet` removes it
 again (add `--remove-settings` to delete its settings too).
@@ -237,6 +267,8 @@ unless you choose another folder.
 | `src/Overskin/Themes/` | Control styles, palette and icons |
 | `src/Overskin/Assets/` | App icon and logo |
 | `src/Installer/` | `OverskinSetup.exe`: the per-user installer and uninstaller |
+| `src/Overskin.Linux/` | The Linux version (Avalonia): capture, editor, pins, tray |
+| `packaging/linux/` | The Linux install script and menu entry |
 | `docs/screenshots/` | The pictures in this README |
 
 ## Known limitations
