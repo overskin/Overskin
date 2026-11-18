@@ -1,18 +1,46 @@
-<p align="center"><img src="src/Overskin/Assets/logo.svg" width="88" alt=""></p>
+<div align="center">
+
+<img src="src/Overskin/Assets/logo.svg" width="88" alt="">
 
 # Overskin
 
 **Screenshots, done right.**
 
-<p align="center"><img src="docs/screenshots/hero.png" alt="The Overskin editor and main window"></p>
+A free, open-source screenshot and screen-recording tool for Windows.
 
-A free, open-source screenshot and screen-recording tool for Windows (Linux and macOS are planned). Capture any area,
-window or scrolling page; record MP4 videos with smooth auto-zoom or GIFs; mark it up, hide
-private details, beautify it and drag it straight into any app. Plus the extras artists and
-tinkerers want: pin anything on top of your screen, trace over it, or let Overskin draw it for
-you in skribbl.io and Gartic Phone.
+[![Download for Windows](https://img.shields.io/badge/Download_for_Windows-OverskinSetup.exe-4f8cff?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/overskin/Overskin/releases/latest/download/OverskinSetup.exe)
+
+[![Latest release](https://img.shields.io/github/v/release/overskin/Overskin?label=release&color=4f8cff)](../../releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/overskin/Overskin/total?color=4f8cff)](../../releases)
+[![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%7C%2011-4f8cff)](#download)
+[![MIT license](https://img.shields.io/github/license/overskin/Overskin?color=4f8cff)](LICENSE)
+[![No telemetry](https://img.shields.io/badge/telemetry-none-2ea44f)](#privacy)
+
+[Download](#download) · [Capture](#capture) · [Video](#video) · [Edit](#edit) · [Pins](#pins) · [Trace](#trace) · [Shortcuts](#shortcuts) · [Changelog](CHANGELOG.md)
+
+<img src="docs/screenshots/hero.png" alt="The Overskin editor and main window">
+
+</div>
+
+Capture any area, window or scrolling page; record MP4 videos with smooth auto-zoom or GIFs;
+mark it up, hide private details, beautify it and drag it straight into any app. Plus the
+extras artists and tinkerers want: pin anything on top of your screen, trace over it, or let
+Overskin draw it for you in skribbl.io and Gartic Phone.
 
 One installer, no administrator rights, no account, and nothing leaves your PC.
+
+## Highlights
+
+| | |
+| --- | --- |
+| **Auto-zoom videos** | MP4 recordings glide in on every click and follow the pointer, with a pointer that stays sharp at any zoom. |
+| **Live text** | Select, copy or erase the words inside any screenshot, and search your whole library by them. Offline. |
+| **Auto-hide** | Finds and blurs emails, card numbers, addresses, IPs and keys before you share. |
+| **Smart erase** | Paint over text or an icon and it's filled in from what's around it. |
+| **Steps** | Click through a task and get a numbered how-to picture, written for you. |
+| **Scrolling capture** | Scrolls the window for you and stitches the whole page together. |
+| **Pins and tracing paper** | Float any picture or window on top, fade it, make it click-through. |
+| **Trace** | Turns a picture into mouse strokes and draws it in Paint, Krita, skribbl.io or Gartic Phone. |
 
 ## Download
 
