@@ -85,6 +85,7 @@ public sealed class CaptureOverlay : Window
         _pixels = new byte[frozen.PixelWidth * frozen.PixelHeight * 4];
         frozen.CopyPixels(_pixels, frozen.PixelWidth * 4, 0);
         _windows = mode is OverlayMode.Region or OverlayMode.Window ? VisibleWindows() : new();
+        if (mode == OverlayMode.Region) FindImages();
 
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
@@ -379,6 +380,58 @@ public sealed class CaptureOverlay : Window
     /// <summary>The window under the cursor, or failing that the monitor.</summary>
     private RECT Hovered(POINT p) => ClipToScreen(HoveredWindow(p)?.Bounds ?? MonitorBounds(p));
 
+    // ---- pictures inside the screenshot ----
+
+    private IReadOnlyList<FoundImage>? _images;
+    private readonly CancellationTokenSource _imageSearch = new();
+    /// <summary>The picture the selection snapped to, if it did.</summary>
+    private FoundImage? _snapped;
+
+    /// <summary>Looks for pictures in the frozen screen in the background; hovering snaps to them once found.</summary>
+    private void FindImages()
+    {
+        int w = _frozen.PixelWidth, h = _frozen.PixelHeight;
+        var token = _imageSearch.Token;
+        Task.Run(() =>
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var found = ImageFinder.Find(_pixels, w, h, token);
+            CrashLog.Note($"capture screen: {found.Count} pictures found in {sw.ElapsedMilliseconds} ms");
+            return found;
+        }, token).ContinueWith(t =>
+        {
+            if (t.IsCompletedSuccessfully && !token.IsCancellationRequested)
+            {
+                _images = t.Result;
+                if (IsVisible && !_dragging) Update(CursorPos());
+            }
+        }, token, TaskContinuationOptions.None, TaskScheduler.FromCurrentSynchronizationContext());
+        Closed += (_, _) => _imageSearch.Cancel();
+    }
+
+#if DEBUG
+    /// <summary>For the self-test: waits for the picture search, then what a click at (x, y) would take.</summary>
+    internal (int Count, Int32Rect Target, bool Picture) PictureTargetForTest(int x, int y)
+    {
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (_images == null && DateTime.UtcNow < until) { App.DoEventsForTest(); Thread.Sleep(10); }
+        var p = new POINT(x + _virtual.Left, y + _virtual.Top);
+        var r = Target(p);
+        return (_images?.Count ?? -1, new Int32Rect(r.Left - _virtual.Left, r.Top - _virtual.Top, r.Width, r.Height), PictureAt(p) != null);
+    }
+#endif
+
+    /// <summary>The picture under the cursor when it's smaller than the window there; Ctrl skips pictures.</summary>
+    private FoundImage? PictureAt(POINT p)
+    {
+        if (_images is not { Count: > 0 } images || _mode != OverlayMode.Region || Pick != CapturePick.Region) return null;
+        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0) return null;
+        if (ImageFinder.At(images, p.X - _virtual.Left, p.Y - _virtual.Top) is not { } found) return null;
+        var window = Hovered(p);
+        if ((long)found.Bounds.Width * found.Bounds.Height >= (long)window.Width * window.Height * 0.9) return null;
+        return found with { Bounds = new Int32Rect(found.Bounds.X + _virtual.Left, found.Bounds.Y + _virtual.Top, found.Bounds.Width, found.Bounds.Height) };
+    }
+
     private (RECT Bounds, IntPtr Handle)? HoveredWindow(POINT p)
     {
         foreach (var w in _windows)
@@ -435,6 +488,11 @@ public sealed class CaptureOverlay : Window
         CapturePick.Screen => ClipToScreen(MonitorBounds(p)),
         CapturePick.AllScreens => _virtual,
         CapturePick.Region when _toolbar?.FixedSize is { } size => FixedAt(p, size),
+        _ when PictureAt(p) is { } picture => new RECT
+        {
+            Left = picture.Bounds.X, Top = picture.Bounds.Y,
+            Right = picture.Bounds.X + picture.Bounds.Width, Bottom = picture.Bounds.Y + picture.Bounds.Height,
+        },
         _ => Hovered(p),
     };
 
@@ -465,6 +523,7 @@ public sealed class CaptureOverlay : Window
                 break;
             case OverlayMode.Region:
             case OverlayMode.Window:
+                _snapped = _mode == OverlayMode.Region && Pick == CapturePick.Region && _toolbar?.FixedSize == null ? PictureAt(p) : null;
                 ShowRect(Target(p), solid: _toolbar?.FixedSize != null && Pick == CapturePick.Region);
                 break;
             case OverlayMode.Ruler when _dragging:
@@ -505,11 +564,14 @@ public sealed class CaptureOverlay : Window
         _frame.Width = rect.Width;
         _frame.Height = rect.Height;
         _frame.StrokeDashArray = solid ? null : new DoubleCollection { 4, 3 };
+        // a picture with rounded corners gets a frame with the same corners
+        double round = _snapped is { } picture ? picture.Radius / _scale : 0;
+        _frame.RadiusX = _frame.RadiusY = round;
 
         var full = new RectangleGeometry(new Rect(0, 0, _backdrop.Width, _backdrop.Height));
-        _dim.Data = new GeometryGroup { FillRule = FillRule.EvenOdd, Children = { full, new RectangleGeometry(rect) } };
+        _dim.Data = new GeometryGroup { FillRule = FillRule.EvenOdd, Children = { full, new RectangleGeometry(rect, round, round) } };
 
-        _labelText.Text = $"{r.Width} × {r.Height}";
+        _labelText.Text = _snapped != null ? $"Picture   {r.Width} × {r.Height}   ·   Ctrl for the window" : $"{r.Width} × {r.Height}";
         _label.Visibility = Visibility.Visible;
         _label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         double ly = rect.Y - _label.DesiredSize.Height - 6;
@@ -627,8 +689,11 @@ public sealed class CaptureOverlay : Window
             case OverlayMode.Region:
                 bool box = moved && Pick == CapturePick.Region && _toolbar?.FixedSize == null;
                 var r = box ? Shaped(_start, end) : Target(end);
-                if (!box && Pick is CapturePick.Region or CapturePick.Window && _toolbar?.FixedSize == null)
+                // a click on a picture inside a window takes just the picture, not the window
+                var picture = !box && Pick == CapturePick.Region && _toolbar?.FixedSize == null ? PictureAt(end) : null;
+                if (!box && picture == null && Pick is CapturePick.Region or CapturePick.Window && _toolbar?.FixedSize == null)
                     SelectedWindow = HoveredWindow(end)?.Handle ?? IntPtr.Zero;
+                if (picture != null) CrashLog.Note($"capture screen: clicked a picture inside the window, radius {picture.Value.Radius}");
                 r = ClipToScreen(r);
                 if (r.Width >= 2 && r.Height >= 2) Selection = new Int32Rect(r.Left, r.Top, r.Width, r.Height);
                 CrashLog.Note($"capture screen: {(box ? "dragged" : "clicked")}, pick={Pick}, {r.Width}x{r.Height}, window={SelectedWindow != IntPtr.Zero}");
@@ -660,10 +725,19 @@ public sealed class CaptureOverlay : Window
         Close();
     }
 
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        // letting go of Ctrl snaps back to the picture under the mouse
+        if (e.Key is Key.LeftCtrl or Key.RightCtrl && !_dragging) Update(CursorPos());
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         // typing a colour code in the colour popup isn't a shortcut
         if (Keyboard.FocusedElement is TextBox) return;
+        // holding Ctrl takes the whole window instead of the picture under the mouse
+        if (e.Key is Key.LeftCtrl or Key.RightCtrl && !_dragging && _images is { Count: > 0 }) Update(CursorPos());
         if (e.Key == Key.Escape)
         {
             if (_pickingColour) { _pickingColour = false; Toast.Hide(); return; }

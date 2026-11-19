@@ -1207,5 +1207,7 @@ public partial class App : Application
 
     private static void DoEvents() =>
         Current.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { }));
+
+    internal static void DoEventsForTest() => DoEvents();
 #endif
 }

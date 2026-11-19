@@ -164,6 +164,74 @@ public partial class App
         }
         catch (Exception ex) { log.Add("gartic strokes: FAILED " + ex); }
 
+        // ---- pictures inside a screenshot: a chat full of text, an avatar, a panel, and two sent pictures ----
+        try
+        {
+            int w = 2560, h = 1440;
+            var visual = new DrawingVisual();
+            var photoRect = new Rect(400, 300, 520, 360);   // rounded, 8 px corners
+            var squareRect = new Rect(400, 760, 300, 200);  // square corners
+            using (var dc = visual.RenderOpen())
+            {
+                dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x31, 0x33, 0x38)), null, new Rect(0, 0, w, h));
+                dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x2B, 0x2D, 0x31)), null, new Rect(0, 0, 240, h)); // sidebar
+                var face = new Typeface("Segoe UI");
+                for (int line = 0; line < 30; line++)
+                {
+                    var text = new FormattedText("Somebody wrote a message here, with a few more words to fill the line " + line,
+                        System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight, face, 15, Brushes.Gainsboro, 1.0);
+                    dc.DrawText(text, new Point(line < 6 ? 400 : 1100, 40 + line * 40));
+                }
+                dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(0x58, 0x65, 0xF2)), null, new Point(340, 320), 20, 20); // avatar
+                dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(0x38, 0x3A, 0x40)), null, new Rect(260, 1340, 2200, 52), 8, 8); // message box
+                dc.DrawText(new FormattedText("Message #general", System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight, face, 15, Brushes.Gray, 1.0), new Point(290, 1355));
+                // a "photo": smooth colour gradients plus fine noise, as a picture has
+                var rnd = new Random(7);
+                var bits = new byte[520 * 360 * 4];
+                for (int y = 0; y < 360; y++)
+                    for (int x = 0; x < 520; x++)
+                    {
+                        int i = (y * 520 + x) * 4;
+                        bits[i] = (byte)Math.Clamp(60 + x / 4 + rnd.Next(-12, 12), 0, 255);
+                        bits[i + 1] = (byte)Math.Clamp(90 + y / 3 + rnd.Next(-12, 12), 0, 255);
+                        bits[i + 2] = (byte)Math.Clamp(200 - x / 5 + rnd.Next(-12, 12), 0, 255);
+                        bits[i + 3] = 255;
+                    }
+                var photo = System.Windows.Media.Imaging.BitmapSource.Create(520, 360, 96, 96, PixelFormats.Bgra32, null, bits, 520 * 4);
+                dc.PushClip(new RectangleGeometry(photoRect, 8, 8));
+                dc.DrawImage(photo, photoRect);
+                dc.Pop();
+                dc.DrawImage(photo, squareRect);
+            }
+            var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(visual);
+            var screen = new byte[w * h * 4];
+            rtb.CopyPixels(screen, w * 4, 0);
+            ImageFinder.Find(screen, w, h); // warm up
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var found = ImageFinder.Find(screen, w, h);
+            sw.Stop();
+            string Show(FoundImage f) => $"{f.Bounds.X},{f.Bounds.Y} {f.Bounds.Width}x{f.Bounds.Height} r{f.Radius}";
+            var onPhoto = ImageFinder.At(found, 600, 500);
+            var onSquare = ImageFinder.At(found, 500, 850);
+            var onText = ImageFinder.At(found, 1300, 300);
+            log.Add($"pictures in a screenshot: {found.Count} found in {sw.ElapsedMilliseconds} ms on {w}x{h} [{string.Join(" | ", found.Select(Show))}] " +
+                    $"(expect 2: 400,300 520x360 r8 and 400,760 300x200 r0) hover photo={(onPhoto is { } a ? Show(a) : "none")} " +
+                    $"square={(onSquare is { } b ? Show(b) : "none")} text={(onText is { } c ? Show(c) : "none")} (expect none on text)");
+            if (Environment.GetEnvironmentVariable("OVERSKIN_TEST_OUT") is { Length: > 0 } dir)
+                SaveBgra(screen, w, h, System.IO.Path.Combine(dir, "pictures-screen.png"));
+
+            // through the capture screen itself (never shown): hovering the photo targets exactly the photo
+            var frozen = System.Windows.Media.Imaging.BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgra32, null, screen, w * 4);
+            var overlay = CaptureOverlay.ForTest(frozen, new NativeMethods.RECT { Left = 0, Top = 0, Right = w, Bottom = h });
+            var hit = overlay.PictureTargetForTest(600, 500);
+            var miss = overlay.PictureTargetForTest(1300, 300);
+            overlay.Close();
+            log.Add($"capture screen snaps to pictures: found={hit.Count} on photo -> {hit.Target.X},{hit.Target.Y} {hit.Target.Width}x{hit.Target.Height} picture={hit.Picture} " +
+                    $"(expect 400,300 520x360 True) on text picture={miss.Picture} (expect False)");
+        }
+        catch (Exception ex) { log.Add("pictures in a screenshot: FAILED " + ex); }
+
         // ---- tray menu: labels, and every submenu placed the same way ----
         try
         {

@@ -84,6 +84,9 @@ for private details), smart erase, crop, rotate, and Beautify.
 - **Region**: drag over an area, or just click a window. The screen freezes while you
   choose, so menus and tooltips stay put, and a magnifier shows the exact pixel under the
   cursor.
+- **Snap to pictures**: hover over a picture inside a window, like a photo in a Discord chat,
+  and just that picture is outlined, rounded corners and all. Click to capture it edge to
+  edge; hold Ctrl to take the whole window instead.
 - **Capture bar** along the top while you choose: capture an area, a window, one screen or
   every screen (1 to 4); draw first with a pen, arrows, boxes or a highlighter (P, A, B, H; C
   changes colour, Ctrl+Z undoes); include the mouse pointer or not; magnifier on or off (M).

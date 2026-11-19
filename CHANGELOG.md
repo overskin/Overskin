@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.6.1
+
+- **Snap to pictures**: on the capture screen, hovering over a picture inside a window (a photo
+  someone sent in Discord, an image on a web page, a thumbnail) outlines just that picture,
+  rounded corners included, and a click captures it edge to edge. Hold Ctrl for the whole
+  window instead. Pictures are found in the background as the capture screen opens, so it
+  never slows it down.
+
 ## 2.6.0
 
 ### Video

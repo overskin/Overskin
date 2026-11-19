@@ -12,7 +12,7 @@
 
     <AssemblyName>Overskin</AssemblyName>
     <RootNamespace>Overskin</RootNamespace>
-    <Version>2.6.0</Version>
+    <Version>2.6.1</Version>
     <Product>Overskin</Product>
     <Description>Screenshots, annotations, pinning and tracing for Windows.</Description>
 
