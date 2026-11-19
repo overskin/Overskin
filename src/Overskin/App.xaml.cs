@@ -97,7 +97,8 @@ public partial class App : Application
         {
             // just the newest tests, for quick checks while working on them
             var quick = new List<string>();
-            try { MoreFeatureTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); }
+            if (e.Args.Contains("--pass")) { try { PassTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
+            else try { MoreFeatureTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); }
             System.IO.File.WriteAllLines(e.Args[1], quick);
             Shutdown();
             return;
@@ -960,92 +961,6 @@ public partial class App : Application
             var usage = colour.ColourIndex!.GroupBy(k => k).Select(g => $"#{g.Key}x{g.Count()}");
             log.Add($"colour flag: strokes={colour.Paths.Count} colours=[{string.Join(" ", usage)}] (expect red=1, blue=2, none of white/black)");
 
-            // bucket fill: trace a scene, then play it onto a simulated canvas with a round brush
-            // and a real flood fill, to prove no fill leaks and the result matches the picture
-            {
-                var red = ((byte)230, (byte)30, (byte)30); var blue = ((byte)30, (byte)40, (byte)220);
-                var green = ((byte)30, (byte)180, (byte)60); var yellow = ((byte)240, (byte)210, (byte)40);
-                (byte, byte, byte) Scene(double x, double y)
-                {
-                    if (x >= 60 && x < 100 && y >= 50 && y < 90) return White;                       // hole in the box
-                    if (x >= 20 && x < 140 && y >= 20 && y < 120) return red;                          // big box
-                    double dc = Math.Sqrt((x - 220) * (x - 220) + (y - 70) * (y - 70));
-                    if (dc < 50) return blue;                                                           // circle
-                    double dr = Math.Sqrt((x - 80) * (x - 80) + (y - 165) * (y - 165));
-                    if (dr >= 15 && dr < 28) return yellow;                                             // ring
-                    if (Math.Abs((x - 150) - (y - 120) * 1.2) < 1.6 && x >= 150 && x < 290) return green; // thin line
-                    if (((int)x / 6 + (int)y / 6) % 2 == 0 && x >= 250 && y >= 160 && x < 290 && y < 190) return Black; // specks
-                    return White;
-                }
-                var pal = new List<(System.Windows.Media.Color, bool)>
-                {
-                    (System.Windows.Media.Colors.White, true),
-                    (System.Windows.Media.Color.FromRgb(230, 30, 30), false),
-                    (System.Windows.Media.Color.FromRgb(30, 40, 220), false),
-                    (System.Windows.Media.Color.FromRgb(30, 180, 60), false),
-                    (System.Windows.Media.Color.FromRgb(240, 210, 40), false),
-                    (System.Windows.Media.Colors.Black, false),
-                };
-
-                var timing = new DrawSettings { DelayMs = 4, PointsPerStep = 1, SelectPauseMs = 40 };
-                static int Switches(TraceResult r) { int s = 0, last = -1; foreach (int k in r.ColourIndex!) { if (k != last) s++; last = k; } return s; }
-                foreach (var (scale, brushPx) in new[] { (1, 4), (3, 4), (3, 10) })
-                {
-                    (byte, byte, byte) Scaled(int x, int y) => Scene((x + 0.5) / scale, (y + 0.5) / scale);
-                    var scene = Source(300 * scale, 200 * scale, Scaled);
-                    var hatched = TraceEngine.Trace(scene, new TraceOptions { Mode = TraceMode.Colour, Spacing = brushPx, OutlineToo = true, Palette = pal, Blur = 0 }, default);
-                    var fast = TraceEngine.Trace(scene, new TraceOptions { Mode = TraceMode.Colour, Spacing = brushPx, OutlineToo = true, Palette = pal, Blur = 0, BucketFill = true, PointMs = 4 }, default);
-                    var (correct, leaks) = SimulateCanvas(fast, brushPx, Scaled, pal);
-                    var (plainCorrect, _) = SimulateCanvas(hatched, brushPx, Scaled, pal);
-                    var tPlain = MouseDrawer.Estimate(hatched.Paths.Count, hatched.PointCount, Switches(hatched), timing);
-                    var tFast = MouseDrawer.Estimate(fast.Paths.Count - fast.FillCount, fast.PointCount - fast.FillCount, Switches(fast) + 2, timing, fast.FillCount);
-                    log.Add($"bucket fill {300 * scale}x{200 * scale} brush {brushPx}: fills={fast.FillCount} strokes={fast.Paths.Count - fast.FillCount} points={fast.PointCount - fast.FillCount} " +
-                            $"vs hatching strokes={hatched.Paths.Count} points={hatched.PointCount}; at 4 ms/point {tFast.TotalSeconds:0.0}s vs {tPlain.TotalSeconds:0.0}s; " +
-                            $"matches picture {correct:P1} (hatching {plainCorrect:P1}); leaked pixels={leaks} (expect 0)");
-                }
-                // a real picture, if one is given: OVERSKIN_TEST_IMAGE=path, traced at 800 px wide
-                if (Environment.GetEnvironmentVariable("OVERSKIN_TEST_IMAGE") is { Length: > 0 } imagePath && System.IO.File.Exists(imagePath))
-                {
-                    var bmp = new System.Windows.Media.Imaging.BitmapImage(new Uri(imagePath));
-                    var src = TraceEngine.Prepare(bmp);
-                    double sc = 800.0 / src.Width;
-                    var skribbl = new List<(System.Windows.Media.Color, bool)> { (System.Windows.Media.Colors.White, true) };
-                    foreach (var hex in new[] { "#000000", "#C1C1C1", "#4C4C4C", "#EF130B", "#740B07", "#FF7100", "#C23800", "#FFE400", "#E8A200", "#00CC00", "#005510", "#00B2FF", "#00569E", "#231FD3", "#0E0865", "#A300BA", "#550069", "#D37CAA", "#A75574", "#A0522D", "#63300D" })
-                        skribbl.Add(((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex), false));
-                    foreach (int brushPx in new[] { 4, 10 })
-                    {
-                        var hatched = TraceEngine.Trace(src, new TraceOptions { Mode = TraceMode.Colour, Scale = sc, Spacing = brushPx, OutlineToo = true, Palette = skribbl, Blur = 1 }, default);
-                        var fast = TraceEngine.Trace(src, new TraceOptions { Mode = TraceMode.Colour, Scale = sc, Spacing = brushPx, OutlineToo = true, Palette = skribbl, Blur = 1, BucketFill = true, PointMs = 4 }, default);
-                        var oldTiming = new DrawSettings { DelayMs = 4, PointsPerStep = 1 };
-                        var tOld = MouseDrawer.Estimate(hatched.Paths.Count, hatched.PointCount, Switches(hatched), oldTiming);
-                        var tFast = MouseDrawer.Estimate(fast.Paths.Count - fast.FillCount, fast.PointCount - fast.FillCount, Switches(fast) + 2, timing, fast.FillCount);
-                        if (Environment.GetEnvironmentVariable("OVERSKIN_TEST_OUT") is { Length: > 0 } simDir)
-                        {
-                            SaveCanvas(hatched, brushPx, System.IO.Path.Combine(simDir, $"sim-hatch-{brushPx}.png"));
-                            SaveCanvas(fast, brushPx, System.IO.Path.Combine(simDir, $"sim-bucket-{brushPx}.png"));
-                            // the quantised picture itself (the backdrop, made opaque again)
-                            var q = (byte[])fast.Backdrop.Clone();
-                            for (int i = 0; i < q.Length; i += 4)
-                            {
-                                if (q[i + 3] == 0) { q[i] = q[i + 1] = q[i + 2] = q[i + 3] = 255; continue; }
-                                for (int c = 0; c < 3; c++) q[i + c] = (byte)Math.Min(255, q[i + c] * 255 / q[i + 3]);
-                                q[i + 3] = 255;
-                            }
-                            var qb = System.Windows.Media.Imaging.BitmapSource.Create(fast.Width, fast.Height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, q, fast.Width * 4);
-                            var qe = new System.Windows.Media.Imaging.PngBitmapEncoder();
-                            qe.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(qb));
-                            using (var qf = System.IO.File.Create(System.IO.Path.Combine(simDir, $"quantised-{brushPx}.png"))) qe.Save(qf);
-                        }
-                        log.Add($"real picture {fast.Width}x{fast.Height} brush {brushPx}: before {tOld.TotalSeconds:0.0}s ({hatched.Paths.Count} strokes, {hatched.PointCount} points), " +
-                                $"now {tFast.TotalSeconds:0.0}s ({fast.Paths.Count - fast.FillCount} strokes, {fast.PointCount - fast.FillCount} points, {fast.FillCount} fills)");
-                    }
-                }
-                const int Brush = 4;
-
-                var mono = Source(200, 120, (x, y) => (x >= 20 && x < 120 && y >= 20 && y < 100 && !(x >= 50 && x < 90 && y >= 45 && y < 75)) || Math.Sqrt((x - 160) * (x - 160) + (y - 60) * (y - 60)) < 30 ? Black : White);
-                var monoFill = TraceEngine.Trace(mono, new TraceOptions { Mode = TraceMode.Outline, Spacing = Brush, Blur = 0, BucketFill = true }, default);
-                log.Add($"outline + bucket: outlines={monoFill.Paths.Count - monoFill.FillCount} fills={monoFill.FillCount} (expect 3 outlines incl. the hole, 2 fills)");
-            }
             var noPalette = TraceEngine.Trace(flag, new TraceOptions { Mode = TraceMode.Colour }, default);
             log.Add($"colour without palette: \"{noPalette.Message}\"");
 
@@ -1235,6 +1150,7 @@ public partial class App : Application
 
             NewFeatureTests(log);
             MoreFeatureTests(log);
+            PassTests(log);
         }
         catch (Exception ex)
         {
@@ -1281,149 +1197,6 @@ public partial class App : Application
     }
 
 #if DEBUG
-    /// <summary>
-    /// Plays a trace onto a pretend canvas (one palette index per pixel, -1 = blank): strokes
-    /// with a round brush of the given width, fills as a paint bucket would (4-connected flood
-    /// over pixels the same as the clicked one). Returns how much of the canvas matches the
-    /// picture's nearest palette colours, and how many pixels a fill wrongly painted.
-    /// </summary>
-    private static (double Correct, int Leaked) SimulateCanvas(TraceResult r, int brush,
-        Func<int, int, (byte R, byte G, byte B)> picture, List<(System.Windows.Media.Color Color, bool Skip)> palette)
-    {
-        int w = r.Width, h = r.Height;
-        var canvas = new int[w * h];
-        Array.Fill(canvas, -1);
-        var target = new int[w * h];
-        for (int y = 0; y < h; y++)
-        {
-            for (int x = 0; x < w; x++)
-            {
-                var (pr, pg, pb) = picture(x, y);
-                int best = 0; double bestD = double.MaxValue;
-                for (int k = 0; k < palette.Count; k++)
-                {
-                    var c = palette[k].Color;
-                    double d = (pr - c.R) * (pr - c.R) + (pg - c.G) * (pg - c.G) + (pb - c.B) * (pb - c.B);
-                    if (d < bestD) { bestD = d; best = k; }
-                }
-                target[y * w + x] = palette[best].Skip ? -1 : best;
-            }
-        }
-
-        double rad = brush / 2.0;
-        void Stamp(double cx, double cy, int colour)
-        {
-            for (int y = (int)Math.Floor(cy - rad); y <= (int)Math.Ceiling(cy + rad); y++)
-                for (int x = (int)Math.Floor(cx - rad); x <= (int)Math.Ceiling(cx + rad); x++)
-                {
-                    if (x < 0 || y < 0 || x >= w || y >= h) continue;
-                    double dx = x + 0.5 - cx, dy = y + 0.5 - cy;
-                    if (dx * dx + dy * dy <= rad * rad) canvas[y * w + x] = colour;
-                }
-        }
-
-        int leaked = 0;
-        for (int p = 0; p < r.Paths.Count; p++)
-        {
-            var path = r.Paths[p];
-            int colour = r.ColourIndex?[p] ?? 5;
-            if (r.IsFill?[p] == true)
-            {
-                int sx = (int)path[0].X, sy = (int)path[0].Y, seed = sy * w + sx, from = canvas[seed];
-                if (from == colour) continue;
-                var stack = new Stack<int>();
-                stack.Push(seed);
-                while (stack.Count > 0)
-                {
-                    int i = stack.Pop();
-                    if (canvas[i] != from) continue;
-                    canvas[i] = colour;
-                    if (target[i] != colour) leaked++;
-                    int x = i % w, y = i / w;
-                    if (x > 0) stack.Push(i - 1);
-                    if (x < w - 1) stack.Push(i + 1);
-                    if (y > 0) stack.Push(i - w);
-                    if (y < h - 1) stack.Push(i + w);
-                }
-                continue;
-            }
-            if (path.Length == 1) Stamp(path[0].X, path[0].Y, colour);
-            for (int i = 1; i < path.Length; i++)
-            {
-                var a = path[i - 1]; var b = path[i];
-                double len = (b - a).Length;
-                int steps = Math.Max(1, (int)Math.Ceiling(len * 2));
-                for (int s = 0; s <= steps; s++)
-                    Stamp(a.X + (b.X - a.X) * s / steps, a.Y + (b.Y - a.Y) * s / steps, colour);
-            }
-        }
-
-        int match = 0;
-        for (int i = 0; i < canvas.Length; i++) if (canvas[i] == target[i]) match++;
-        return (match / (double)canvas.Length, leaked);
-    }
-
-    /// <summary>Paints a trace onto a white canvas the way the game would and saves it as a PNG.</summary>
-    private static void SaveCanvas(TraceResult r, int brush, string path)
-    {
-        int w = r.Width, h = r.Height;
-        var canvas = new int[w * h];
-        Array.Fill(canvas, -1);
-        double rad = brush / 2.0;
-        void Stamp(double cx, double cy, int colour)
-        {
-            for (int y = (int)Math.Floor(cy - rad); y <= (int)Math.Ceiling(cy + rad); y++)
-                for (int x = (int)Math.Floor(cx - rad); x <= (int)Math.Ceiling(cx + rad); x++)
-                {
-                    if (x < 0 || y < 0 || x >= w || y >= h) continue;
-                    double dx = x + 0.5 - cx, dy = y + 0.5 - cy;
-                    if (dx * dx + dy * dy <= rad * rad) canvas[y * w + x] = colour;
-                }
-        }
-        for (int p = 0; p < r.Paths.Count; p++)
-        {
-            var pts = r.Paths[p];
-            int colour = r.ColourIndex?[p] ?? 0;
-            if (r.IsFill?[p] == true)
-            {
-                int seed = (int)pts[0].Y * w + (int)pts[0].X, from = canvas[seed];
-                if (from == colour) continue;
-                var stack = new Stack<int>();
-                stack.Push(seed);
-                while (stack.Count > 0)
-                {
-                    int i = stack.Pop();
-                    if (canvas[i] != from) continue;
-                    canvas[i] = colour;
-                    int x = i % w, y = i / w;
-                    if (x > 0) stack.Push(i - 1);
-                    if (x < w - 1) stack.Push(i + 1);
-                    if (y > 0) stack.Push(i - w);
-                    if (y < h - 1) stack.Push(i + w);
-                }
-                continue;
-            }
-            if (pts.Length == 1) Stamp(pts[0].X, pts[0].Y, colour);
-            for (int i = 1; i < pts.Length; i++)
-            {
-                var a = pts[i - 1]; var b = pts[i];
-                int steps = Math.Max(1, (int)Math.Ceiling((b - a).Length * 2));
-                for (int s = 0; s <= steps; s++) Stamp(a.X + (b.X - a.X) * s / steps, a.Y + (b.Y - a.Y) * s / steps, colour);
-            }
-        }
-        var px = new byte[w * h * 4];
-        for (int i = 0; i < canvas.Length; i++)
-        {
-            var c = canvas[i] < 0 || r.Colours == null ? System.Windows.Media.Colors.White : r.Colours[canvas[i]];
-            px[i * 4] = c.B; px[i * 4 + 1] = c.G; px[i * 4 + 2] = c.R; px[i * 4 + 3] = 255;
-        }
-        var bmp = System.Windows.Media.Imaging.BitmapSource.Create(w, h, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, px, w * 4);
-        var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
-        enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bmp));
-        using var file = System.IO.File.Create(path);
-        enc.Save(file);
-    }
-
     private delegate void WinEventProc(IntPtr hook, uint evt, IntPtr hwnd, int obj, int child, uint thread, uint time);
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]

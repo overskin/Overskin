@@ -90,6 +90,9 @@ public partial class MainWindow
         VidStyleSystem.IsChecked = v.PointerStyle == "System";
         VidPointerSize.Value = v.PointerSize;
         VidSmoothing.Value = v.PointerSmoothing;
+        VidSmoothCursorSwitch.IsChecked = v.SmoothCursor;
+        VidMotionBlur.Value = v.MotionBlur;
+        VidKeysSwitch.IsChecked = v.ShowKeys;
         VidRingsSwitch.IsChecked = v.ClickRings;
         VideoZoomSwitch.IsChecked = v.AutoZoom;
         VidZoom.Value = v.Zoom;
@@ -150,6 +153,16 @@ public partial class MainWindow
         });
     }
 
+    private void BackdropButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowChoices(BackdropButton, Beautify.Backgrounds.Select(b => (b.Name, b.Name)), _settings.Video.Backdrop, name =>
+        {
+            _settings.Video.Backdrop = name;
+            SaveSettings();
+            UpdateVideoLabels();
+        });
+    }
+
     private async void CameraButton_Click(object sender, RoutedEventArgs e)
     {
         var cams = await Webcam.CamerasAsync();
@@ -167,12 +180,15 @@ public partial class MainWindow
         var v = _settings.Video;
         VidPointerSizeText.Text = $"{v.PointerSize:0.##}×";
         VidSmoothingText.Text = v.PointerSmoothing == 0 ? "Off" : $"{v.PointerSmoothing}";
+        VidMotionBlurText.Text = v.MotionBlur == 0 ? "Off" : $"{v.MotionBlur}";
+        BackdropName.Text = v.Backdrop;
         VidZoomText.Text = $"{v.Zoom:0.0}×";
         VidZoomSpeedText.Text = $"{v.ZoomSpeed}";
         VidFollowText.Text = $"{v.FollowSmoothing}";
         VidHoldText.Text = $"{v.ZoomHold:0.#} s";
         foreach (var c in new FrameworkElement[] { VidZoom, VidZoomSpeed, VidFollow, VidHold }) c.IsEnabled = v.AutoZoom;
-        foreach (var c in new FrameworkElement[] { VidStyleWhite, VidStyleBlack, VidStyleSystem, VidPointerSize, VidSmoothing }) c.IsEnabled = v.Pointer;
+        foreach (var c in new FrameworkElement[] { VidStyleWhite, VidStyleBlack, VidStyleSystem, VidPointerSize, VidSmoothing, VidSmoothCursorSwitch }) c.IsEnabled = v.Pointer;
+        VidMotionBlur.IsEnabled = v.Pointer && v.SmoothCursor;
         MicButton.IsEnabled = v.Microphone;
         VidCamSizeText.Text = $"{v.WebcamSize}%";
         foreach (var c in new FrameworkElement[] { CameraButton, CamTopLeft, CamTopRight, CamBottomLeft, CamBottomRight, CamCircle, CamRounded, VidCamSize }) c.IsEnabled = v.Webcam;
@@ -192,6 +208,9 @@ public partial class MainWindow
         v.PointerStyle = VidStyleBlack.IsChecked == true ? "Black" : VidStyleSystem.IsChecked == true ? "System" : "White";
         v.PointerSize = VidPointerSize.Value;
         v.PointerSmoothing = (int)VidSmoothing.Value;
+        v.SmoothCursor = VidSmoothCursorSwitch.IsChecked == true;
+        v.MotionBlur = (int)VidMotionBlur.Value;
+        v.ShowKeys = VidKeysSwitch.IsChecked == true;
         v.ClickRings = VidRingsSwitch.IsChecked == true;
         v.AutoZoom = VideoZoomSwitch.IsChecked == true;
         v.Zoom = Math.Round(VidZoom.Value, 1);

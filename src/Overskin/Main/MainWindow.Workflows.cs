@@ -37,7 +37,7 @@ public partial class MainWindow
         foreach (var (what, key) in BuiltInHotkeys())
             if (key == text) return what;
         foreach (var w in _settings.Workflows)
-            if (!ReferenceEquals(w, except) && w.Hotkey == text) return $"the workflow \"{w.Name}\"";
+            if (!ReferenceEquals(w, except) && w.Hotkey == text) return $"the workflow \"{w.Title}\"";
         return null;
     }
 
@@ -67,7 +67,7 @@ public partial class MainWindow
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            text.Children.Add(new TextBlock { Text = w.Name, Style = (Style)FindResource("Label"), FontWeight = FontWeights.SemiBold });
+            text.Children.Add(new TextBlock { Text = w.Title, Style = (Style)FindResource("Label"), FontWeight = FontWeights.SemiBold });
             text.Children.Add(new TextBlock { Text = w.Summary, Style = (Style)FindResource("Dim"), FontSize = 11, TextTrimming = TextTrimming.CharacterEllipsis });
             row.Children.Add(text);
 

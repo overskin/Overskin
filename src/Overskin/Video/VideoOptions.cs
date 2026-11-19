@@ -14,6 +14,18 @@ public sealed class VideoOptions
     /// <summary>0 (none) to 100 (very smooth).</summary>
     public int PointerSmoothing { get; set; } = 45;
     public bool ClickRings { get; set; } = true;
+    /// <summary>
+    /// Records the pointer apart from the picture and draws it a moment later, smoothed with no lag
+    /// and blurred while it moves (instead of drawing it as it is, frame by frame).
+    /// </summary>
+    public bool SmoothCursor { get; set; } = true;
+    /// <summary>0 (sharp) to 100 (the shutter open the whole frame).</summary>
+    public int MotionBlur { get; set; } = 50;
+    /// <summary>Show keyboard shortcuts (never ordinary typing) as a label near the bottom.</summary>
+    public bool ShowKeys { get; set; }
+
+    /// <summary>A Beautify backdrop name to put the recording on, or "None".</summary>
+    public string Backdrop { get; set; } = "None";
 
     public bool AutoZoom { get; set; } = true;
     public double Zoom { get; set; } = 1.8;
@@ -53,6 +65,8 @@ public sealed class VideoOptions
         if (PointerStyle is not ("White" or "Black" or "System")) PointerStyle = "White";
         PointerSize = Math.Clamp(PointerSize, 0.75, 3);
         PointerSmoothing = Math.Clamp(PointerSmoothing, 0, 100);
+        MotionBlur = Math.Clamp(MotionBlur, 0, 100);
+        if (Backdrop == null || !Beautify.Backgrounds.Any(b => b.Name == Backdrop)) Backdrop = "None";
         Zoom = Math.Clamp(Zoom, 1.2, 3);
         ZoomSpeed = Math.Clamp(ZoomSpeed, 0, 100);
         FollowSmoothing = Math.Clamp(FollowSmoothing, 0, 100);

@@ -28,7 +28,7 @@ public partial class MainWindow
             new("video", "Record a video", "IcCircleDot", () => ToggleVideo(false), true),
             new("zoomvideo", "Record a video with auto-zoom", "IcZoomIn", () => ToggleVideo(true), true),
             new("steps", "Record steps (how-to guide)", "IcListOrdered", ToggleSteps, true),
-        }.Concat(_settings.Workflows.Select((w, i) => new Command($"workflow{i + 1}", w.Name, "IcWorkflow", () => RunWorkflow(w)))).ToArray()),
+        }.Concat(_settings.Workflows.Select((w, i) => new Command($"workflow{i + 1}", w.Title, "IcWorkflow", () => RunWorkflow(w)))).ToArray()),
         ("Tools", "IcZap", new Command[]
         {
             new("snip", "Snip and pin", "IcScissors", SnipAndPin, true),
@@ -101,6 +101,10 @@ public partial class MainWindow
             items.Add(header);
         }
     }
+
+    /// <summary>For the self-test: every group and item label in the tray menu.</summary>
+    internal List<string> TrayHeadersForTest() =>
+        Commands().SelectMany(g => new[] { g.Group }.Concat(g.Items.Select(c => c.Header))).ToList();
 
     /// <summary>Right-clicking Overskin on the taskbar or in Start lists the main commands.</summary>
     private void SetUpJumpList()

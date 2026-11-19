@@ -43,8 +43,6 @@ public sealed class VideoRecorder : IRecorder
         IsRecording = true;
         _stop = _cancel = false;
 
-        var sprites = options.Pointer && options.PointerStyle != "System" ? DrawPointers(area, options) : null;
-
         _frame = new RecordFrameWindow(area);
         _frame.Show();
         _bar = new RecordBarWindow(this, area);
@@ -55,7 +53,11 @@ public sealed class VideoRecorder : IRecorder
         double fit = Fit(area);
         int ow = Math.Max(2, (int)(area.Width * fit) & ~1), oh = Math.Max(2, (int)(area.Height * fit) & ~1);
         byte[]? mark = watermark != null ? Watermark.Layer(watermark, ow, oh) : null;
-        var thread = new Thread(() => Run(area, path, options, sprites, mark)) { IsBackground = true, Name = "Overskin video recorder" };
+        // the backdrop, also drawn once; the screen then fills the card in the middle of it
+        var look = VideoBackdrop.Create(options.Backdrop, ow, oh);
+        double inner = look == null ? 1 : look.InnerWidth / (double)ow;
+        var sprites = options.Pointer && options.PointerStyle != "System" ? DrawPointers(area, options, inner) : null;
+        var thread = new Thread(() => Run(area, path, options, sprites, mark, look)) { IsBackground = true, Name = "Overskin video recorder" };
         thread.Start();
     }
 
@@ -63,10 +65,10 @@ public sealed class VideoRecorder : IRecorder
         Math.Min(1, Math.Min(MaxWidth / (double)area.Width, MaxHeight / (double)area.Height));
 
     /// <summary>The pointer at every size it can appear at, drawn now on the UI thread.</summary>
-    internal static Dictionary<(PointerArt.Shape, int), PointerSprite> DrawPointers(Int32Rect area, VideoOptions o)
+    internal static Dictionary<(PointerArt.Shape, int), PointerSprite> DrawPointers(Int32Rect area, VideoOptions o, double scale = 1)
     {
         var sprites = new Dictionary<(PointerArt.Shape, int), PointerSprite>();
-        double baseSize = PointerBase(area, o);
+        double baseSize = PointerBase(area, o, scale);
         int min = (int)Math.Floor(baseSize), max = (int)Math.Ceiling(baseSize * Math.Sqrt(o.AutoZoom ? o.Zoom : 1)) + 1;
         bool dark = o.PointerStyle == "Black";
         for (int size = min; size <= max; size++)
@@ -76,7 +78,7 @@ public sealed class VideoRecorder : IRecorder
     }
 
     /// <summary>Pointer height in output pixels at no zoom.</summary>
-    private static double PointerBase(Int32Rect area, VideoOptions o) => Math.Max(12, 26 * o.PointerSize * Fit(area));
+    private static double PointerBase(Int32Rect area, VideoOptions o, double scale = 1) => Math.Max(12, 26 * o.PointerSize * Fit(area) * scale);
 
     /// <summary>Something worth telling the user after the recording, such as a microphone that couldn't be opened.</summary>
     public string? Notice { get; private set; }
@@ -104,10 +106,14 @@ public sealed class VideoRecorder : IRecorder
         return (new AudioMixer(_clock, sources, sound), sound);
     }
 
-    private void Run(Int32Rect area, string path, VideoOptions o, Dictionary<(PointerArt.Shape, int), PointerSprite>? sprites, byte[]? mark)
+    private void Run(Int32Rect area, string path, VideoOptions o, Dictionary<(PointerArt.Shape, int), PointerSprite>? sprites, byte[]? mark, VideoBackdrop? look)
     {
         double fit = Fit(area);
         int w = Math.Max(2, (int)(area.Width * fit) & ~1), h = Math.Max(2, (int)(area.Height * fit) & ~1);
+        // the screen's own pictures: the whole frame, or the card inside the backdrop
+        int cw = look?.InnerWidth ?? w, ch = look?.InnerHeight ?? h;
+        double inner = cw / (double)w;
+        fit *= inner;
         int fps = o.Fps;
 
         var queue = new BlockingCollection<VideoFrame>(boundedCapacity: 8);
@@ -122,15 +128,59 @@ public sealed class VideoRecorder : IRecorder
         var (mixer, sound) = OpenSound(o);
         if (_problems.Count > 0) Notice = string.Join(" ", _problems);
         _clock.Restart();
+        var keys = o.ShowKeys ? new KeyCaps(_ui, () => _clock.Elapsed.TotalSeconds, h) : null;
         var encoding = Task.Run(() => VideoEncoder.EncodeAsync(path, w, h, fps, queue, o.HighQuality, sound));
         string? error = null;
         bool highRes = timeBeginPeriod(1) == 0;
         int frames = 0;
         var systemPointers = new SystemPointers();
         IFrameGrabber? grabber = null;
+        // the smooth pointer: recorded apart from the picture and drawn a moment later (see CursorTrack)
+        bool smooth = o.Pointer && o.SmoothCursor;
+        var track = smooth ? new CursorTrack(area, () => _clock.Elapsed.TotalSeconds) : null;
+        var painter = smooth ? new SmoothCursorPainter(sprites) : null;
+        double sigma = SmoothCursorPainter.Sigma(o.PointerSmoothing), shutter = SmoothCursorPainter.Shutter(o.MotionBlur);
+        // how far ahead to look, kept to about 400 MB of waiting frames
+        double ahead = Math.Min(3 * sigma + shutter / fps, Math.Max(2, 400_000_000L / ((long)cw * ch * 4)) / (double)fps);
+        var pending = new Queue<PendingFrame>();
+        void Finish(PendingFrame f, bool wait)
+        {
+            var view = f.View;
+            double k = f.Scale;
+            Point Out(Point a) => new((a.X - view.X) * k, (a.Y - view.Y) * k);
+            if (o.ClickRings)
+                foreach (var (time, at) in track!.ClicksBetween(f.Time - 0.5, f.Time))
+                {
+                    double age = f.Time - time;
+                    double grow = 1 - Math.Pow(1 - age / 0.5, 3);
+                    var c = Out(at);
+                    PointerArt.Ring(f.Pixels, cw, ch, c.X, c.Y, (8 + 26 * grow) * k * fit, Math.Max(1.5, 2.6 * k * fit), 1 - age / 0.5);
+                }
+            if (track!.SampleAt(f.Time) is { Showing: true } s && painter!.SpriteFor(s.Handle, f.Size) is { } sprite)
+            {
+                var path = SmoothCursorPainter.ShutterPath(t => Out(track.SmoothAt(t, sigma, ahead)), f.Time, 1.0 / fps, shutter);
+                SmoothCursorPainter.Paint(f.Pixels, cw, ch, sprite, path);
+            }
+            if (Decorate(f.Pixels, f.Time, f.Face) is var done && (wait ? queue.TryAdd(new VideoFrame(done, TimeSpan.FromSeconds(f.Time)), 3000)
+                : queue.TryAdd(new VideoFrame(done, TimeSpan.FromSeconds(f.Time))))) frames++;
+        }
+        // everything over the screen's picture: the backdrop around it, then the webcam, shortcut keys and watermark
+        byte[] Decorate(byte[] pixels, double time, (byte[] Pixels, int Width, int Height)? face)
+        {
+            if (look != null) pixels = look.Compose(pixels);
+            if (face is { } f) WebcamBubble.Draw(pixels, w, h, f.Pixels, f.Width, f.Height, o);
+            keys?.Draw(pixels, w, h, time);
+            if (mark != null) Watermark.Blend(pixels, mark);
+            return pixels;
+        }
+        void Release(bool all)
+        {
+            while (pending.Count > 0 && (all || pending.Peek().Time + ahead <= track!.Latest)) Finish(pending.Dequeue(), all);
+            if (pending.Count > 0) track!.Trim(pending.Peek().Time - 1);
+        }
         try
         {
-            grabber = FrameGrabbers.For(area, w, h);
+            grabber = FrameGrabbers.For(area, cw, ch);
             GrabberKind = grabber.Kind;
             var camera = new SmartCamera(area.Width, area.Height)
             {
@@ -142,7 +192,7 @@ public sealed class VideoRecorder : IRecorder
             };
             var rings = new List<(Point At, double Age)>();
             bool wasDown = false;
-            double lastTime = 0, pointerBase = PointerBase(area, o);
+            double lastTime = 0, pointerBase = PointerBase(area, o, inner);
             int n = 0;
             while (!_stop && !_cancel && !encoding.IsCompleted)
             {
@@ -171,7 +221,7 @@ public sealed class VideoRecorder : IRecorder
                 }
 
                 var view = camera.View();
-                double k = w / view.Width; // area pixels -> output pixels
+                double k = cw / view.Width; // area pixels -> output pixels
                 var c = camera.Cursor;
                 double px = (c.X - view.X) * k, py = (c.Y - view.Y) * k;
                 int size = (int)Math.Round(pointerBase * Math.Sqrt(camera.Zoom));
@@ -187,7 +237,7 @@ public sealed class VideoRecorder : IRecorder
                 void Overlay(IntPtr dc)
                 {
                     // any other pointer (hand, resize, an app's own) is the Windows picture, loaded at the size needed
-                    if (kind != SystemPointers.Kind.None && sprite == null) systemPointers.Draw(dc, px, py, size);
+                    if (!smooth && kind != SystemPointers.Kind.None && sprite == null) systemPointers.Draw(dc, px, py, size);
                 }
                 byte[] pixels;
                 try
@@ -198,19 +248,25 @@ public sealed class VideoRecorder : IRecorder
                 {
                     // the fast way stopped working (HDR switched on, a driver reset): carry on the old way
                     grabber.Dispose();
-                    grabber = new ScaledGrabber(w, h);
+                    grabber = new ScaledGrabber(cw, ch);
                     GrabberKind = grabber.Kind;
                     pixels = grabber.Grab(area.X + view.X, area.Y + view.Y, view.Width, view.Height, Overlay);
+                }
+                if (smooth)
+                {
+                    pending.Enqueue(new PendingFrame(pixels, t, view, k, size, cam?.Latest()));
+                    Release(false);
+                    n = (int)(_clock.ElapsedMilliseconds * fps / 1000) + 1;
+                    continue;
                 }
                 foreach (var (at, age) in rings)
                 {
                     double grow = 1 - Math.Pow(1 - age / 0.5, 3);
-                    PointerArt.Ring(pixels, w, h, (at.X - view.X) * k, (at.Y - view.Y) * k,
+                    PointerArt.Ring(pixels, cw, ch, (at.X - view.X) * k, (at.Y - view.Y) * k,
                         (8 + 26 * grow) * k * fit, Math.Max(1.5, 2.6 * k * fit), 1 - age / 0.5);
                 }
-                if (sprite != null) PointerArt.Blend(pixels, w, h, sprite, px, py);
-                if (cam?.Latest() is { } face) WebcamBubble.Draw(pixels, w, h, face.Pixels, face.Width, face.Height, o);
-                if (mark != null) Watermark.Blend(pixels, mark);
+                if (sprite != null) PointerArt.Blend(pixels, cw, ch, sprite, px, py);
+                pixels = Decorate(pixels, t, cam?.Latest());
 
                 if (queue.TryAdd(new VideoFrame(pixels, _clock.Elapsed))) frames++;
                 n = (int)(_clock.ElapsedMilliseconds * fps / 1000) + 1; // skip ahead rather than fall behind
@@ -222,6 +278,17 @@ public sealed class VideoRecorder : IRecorder
         }
         finally
         {
+            try
+            {
+                track?.Dispose();
+                if (smooth && !_cancel && error == null) Release(true);
+            }
+            catch (Exception ex)
+            {
+                error ??= ex.Message;
+            }
+            painter?.Dispose();
+            keys?.Dispose();
             if (highRes) timeEndPeriod(1);
             grabber?.Dispose();
             mixer?.Finish();
@@ -258,6 +325,9 @@ public sealed class VideoRecorder : IRecorder
     }
 }
 
+/// <summary>A grabbed frame waiting for its pointer: when it was taken, which part of the area it shows, and how big the pointer is.</summary>
+internal sealed record PendingFrame(byte[] Pixels, double Time, Rect View, double Scale, int Size, (byte[] Pixels, int Width, int Height)? Face);
+
 /// <summary>Which standard pointer is showing, and the Windows pictures of them at any size.</summary>
 internal sealed class SystemPointers : IDisposable
 {
@@ -269,6 +339,9 @@ internal sealed class SystemPointers : IDisposable
         .Where(x => x.Handle != IntPtr.Zero)
         .GroupBy(x => x.Handle).ToDictionary(g => g.Key, g => g.First().Id);
     private readonly Dictionary<(int Id, int Size), IntPtr> _loaded = new();
+
+    /// <summary>Which standard pointer a handle is (its resource number), or 0 for an app's own.</summary>
+    public static int IdOf(IntPtr handle) => Handles.TryGetValue(handle, out int id) ? id : 0;
 
     public static Kind Current()
     {

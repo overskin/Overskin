@@ -818,6 +818,23 @@
                                             <RadioButton x:Name="VidQualityHigh" Style="{StaticResource Seg}" GroupName="VidQuality" Content="Sharper" Checked="VideoSetting_Click" />
                                         </StackPanel>
                                     </Grid>
+                                    <Grid Height="34" ToolTip="Puts the recording on a gradient with rounded corners and a soft shadow, like Beautify does for screenshots">
+                                        <TextBlock Text="Backdrop" Style="{StaticResource Label}" />
+                                        <Button x:Name="BackdropButton" Style="{StaticResource Btn}" Height="26" MinWidth="190" MaxWidth="260" HorizontalAlignment="Right"
+                                                HorizontalContentAlignment="Stretch" Padding="8,0" Click="BackdropButton_Click">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="BackdropName" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                <local:Icon Grid.Column="1" Data="{StaticResource IcChevronRight}" Width="11" Height="11" Margin="10,0,0,0" RenderTransformOrigin="0.5,0.5">
+                                                    <local:Icon.RenderTransform><RotateTransform Angle="90" /></local:Icon.RenderTransform>
+                                                </local:Icon>
+                                            </Grid>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Shows shortcuts such as Ctrl + C or Alt + Tab near the bottom of the video. Ordinary typing is never shown.">
+                                        <TextBlock Text="Show keyboard shortcuts" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="VidKeysSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
                             <Border Style="{StaticResource Card}">
@@ -929,13 +946,26 @@
                                             <TextBlock x:Name="VidPointerSizeText" Grid.Column="1" Style="{StaticResource Value}" />
                                         </Grid>
                                     </Grid>
-                                    <Grid Height="31" ToolTip="Calms shaky or jumpy movement. Higher is smoother but trails a little further behind.">
+                                    <Grid Height="31" ToolTip="Records the pointer apart from the picture and draws it afterwards: it glides from place to place, lands exactly on each click and blurs as it moves">
+                                        <TextBlock Text="Smooth cursor" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="VidSmoothCursorSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="How much the pointer's movement is smoothed. With Smooth cursor on there's no lag; without it, higher trails a little further behind.">
                                         <TextBlock Text="Smoothing" Style="{StaticResource Label}" />
                                         <Grid HorizontalAlignment="Right" Width="230">
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
                                             <Slider x:Name="VidSmoothing" Minimum="0" Maximum="100" SmallChange="5" LargeChange="5" TickFrequency="5"
                                                     IsSnapToTickEnabled="True" ValueChanged="VideoSetting_Changed" />
                                             <TextBlock x:Name="VidSmoothingText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Blurs the pointer along its path while it moves, like a film camera. Needs Smooth cursor.">
+                                        <TextBlock Text="Motion blur" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="VidMotionBlur" Minimum="0" Maximum="100" SmallChange="5" LargeChange="5" TickFrequency="5"
+                                                    IsSnapToTickEnabled="True" ValueChanged="VideoSetting_Changed" />
+                                            <TextBlock x:Name="VidMotionBlurText" Grid.Column="1" Style="{StaticResource Value}" />
                                         </Grid>
                                     </Grid>
                                     <Grid Height="31">
@@ -1244,24 +1274,24 @@
                                 <RowDefinition Height="24" />
                             </Grid.RowDefinitions>
                             <Border Style="{StaticResource Key}"><TextBlock Text="Scroll" Style="{StaticResource KeyText}" /></Border>
-                            <TextBlock Grid.Column="1" Text="resize" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <TextBlock Grid.Column="1" Text="Resize" Style="{StaticResource Dim}" Margin="10,0,12,0" />
                             <Border Grid.Column="2" Style="{StaticResource Key}"><TextBlock Text="Ctrl+Scroll" Style="{StaticResource KeyText}" /></Border>
-                            <TextBlock Grid.Column="3" Text="opacity" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <TextBlock Grid.Column="3" Text="Opacity" Style="{StaticResource Dim}" Margin="10,0,12,0" />
 
                             <Border Grid.Row="1" Style="{StaticResource Key}"><TextBlock Text="Shift+Scroll" Style="{StaticResource KeyText}" /></Border>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="rotate" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Rotate" Style="{StaticResource Dim}" Margin="10,0,12,0" />
                             <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource Key}"><TextBlock Text="Right-click" Style="{StaticResource KeyText}" /></Border>
-                            <TextBlock Grid.Row="1" Grid.Column="3" Text="menu" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <TextBlock Grid.Row="1" Grid.Column="3" Text="Menu" Style="{StaticResource Dim}" Margin="10,0,12,0" />
 
                             <Border Grid.Row="2" Style="{StaticResource Key}"><TextBlock x:Name="HintClickKey" Text="Ctrl+Alt+C" Style="{StaticResource KeyText}" /></Border>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Text="click-through" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Click-through" Style="{StaticResource Dim}" Margin="10,0,12,0" />
                             <Border x:Name="HintGrabKey" Grid.Row="2" Grid.Column="2" Style="{StaticResource Key}"><TextBlock Text="Hold Ctrl+Alt" Style="{StaticResource KeyText}" /></Border>
-                            <TextBlock x:Name="HintGrabText" Grid.Row="2" Grid.Column="3" Text="grab through it" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <TextBlock x:Name="HintGrabText" Grid.Row="2" Grid.Column="3" Text="Grab through it" Style="{StaticResource Dim}" Margin="10,0,12,0" />
 
                             <Border Grid.Row="3" Style="{StaticResource Key}"><TextBlock x:Name="HintSnipKey" Text="Ctrl+Alt+S" Style="{StaticResource KeyText}" /></Border>
-                            <TextBlock Grid.Row="3" Grid.Column="1" Text="snip and pin" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="Snip and pin" Style="{StaticResource Dim}" Margin="10,0,12,0" />
                             <Border Grid.Row="3" Grid.Column="2" Style="{StaticResource Key}"><TextBlock Text="Esc" Style="{StaticResource KeyText}" /></Border>
-                            <TextBlock Grid.Row="3" Grid.Column="3" Text="close the image" Style="{StaticResource Dim}" Margin="10,0,12,0" />
+                            <TextBlock Grid.Row="3" Grid.Column="3" Text="Close the image" Style="{StaticResource Dim}" Margin="10,0,12,0" />
                         </Grid>
                     </Border>
                 </Grid>
@@ -1529,24 +1559,10 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="52" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="SpacingLabel" Text="Line spacing" Style="{StaticResource Label}" />
+                                        <TextBlock Text="Line spacing" Style="{StaticResource Label}" />
                                         <Slider x:Name="SpacingSlider" Grid.Column="1" Minimum="1" Maximum="40" SmallChange="1" LargeChange="2"
                                                 TickFrequency="1" IsSnapToTickEnabled="True" Value="4" ValueChanged="TraceParam_Changed" />
                                         <TextBlock x:Name="SpacingText" Grid.Column="2" Style="{StaticResource Value}" />
-                                    </Grid>
-                                    <Grid x:Name="BucketRow" Height="31"
-                                          ToolTip="Outlines big areas, then fills each one with a single click of the game's paint bucket. Much faster than hatching.">
-                                        <TextBlock Text="Fill with bucket" Style="{StaticResource Label}" />
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <Button x:Name="PickToolsButton" Style="{StaticResource Btn}" Height="25" Margin="0,0,10,0" Click="PickTools_Click"
-                                                    ToolTip="Click the game's brush, then its bucket">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <local:Icon Data="{StaticResource IcPipette}" Width="13" Height="13" Margin="0,0,6,0" />
-                                                    <TextBlock x:Name="PickToolsLabel" Text="Pick brush and bucket" />
-                                                </StackPanel>
-                                            </Button>
-                                            <ToggleButton x:Name="BucketSwitch" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="BucketSwitch_Click" />
-                                        </StackPanel>
                                     </Grid>
                                     <Grid x:Name="InvertRow" Height="29" ToolTip="Draw the light areas instead of the dark ones">
                                         <TextBlock Text="Invert" Style="{StaticResource Label}" />

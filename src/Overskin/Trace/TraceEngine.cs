@@ -53,13 +53,6 @@ public sealed class TraceOptions
     public bool OutlineToo { get; init; }
     /// <summary>Colour mode: the colours the target program offers. Skipped ones are left blank.</summary>
     public IReadOnlyList<(Color Color, bool Skip)> Palette { get; init; } = Array.Empty<(Color, bool)>();
-    /// <summary>
-    /// Outline and Colour modes: outline big areas, then fill them with one click of the
-    /// program's paint bucket instead of hatching them. Needs the brush and bucket picked.
-    /// </summary>
-    public bool BucketFill { get; init; }
-    /// <summary>Milliseconds per drawn point at the chosen speed; used to pick the quicker way to cover each area.</summary>
-    public double PointMs { get; init; } = 8;
     /// <summary>Gartic: the game's brush diameters in working pixels, smallest first.</summary>
     public IReadOnlyList<double> BrushSizes { get; init; } = Array.Empty<double>();
     /// <summary>Gartic: how many opacity levels the game has (1 = always full).</summary>
@@ -88,9 +81,6 @@ public sealed class TraceResult
     public List<int>? ColourIndex { get; init; }
     /// <summary>Colour mode: the palette colours, for previews.</summary>
     public Color[]? Colours { get; init; }
-    /// <summary>Bucket fill: true for paths that are one click with the bucket. Null without bucket fill.</summary>
-    public List<bool>? IsFill { get; init; }
-    public int FillCount { get; init; }
     /// <summary>Faint picture of what was traced, premultiplied BGRA, Width × Height.</summary>
     public required byte[] Backdrop { get; init; }
     public int PointCount { get; init; }
@@ -225,23 +215,6 @@ public static class TraceEngine
         {
             case TraceMode.Outline:
                 paths = OrderNearest(Outlines(mask, w, h, o, ct), ct);
-                if (o.BucketFill)
-                {
-                    // every outline is already drawn, so each big shape only needs its inside clicked
-                    var seeds = PlanFill(mask, w, h, o.Spacing, ct).Seeds;
-                    var fills = new List<bool>(Enumerable.Repeat(false, paths.Count));
-                    foreach (var s in seeds)
-                    {
-                        paths.Add(new[] { s });
-                        fills.Add(true);
-                    }
-                    return new TraceResult
-                    {
-                        Width = w, Height = h, Paths = paths, IsFill = fills, FillCount = seeds.Count,
-                        Backdrop = MaskBackdrop(mask, 90), PointCount = CountPoints(paths),
-                        Message = paths.Count > 0 ? null : "Nothing to draw. Try another threshold, or Invert.",
-                    };
-                }
                 break;
 
             case TraceMode.Lines:
@@ -375,11 +348,6 @@ public static class TraceEngine
         }
         ct.ThrowIfCancellationRequested();
 
-        // fast mode: soft edges between two colours come out as one- or two-pixel slivers of
-        // some in-between colour, each costing a stroke but invisible at brush size; a
-        // majority vote over each pixel's neighbours folds them into the colours either side
-        if (o.BucketFill) labels = Majority(Majority(labels, w, h, colours.Length), w, h, colours.Length);
-
         // lightest colours first, so darker detail lands on top
         var order = Enumerable.Range(0, colours.Length)
             .Where(k => !palette[k].Skip)
@@ -388,8 +356,6 @@ public static class TraceEngine
 
         var paths = new List<Point[]>();
         var index = new List<int>();
-        List<bool>? isFill = o.BucketFill ? new() : null;
-        var seedsByColour = new List<(int Colour, List<Point> Seeds)>();
         foreach (int k in order)
         {
             ct.ThrowIfCancellationRequested();
@@ -400,40 +366,11 @@ public static class TraceEngine
             if (!any) continue;
 
             var mine = new List<Point[]>();
-            if (o.BucketFill)
-            {
-                // big areas: their whole border (holes too) now, one bucket click each later;
-                // areas too thin to fill are hatched as usual
-                var (loops, seeds, brushMask, lines) = ChooseFill(mask, w, h, o, ct);
-                mine.AddRange(Hatch(brushMask, w, h, o.Spacing, o.Angle, MinRun(o), ct));
-                if (o.OutlineToo) mine.AddRange(Outlines(brushMask, w, h, o, ct));
-                mine.AddRange(lines);
-                mine.AddRange(loops);
-                mine = OrderNearest(mine, ct);
-                if (seeds.Count > 0) seedsByColour.Add((k, seeds));
-            }
-            else
-            {
-                mine.AddRange(Hatch(mask, w, h, o.Spacing, o.Angle, MinRun(o), ct));
-                if (o.Crosshatch) mine.AddRange(Hatch(mask, w, h, o.Spacing, o.Angle + 90, MinRun(o), ct));
-                if (o.OutlineToo) mine.AddRange(OrderNearest(Outlines(mask, w, h, o, ct), ct));
-            }
+            mine.AddRange(Hatch(mask, w, h, o.Spacing, o.Angle, MinRun(o), ct));
+            if (o.Crosshatch) mine.AddRange(Hatch(mask, w, h, o.Spacing, o.Angle + 90, MinRun(o), ct));
+            if (o.OutlineToo) mine.AddRange(OrderNearest(Outlines(mask, w, h, o, ct), ct));
             paths.AddRange(mine);
             index.AddRange(Enumerable.Repeat(k, mine.Count));
-            isFill?.AddRange(Enumerable.Repeat(false, mine.Count));
-        }
-
-        // then the bucket, once every border is down: a fill can't leak past its own outline
-        int fillCount = 0;
-        foreach (var (k, seeds) in seedsByColour)
-        {
-            foreach (var s in seeds)
-            {
-                paths.Add(new[] { s });
-                index.Add(k);
-                isFill!.Add(true);
-                fillCount++;
-            }
         }
 
         // backdrop: the quantised picture, faint
@@ -458,8 +395,6 @@ public static class TraceEngine
             Paths = paths,
             ColourIndex = index,
             Colours = colours,
-            IsFill = isFill,
-            FillCount = fillCount,
             Backdrop = backdrop,
             PointCount = CountPoints(paths),
             Message = paths.Count > 0 ? null : "Nothing to draw with these colours.",
@@ -467,29 +402,6 @@ public static class TraceEngine
     }
 
     public static double Luma(Color c) => 0.299 * c.R + 0.587 * c.G + 0.114 * c.B;
-
-    /// <summary>Each pixel takes the most common label among itself and its 8 neighbours (ties keep it).</summary>
-    private static int[] Majority(int[] labels, int w, int h, int count)
-    {
-        var result = new int[labels.Length];
-        var votes = new int[count];
-        for (int y = 0; y < h; y++)
-        {
-            for (int x = 0; x < w; x++)
-            {
-                int i = y * w + x, own = labels[i];
-                Array.Clear(votes);
-                for (int ny = Math.Max(0, y - 1); ny <= Math.Min(h - 1, y + 1); ny++)
-                    for (int nx = Math.Max(0, x - 1); nx <= Math.Min(w - 1, x + 1); nx++)
-                        votes[labels[ny * w + nx]]++;
-                int best = own;
-                for (int k = 0; k < count; k++)
-                    if (votes[k] > votes[best]) best = k;
-                result[i] = best;
-            }
-        }
-        return result;
-    }
 
     // ===================================================================================
     //  resampling and smoothing
@@ -715,7 +627,7 @@ public static class TraceEngine
     /// Where strokes meet at a crossing, carries on into whichever one continues in the same
     /// direction, so a plus sign is two strokes rather than four.
     /// </summary>
-    private static List<Point[]> JoinStraight(List<Point[]> paths, CancellationToken ct)
+    internal static List<Point[]> JoinStraight(List<Point[]> paths, CancellationToken ct)
     {
         const double reach = 3.2;   // px between the ends that may be joined
         const double minCos = 0.80; // within about 37 degrees of straight on
@@ -815,7 +727,7 @@ public static class TraceEngine
     }
 
     /// <summary>Zhang-Suen thinning: peels shapes down to one-pixel-wide lines.</summary>
-    private static bool[] Thin(bool[] src, int w, int h, CancellationToken ct)
+    internal static bool[] Thin(bool[] src, int w, int h, CancellationToken ct)
     {
         var m = (bool[])src.Clone();
         for (int x = 0; x < w; x++) { m[x] = false; m[(h - 1) * w + x] = false; }
@@ -862,7 +774,7 @@ public static class TraceEngine
     /// Removes corner pixels whose two straight neighbours already touch diagonally, so every
     /// line is cleanly one pixel wide and corners don't look like branches.
     /// </summary>
-    private static void RemoveStairs(bool[] m, int w, int h)
+    internal static void RemoveStairs(bool[] m, int w, int h)
     {
         for (int y = 1; y < h - 1; y++)
         {
@@ -879,7 +791,7 @@ public static class TraceEngine
         }
     }
 
-    private static List<Point[]> WalkSkeleton(bool[] sk, int w, int h, int minLength, CancellationToken ct)
+    internal static List<Point[]> WalkSkeleton(bool[] sk, int w, int h, int minLength, CancellationToken ct)
     {
         // straight neighbours first, so a walk never skips a pixel by cutting a corner
         int[] offs = { -w, 1, w, -1, -w + 1, w + 1, w - 1, -w - 1 };
@@ -973,7 +885,7 @@ public static class TraceEngine
     //  simplification
     // ===================================================================================
 
-    private static Point[] SimplifyOpen(Point[] pts, double tolerance)
+    internal static Point[] SimplifyOpen(Point[] pts, double tolerance)
     {
         if (tolerance <= 0 || pts.Length <= 2) return pts;
         bool[] keep = new bool[pts.Length];
@@ -1103,268 +1015,11 @@ public static class TraceEngine
         return ordered;
     }
 
-    // ===================================================================================
-    //  bucket fill planning
-    // ===================================================================================
-
-    /// <summary>
-    /// Splits a mask into areas the program's paint bucket can fill and areas too thin for it.
-    /// Once a brush of <paramref name="brush"/> pixels has gone round an area's border, whatever
-    /// is still blank inside is one or more "islands"; each island needs one bucket click, at
-    /// its deepest point so the click can't land on the outline. Areas with no island left
-    /// inside are thin, and are better drawn with the brush.
-    /// </summary>
-    private static (bool[] Fillable, bool[] Thin, List<Point> Seeds, int[] Component, List<int> SeedComponent, float[] Distance, List<(int Component, List<int> Pixels, int Deepest)> Slivers)
-        PlanFill(bool[] mask, int w, int h, double brush, CancellationToken ct)
-    {
-        int n = w * h;
-        float[] dist = InsideDistance(mask, w, h);
-        ct.ThrowIfCancellationRequested();
-
-        // the outline is centred on the border, so it paints about half a brush inwards
-        // ("reach"); whatever is deeper than that stays blank until the bucket. Clicks go a
-        // little deeper still ("cover"), clear of the brush's soft edge.
-        double reach = Math.Max(1, brush) / 2 + 0.5;
-        double cover = Math.Max(1, brush) / 2 + 1.5;
-        const int MinIsland = 4;
-
-        int[] component = Label(mask, w, h);
-        var fillableComponent = new HashSet<int>();
-        var seeds = new List<Point>();
-        var seedComponent = new List<int>();
-        var unseeded = new List<(int Component, List<int> Pixels, int Deepest)>();
-        var seen = new bool[n];
-        var queue = new Queue<int>();
-        var island = new List<int>();
-
-        for (int start = 0; start < n; start++)
-        {
-            if (seen[start] || dist[start] <= reach) continue;
-            if ((seeds.Count & 63) == 0) ct.ThrowIfCancellationRequested();
-
-            // flood one blank island, remembering its deepest pixel
-            island.Clear();
-            int deepest = start;
-            seen[start] = true;
-            queue.Enqueue(start);
-            while (queue.Count > 0)
-            {
-                int i = queue.Dequeue();
-                island.Add(i);
-                if (dist[i] > dist[deepest]) deepest = i;
-                int x = i % w, y = i / w;
-                if (x > 0) Visit(i - 1);
-                if (x < w - 1) Visit(i + 1);
-                if (y > 0) Visit(i - w);
-                if (y < h - 1) Visit(i + w);
-            }
-
-            if (island.Count >= MinIsland && dist[deepest] > cover)
-            {
-                fillableComponent.Add(component[deepest]);
-                seeds.Add(new Point(deepest % w + 0.5, deepest / w + 0.5));
-                seedComponent.Add(component[deepest]);
-            }
-            else
-            {
-                // too narrow to click safely: if the area is filled, the brush must cover it
-                unseeded.Add((component[deepest], new List<int>(island), deepest));
-            }
-        }
-
-        void Visit(int j)
-        {
-            if (seen[j] || dist[j] <= reach) return;
-            seen[j] = true;
-            queue.Enqueue(j);
-        }
-
-        var fillable = new bool[n];
-        var thin = new bool[n];
-        for (int i = 0; i < n; i++)
-        {
-            if (!mask[i]) continue;
-            if (fillableComponent.Contains(component[i])) fillable[i] = true;
-            else thin[i] = true;
-        }
-        var slivers = unseeded.Where(s => fillableComponent.Contains(s.Component)).ToList();
-        return (fillable, thin, seeds, component, seedComponent, dist, slivers);
-    }
-
-    /// <summary>
-    /// Brush strokes for the blank slivers a filled area's outline pinches off: a dot for a
-    /// tiny one, a line down the middle of a longer one.
-    /// </summary>
-    private static List<Point[]> SliverStrokes(List<(int Component, List<int> Pixels, int Deepest)> slivers, int w, int h, TraceOptions o, CancellationToken ct)
-    {
-        var strokes = new List<Point[]>();
-        bool[]? longOnes = null;
-        foreach (var s in slivers)
-        {
-            if (s.Pixels.Count <= 6)
-            {
-                var p = new Point(s.Deepest % w + 0.5, s.Deepest / w + 0.5);
-                strokes.Add(new[] { p, p });
-                continue;
-            }
-            longOnes ??= new bool[w * h];
-            foreach (int i in s.Pixels) longOnes[i] = true;
-        }
-        if (longOnes != null)
-            strokes.AddRange(Centrelines(longOnes, w, h, new TraceOptions { MinPathLength = 1, Tolerance = o.Tolerance }, ct));
-        return strokes;
-    }
-
-    /// <summary>
-    /// Bucket mode, per area: outline-and-fill or plain hatching, whichever takes less time.
-    /// Outlining wins for big smooth areas; hatching can win for small or very ragged ones,
-    /// whose borders cost more points than a few hatch lines. Returns the outline loops and
-    /// bucket clicks to draw, and the mask of everything left for the brush.
-    /// </summary>
-    private static (List<Point[]> Loops, List<Point> Seeds, bool[] Brush, List<Point[]> Lines) ChooseFill(bool[] mask, int w, int h, TraceOptions o, CancellationToken ct)
-    {
-        var plan = PlanFill(mask, w, h, o.Spacing, ct);
-        var component = plan.Component;
-        var (brushOnly, lines) = SplitLines(plan.Thin, plan.Component, plan.Distance, w, h, o, ct);
-        if (plan.Seeds.Count == 0) return (new(), new(), brushOnly, lines);
-
-        // timings, matching MouseDrawer: a point is one refresh, a pen lift a few short waits,
-        // a bucket click a lift plus the wait for the flood
-        double point = Math.Max(0.5, o.PointMs);
-        double lift = 4 * Math.Clamp(point / 2, 2, 10);
-        double click = lift + 45;
-
-        // outlines of every fillable area, each loop credited to the area on its inner side
-        var loops = new List<Point[]>();
-        var loopComponent = new List<int>();
-        var outlineCost = new Dictionary<int, double>();
-        foreach (var raw in Contours(plan.Fillable, w, h, 4, ct))
-        {
-            int c = LoopOwner(raw, component, w, h);
-            var loop = SimplifyClosed(raw, o.Tolerance);
-            loops.Add(loop);
-            loopComponent.Add(c);
-            outlineCost[c] = outlineCost.GetValueOrDefault(c) + loop.Length * point + lift;
-        }
-        var clicks = new Dictionary<int, int>();
-        foreach (int c in plan.SeedComponent)
-        {
-            outlineCost[c] = outlineCost.GetValueOrDefault(c) + click;
-            clicks[c] = clicks.GetValueOrDefault(c) + 1;
-        }
-
-        // hatching the same areas: two points per run on each hatch row; neighbouring rows
-        // mostly join into one zig-zag, so count a lift for about every third run
-        var hatchCost = new Dictionary<int, double>();
-        double spacing = Math.Max(1, o.Spacing);
-        for (double row = spacing / 2; row < h; row += spacing)
-        {
-            int y = (int)row, start = y * w, previous = 0;
-            for (int x = 0; x < w; x++)
-            {
-                int c = plan.Fillable[start + x] ? component[start + x] : 0;
-                if (c != 0 && c != previous) hatchCost[c] = hatchCost.GetValueOrDefault(c) + 2 * point + lift / 3;
-                previous = c;
-            }
-        }
-        ct.ThrowIfCancellationRequested();
-
-        // with outlines on, hatched areas get the same outline on top, so only the fill click
-        // is weighed against the hatch lines
-        var hatchInstead = new HashSet<int>();
-        foreach (var (c, cost) in outlineCost)
-        {
-            double hatch = hatchCost.GetValueOrDefault(c, double.MaxValue);
-            double fill = o.OutlineToo ? clicks.GetValueOrDefault(c) * click : cost;
-            if (fill >= hatch) hatchInstead.Add(c);
-        }
-
-        var brush = brushOnly;
-        if (hatchInstead.Count > 0)
-        {
-            brush = (bool[])brushOnly.Clone();
-            for (int i = 0; i < brush.Length; i++)
-                if (plan.Fillable[i] && hatchInstead.Contains(component[i])) brush[i] = true;
-        }
-
-        var keptLoops = new List<Point[]>();
-        for (int i = 0; i < loops.Count; i++)
-            if (!hatchInstead.Contains(loopComponent[i])) keptLoops.Add(loops[i]);
-        var keptSeeds = new List<Point>();
-        for (int s = 0; s < plan.Seeds.Count; s++)
-            if (!hatchInstead.Contains(plan.SeedComponent[s])) keptSeeds.Add(plan.Seeds[s]);
-        var slivers = plan.Slivers.Where(s => !hatchInstead.Contains(s.Component)).ToList();
-        if (slivers.Count > 0) lines = lines.Concat(SliverStrokes(slivers, w, h, o, ct)).ToList();
-        return (keptLoops, keptSeeds, brush, lines);
-    }
-
-    /// <summary>
-    /// Areas no wider than the brush (lines, lettering, the outlines in cartoons) are drawn
-    /// as one stroke down their middle instead of being hatched across, which would take a
-    /// pen lift for every hatch row they cross. Tiny specks stay with the hatching.
-    /// Returns what is left for hatching, and the centrelines.
-    /// </summary>
-    private static (bool[] Remaining, List<Point[]> Lines) SplitLines(bool[] thin, int[] component, float[] dist, int w, int h, TraceOptions o, CancellationToken ct)
-    {
-        double brush = Math.Max(1, o.Spacing);
-        double maxHalfWidth = brush / 2 + 0.5; // one stroke down the middle covers the whole width
-        double minSpan = Math.Max(4, brush * 2); // smaller than this is a speck
-
-        var widest = new Dictionary<int, float>();
-        var box = new Dictionary<int, (int X0, int Y0, int X1, int Y1)>();
-        for (int i = 0; i < thin.Length; i++)
-        {
-            if (!thin[i]) continue;
-            int c = component[i], x = i % w, y = i / w;
-            widest[c] = Math.Max(widest.GetValueOrDefault(c), dist[i]);
-            box[c] = box.TryGetValue(c, out var b)
-                ? (Math.Min(b.X0, x), Math.Min(b.Y0, y), Math.Max(b.X1, x), Math.Max(b.Y1, y))
-                : (x, y, x, y);
-        }
-
-        var lineAreas = new HashSet<int>();
-        foreach (var (c, half) in widest)
-        {
-            var b = box[c];
-            if (half <= maxHalfWidth && Math.Max(b.X1 - b.X0, b.Y1 - b.Y0) + 1 >= minSpan) lineAreas.Add(c);
-        }
-        if (lineAreas.Count == 0) return (thin, new());
-
-        var rest = (bool[])thin.Clone();
-        var lineMask = new bool[thin.Length];
-        for (int i = 0; i < thin.Length; i++)
-        {
-            if (thin[i] && lineAreas.Contains(component[i]))
-            {
-                lineMask[i] = true;
-                rest[i] = false;
-            }
-        }
-        ct.ThrowIfCancellationRequested();
-        var lines = Centrelines(lineMask, w, h, new TraceOptions { MinPathLength = 2, Tolerance = o.Tolerance }, ct);
-        return (rest, lines);
-    }
-
-    /// <summary>
-    /// The area a contour loop belongs to: the pixel just inside its first edge. Loops keep
-    /// ink on the right, and points are corners, so the direction of the first edge says
-    /// which pixel that is.
-    /// </summary>
-    private static int LoopOwner(Point[] loop, int[] component, int w, int h)
-    {
-        int vx = (int)loop[0].X, vy = (int)loop[0].Y;
-        double dx = loop[1].X - loop[0].X, dy = loop[1].Y - loop[0].Y;
-        (int x, int y) = dx > 0 ? (vx, vy) : dy > 0 ? (vx - 1, vy) : dx < 0 ? (vx - 1, vy - 1) : (vx, vy - 1);
-        x = Math.Clamp(x, 0, w - 1);
-        y = Math.Clamp(y, 0, h - 1);
-        return component[y * w + x];
-    }
-
     /// <summary>
     /// For every pixel in the mask, roughly how far it is from the nearest pixel outside it
     /// (or off the picture), by a two-pass chamfer transform. Pixels outside are 0.
     /// </summary>
-    private static float[] InsideDistance(bool[] m, int w, int h)
+    internal static float[] InsideDistance(bool[] m, int w, int h)
     {
         const float Straight = 1f, Diagonal = 1.4142f;
         var d = new float[w * h];
@@ -1402,31 +1057,6 @@ public static class TraceEngine
             }
         }
         return d;
-    }
-
-    /// <summary>Numbers the 4-connected areas of a mask (1, 2, 3 ...); 0 outside it.</summary>
-    private static int[] Label(bool[] m, int w, int h)
-    {
-        var labels = new int[w * h];
-        var stack = new Stack<int>();
-        int count = 0;
-        for (int start = 0; start < labels.Length; start++)
-        {
-            if (!m[start] || labels[start] != 0) continue;
-            int id = ++count;
-            labels[start] = id;
-            stack.Push(start);
-            while (stack.Count > 0)
-            {
-                int i = stack.Pop();
-                int x = i % w, y = i / w;
-                if (x > 0 && m[i - 1] && labels[i - 1] == 0) { labels[i - 1] = id; stack.Push(i - 1); }
-                if (x < w - 1 && m[i + 1] && labels[i + 1] == 0) { labels[i + 1] = id; stack.Push(i + 1); }
-                if (y > 0 && m[i - w] && labels[i - w] == 0) { labels[i - w] = id; stack.Push(i - w); }
-                if (y < h - 1 && m[i + w] && labels[i + w] == 0) { labels[i + w] = id; stack.Push(i + w); }
-            }
-        }
-        return labels;
     }
 
     // ===================================================================================

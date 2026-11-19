@@ -15,11 +15,11 @@ public readonly record struct DrawProgress(int CountdownSeconds, int PointsDone,
 
 /// <summary>
 /// One pen-down stroke, in physical screen pixels. When <see cref="ToolAt"/> is set, that spot
-/// (the program's brush or bucket button) is clicked first unless it is already chosen; the
-/// same for <see cref="SelectAt"/> (a palette swatch). A <see cref="Fill"/> stroke is a single
-/// click with the bucket.
+/// (the program's pen button) is clicked first unless it is already chosen; the same for
+/// <see cref="SelectAt"/> (a palette swatch), <see cref="SizeAt"/> (a brush size) and
+/// <see cref="OpacityAt"/>.
 /// </summary>
-public readonly record struct DrawStroke(Point[] Points, Point? SelectAt = null, Point? ToolAt = null, bool Fill = false,
+public readonly record struct DrawStroke(Point[] Points, Point? SelectAt = null, Point? ToolAt = null,
     Point? SizeAt = null, Point? OpacityAt = null);
 
 public sealed class DrawSettings
@@ -32,6 +32,10 @@ public sealed class DrawSettings
     public bool StopOnMouseMove { get; init; } = true;
     /// <summary>Wait after clicking a palette swatch or tool button, so the program can switch.</summary>
     public int SelectPauseMs { get; init; } = 140;
+    /// <summary>Glide to each stroke's start with the pen up, like a hand, instead of jumping there.</summary>
+    public bool Humanize { get; init; }
+    /// <summary>Pixels per tick at full speed when <see cref="Humanize"/> is on.</summary>
+    public double HumanCruise { get; init; } = 16;
 }
 
 /// <summary>
@@ -42,7 +46,6 @@ public sealed class MouseDrawer
 {
     private const int CornerSize = 4;      // px from the primary screen's top-left that count as the failsafe corner
     private const double MoveTolerance = 6; // px the cursor may differ from where we put it before we assume the user moved it
-    private const int FillPauseMs = 45;     // after a bucket click, so the program can finish flooding
 
     private Thread? _thread;
     private volatile bool _abort;
@@ -109,12 +112,12 @@ public sealed class MouseDrawer
     private static int Settle(int delayMs) => Math.Clamp(delayMs / 2, 2, 10);
 
     /// <summary>Rough duration for the UI, before anything has been timed.</summary>
-    public static TimeSpan Estimate(int strokes, int points, int colourSwitches, DrawSettings s, int fills = 0)
+    public static TimeSpan Estimate(int strokes, int points, int colourSwitches, DrawSettings s)
     {
         double perPoint = s.DelayMs / (double)Math.Max(1, s.PointsPerStep) + 0.05;
         double perStroke = 4 * Settle(s.DelayMs) + 0.5;
         double perSwitch = 3 * Settle(s.DelayMs) + s.SelectPauseMs;
-        return TimeSpan.FromMilliseconds(points * perPoint + strokes * perStroke + colourSwitches * perSwitch + fills * FillPauseMs);
+        return TimeSpan.FromMilliseconds(points * perPoint + strokes * perStroke + colourSwitches * perSwitch);
     }
 
     private void Run(IReadOnlyList<DrawStroke> strokes, DrawSettings s)
@@ -237,14 +240,16 @@ public sealed class MouseDrawer
                     selected = swatch;
                 }
 
-                if (stroke.Fill)
+                if (s.Humanize && lastSent is { } from)
                 {
-                    Click(path[0], FillPauseMs);
-                    done++;
-                    Report();
-                    continue;
+                    // pen up: glide over to the next stroke
+                    foreach (var p in HumanStroke.Travel(from, path[0], s.HumanCruise))
+                    {
+                        Move(p);
+                        if (delay > 0) Thread.Sleep(delay);
+                        Check();
+                    }
                 }
-
                 Move(path[0]);
                 Thread.Sleep(settle);
                 PressButton();

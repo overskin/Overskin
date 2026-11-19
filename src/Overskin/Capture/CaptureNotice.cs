@@ -182,7 +182,7 @@ public sealed class TextResultWindow : Window
         var heading = new StackPanel { Orientation = Orientation.Horizontal };
         heading.Children.Add(new Icon { Data = (Geometry)FindResource("IcScanText"), Width = 15, Height = 15, Foreground = (Brush)FindResource("Accent"), Margin = new Thickness(0, 0, 8, 0) });
         heading.Children.Add(new TextBlock { Text = "Text from screen", Style = (Style)FindResource("Heading") });
-        heading.Children.Add(new TextBlock { Text = "copied", Style = (Style)FindResource("Dim"), Margin = new Thickness(8, 1, 0, 0) });
+        heading.Children.Add(new TextBlock { Text = "Copied", Style = (Style)FindResource("Dim"), Margin = new Thickness(8, 1, 0, 0) });
         heading.MouseLeftButtonDown += (_, e) => { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); };
         heading.Background = Brushes.Transparent;
 

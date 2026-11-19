@@ -22,8 +22,9 @@ A free, open-source screenshot and screen-recording tool for Windows.
 
 </div>
 
-Capture any area, window or scrolling page; record MP4 videos with smooth auto-zoom or GIFs;
-mark it up, hide private details, beautify it and drag it straight into any app. Plus the
+Capture any area, window or scrolling page; record MP4 videos with auto-zoom and a smooth,
+motion-blurred cursor, or GIFs; mark it up, fix a typo in the screenshot itself, hide private
+details, beautify it and drag it straight into any app. Plus the
 extras artists and tinkerers want: pin anything on top of your screen, trace over it, or let
 Overskin draw it for you in skribbl.io and Gartic Phone.
 
@@ -33,8 +34,10 @@ One installer, no administrator rights, no account, and nothing leaves your PC.
 
 | | |
 | --- | --- |
-| **Auto-zoom videos** | MP4 recordings glide in on every click and follow the pointer, with sound, your webcam in a corner, and a pointer that stays sharp at any zoom. |
-| **Live text** | Select, copy or erase the words inside any screenshot, and search your whole library by them. Offline. |
+| **Auto-zoom videos** | MP4 recordings glide in on every click and follow the pointer, with sound, your webcam in a corner, and an optional backdrop. |
+| **Smooth cursor** | The pointer in your videos glides with no lag, lands exactly on each click and gets motion blur, like a professionally edited demo. |
+| **Edit text in screenshots** | Select, delete or type words inside any screenshot. New letters come out in the picture's own font, size and colour. |
+| **Live text** | Copy the words in any screenshot, and search your whole library by them. Offline. |
 | **Auto-hide** | Finds and blurs emails, card numbers, addresses, IPs and keys before you share. |
 | **Smart erase** | Paint over text or an icon and it's filled in from what's around it. |
 | **Steps** | Click through a task and get a numbered how-to guide as a picture, web page, Markdown or PDF. |
@@ -63,7 +66,7 @@ Overskin runs on **Windows** today. **Linux** and **macOS** versions are planned
 | | |
 | --- | --- |
 | ![Capture](docs/screenshots/capture.png) | ![Recording](docs/screenshots/recording.png) |
-| **Capture**: area, window, screen or a whole scrolling page | **Recording**: MP4 with auto-zoom and a sharp pointer, or GIF |
+| **Capture**: area, window, screen or a whole scrolling page | **Recording**: MP4 with auto-zoom, a smooth cursor and motion blur, or GIF |
 | ![Library](docs/screenshots/library.png) | ![Settings](docs/screenshots/settings.png) |
 | **Library**: search the text in your captures, convert, rename | **Settings**: dark or light, editor themes, any accent |
 | ![Trace](docs/screenshots/trace-colour.png) | ![Light theme](docs/screenshots/light.png) |
@@ -114,7 +117,12 @@ Capture → **Recording** has the Video and GIF buttons and every video setting.
 - **Webcam**: you in a circle or rounded square in any corner, sized to suit.
 - **Pointer**: drawn from vector shapes (white or black), so it stays perfectly sharp at any
   size and any zoom, or your own Windows pointer read at full resolution from its file. Size,
-  smoothing (calms shaky movement) and a ring on each click are all adjustable.
+  smoothing and a ring on each click are all adjustable.
+- **Smooth cursor** (on by default): the pointer is recorded apart from the picture and drawn
+  a fraction of a second later, so it can be smoothed with no lag: it glides, eases in and out,
+  lands exactly on each click and gets motion blur while it moves (*Motion blur* sets how much).
+- **Backdrop**: put the recording on a gradient with rounded corners and a shadow.
+- **Keyboard shortcuts**: show shortcuts like Ctrl + C in the video. Ordinary typing is never shown.
 - **Auto-zoom**: the video glides in towards each click, follows the pointer while you work
   and eases back out after a few quiet seconds. Zoom amount, zoom speed, how loosely the view
   follows, and how long it waits before zooming out are all adjustable.
@@ -223,15 +231,11 @@ palette) and *Gartic Phone*. Every picture you trace is kept in a catalog for ne
 *Careful* and *Fast*. Pause and resume, a start hotkey that works from inside the
 game, and it stops the moment you touch the mouse.
 
-**Fill with bucket** (Outline and Colour styles) uses the game's own paint bucket: it outlines
-each big area, then fills it with one click instead of hatching it line by line. Areas no
-wider than the brush are drawn as a single stroke down the middle, and anti-aliased slivers
-are cleaned up first. Pick the game's brush and bucket buttons once, and set *Brush size* to
-the brush you draw with. On a typical cartoon it draws about three times faster.
-
 **Gartic Phone** paints rather than traces, using the game's five brush sizes and its opacity
-levels, and never the bucket. It blocks the picture in with the biggest brush, then each
-smaller brush only goes where the result is still off. Every stroke picks a colour and an
+levels. Like a person, it sketches the outlines first, then colours in up to them with the
+biggest brush, then each smaller brush only goes where the result is still off. Strokes are
+continuous smooth curves, never dots; each one eases in and out, wobbles very slightly, and
+the pen lifts between strokes. Every stroke picks a colour and an
 opacity, so layering makes shades the palette doesn't have (thin red over white is pink).
 Overskin simulates the canvas as it plans, and the preview shows the finished painting. The
 Gartic Phone card is a four-step checklist that ticks itself off: pick the game's colours,

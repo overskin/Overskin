@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
+using System.Windows.Media;
 using static Overskin.NativeMethods;
 
 namespace Overskin;
@@ -54,6 +55,54 @@ public sealed class TrayIcon : IDisposable
         _fillMenu(_menu.Items);
         if (_menu.Items.Count > before) _menu.Items.Add(new Separator());
         _menu.Items.Add(exit);
+        foreach (var item in _menu.Items.OfType<MenuItem>().Where(i => i.Items.Count > 0))
+            item.SubmenuOpened += (_, e) => { if (ReferenceEquals(e.OriginalSource, item)) PlaceSubmenu(item); };
+    }
+
+    /// <summary>
+    /// Every submenu opens the same way: to the right of its item and, as the menu sits by the
+    /// taskbar, upwards from the item's bottom edge (downwards from its top when the menu is in the
+    /// top half of the screen). Left to itself, WPF opens short submenus down and pushes tall ones
+    /// up, so they jumped about.
+    /// </summary>
+    private static void PlaceSubmenu(MenuItem item)
+    {
+        if (item.Template?.FindName("PART_Popup", item) is not Popup popup) return;
+        popup.Placement = PlacementMode.Custom;
+        popup.HorizontalOffset = 0;
+        popup.VerticalOffset = 0;
+        popup.CustomPopupPlacementCallback = (popupSize, targetSize, _) => SubmenuPlacements(item, popupSize, targetSize);
+    }
+
+    /// <summary>Where a submenu goes: right of the item, then left of it if there's no room on the right.</summary>
+    internal static CustomPopupPlacement[] SubmenuPlacements(MenuItem item, Size popupSize, Size targetSize)
+    {
+        // the callback works in device pixels; the popup has a 10 px margin for its shadow and a
+        // 4 px padding plus a 1 px border before its first item
+        var dpi = VisualTreeHelper.GetDpi(item);
+        double k = dpi.DpiScaleY, inset = 15 * k, overlap = 8 * dpi.DpiScaleX;
+        bool up = OpensUp(item);
+        double y = up ? targetSize.Height - popupSize.Height + inset : -inset;
+        return new[]
+        {
+            new CustomPopupPlacement(new Point(targetSize.Width - overlap, y), PopupPrimaryAxis.Horizontal),
+            new CustomPopupPlacement(new Point(-popupSize.Width + overlap, y), PopupPrimaryAxis.Horizontal),
+        };
+    }
+
+    /// <summary>True when the menu is in the bottom half of its screen (the usual taskbar), so submenus grow upwards.</summary>
+    internal static bool OpensUp(FrameworkElement item)
+    {
+        try
+        {
+            var mid = item.PointToScreen(new Point(item.ActualWidth / 2, item.ActualHeight / 2));
+            var work = MonitorWorkArea(new POINT((int)mid.X, (int)mid.Y));
+            return mid.Y > (work.Top + work.Bottom) / 2.0;
+        }
+        catch
+        {
+            return true;
+        }
     }
 
     private readonly string _tooltip;

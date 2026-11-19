@@ -1359,7 +1359,7 @@ public partial class MainWindow : Window
         [TraceMode.Hatch] = "Fills dark areas with parallel strokes. Set the spacing to your brush size for solid fills.",
         [TraceMode.Shade] = "Hatching that builds up in darker tones, for a shaded pencil look.",
         [TraceMode.Colour] = "Paints each area in the closest colour from the game's palette, switching colours as it goes.",
-        [TraceMode.Gartic] = "Made for Gartic Phone: paints with its five brush sizes and opacity levels, big blobs first and finer brushes after. No bucket.",
+        [TraceMode.Gartic] = "Made for Gartic Phone: sketches the outlines, then paints with its five brush sizes and opacity levels, big strokes first and finer ones after.",
     };
 
     private void LoadTrace_Click(object sender, RoutedEventArgs e)
@@ -1426,16 +1426,10 @@ public partial class MainWindow : Window
             ? "Higher finds fainter edges"
             : "Pixels darker than this are drawn";
         AutoThresholdButton.Visibility = Show(_mode != TraceMode.Sketch);
-        bool bucketMode = _mode is TraceMode.Outline or TraceMode.Colour;
-        BucketRow.Visibility = Show(bucketMode);
-        // with the bucket, Outline needs to know the brush size too, to keep clicks off the outline
-        SpacingRow.Visibility = Show(fills || (bucketMode && _settings.BucketFill));
+        SpacingRow.Visibility = Show(fills);
         if (gartic) SpacingRow.Visibility = Visibility.Collapsed; // its brushes are measured instead
         GarticCard.Visibility = Show(gartic);
         if (gartic) SyncGarticControls();
-        // with the bucket on, the slider is the game's brush size: outlines and clicks are planned around it
-        SpacingLabel.Text = _mode == TraceMode.Outline || (bucketMode && _settings.BucketFill) ? "Brush size" : "Line spacing";
-        UpdateToolsLabel();
         InvertRow.Visibility = Show(_mode is not (TraceMode.Sketch or TraceMode.Colour or TraceMode.Gartic));
         PaletteCard.Visibility = Show(_mode is TraceMode.Colour or TraceMode.Gartic);
         UpdatePaletteHint();
@@ -1479,7 +1473,6 @@ public partial class MainWindow : Window
         _settings.TraceSpeed = tag;
         UpdateSpeedHint();
         if (!_ready) return;
-        if (_settings.BucketFill) ScheduleTrace(); // the quicker way to cover each area depends on speed
         UpdateEstimate();
     }
 
@@ -1556,9 +1549,21 @@ public partial class MainWindow : Window
             EstimateText.Text = "";
             return;
         }
-        var estimate = MouseDrawer.Estimate(_trace.Paths.Count - _trace.FillCount, _trace.PointCount - _trace.FillCount,
-            ColourSwitches(_trace) + (_trace.FillCount > 0 ? 2 : 0), CurrentDrawSettings(), _trace.FillCount);
-        EstimateText.Text = "about " + FormatTime(estimate);
+        int points = _trace.PointCount;
+        if (_trace.SizeIndex != null)
+        {
+            // Gartic strokes are sent eased, one short step per tick: count those steps instead
+            double scale = DrawingRect() is { } r ? r.Width / (double)Math.Max(1, _trace.Width) : 1, cruise = GarticCruise(), steps = 0;
+            foreach (var path in _trace.Paths)
+            {
+                double length = 0;
+                for (int i = 1; i < path.Length; i++) length += (path[i] - path[i - 1]).Length;
+                steps += length * scale / cruise * 1.3 + 6;
+            }
+            points = (int)steps;
+        }
+        var estimate = MouseDrawer.Estimate(_trace.Paths.Count, points, ColourSwitches(_trace), CurrentDrawSettings());
+        EstimateText.Text = "About " + FormatTime(estimate);
     }
 
     private static string FormatTime(TimeSpan t)
@@ -1601,8 +1606,6 @@ public partial class MainWindow : Window
         Levels = 3,
         OutlineToo = true,
         Palette = _settings.Palette.Select(p => (p.Color, p.Skip)).ToList(),
-        BucketFill = _settings.BucketFill && _mode is TraceMode.Outline or TraceMode.Colour,
-        PointMs = SpeedTiming() is var (d, per) ? Math.Max(0.5, d / (double)per) : 8,
     };
 
     private async void RunTrace()
@@ -1630,10 +1633,7 @@ public partial class MainWindow : Window
             {
                 string strokes = result.Paths.Count == 1 ? "1 stroke" : $"{result.Paths.Count:N0} strokes";
                 string colours = result.ColourIndex is { } idx ? $"  ·  {idx.Distinct().Count()} colours" : "";
-                string fills = result.FillCount > 0 ? $"  ·  {result.FillCount:N0} fills" : "";
-                int lines = result.Paths.Count - result.FillCount;
-                strokes = lines == 1 ? "1 stroke" : $"{lines:N0} strokes";
-                TraceStats.Text = $"{strokes}{fills}  ·  {result.PointCount - result.FillCount:N0} points{colours}  ·  {result.Width} × {result.Height}";
+                TraceStats.Text = $"{strokes}  ·  {result.PointCount:N0} points{colours}  ·  {result.Width} × {result.Height}";
             }
             _ghostSuppressed = false;
             UpdateEstimate();
@@ -1794,70 +1794,11 @@ public partial class MainWindow : Window
         Toast.ShowSticky("Click each colour in the game's palette. Right-click or Esc to finish.");
     }
 
-    // ---- brush and bucket ------------------------------------------------------------------
-
-    /// <summary>-1 when not picking tools; 0 waiting for the brush, 1 waiting for the bucket.</summary>
-    private int _toolPickStep = -1;
-
-    private void BucketSwitch_Click(object sender, RoutedEventArgs e)
-    {
-        _settings.BucketFill = BucketSwitch.IsChecked == true;
-        SaveSettings();
-        UpdateModeUi();
-        ScheduleTrace();
-        if (_settings.BucketFill && (_settings.BrushTool == null || _settings.FillTool == null))
-            PickTools_Click(sender, e);
-    }
-
-    private void UpdateToolsLabel()
-    {
-        BucketSwitch.IsChecked = _settings.BucketFill;
-        bool picked = _settings.BrushTool != null && _settings.FillTool != null;
-        PickToolsLabel.Text = _toolPickStep >= 0 ? "Done" : picked ? "Brush and bucket set" : "Pick brush and bucket";
-        PickToolsButton.Visibility = _settings.BucketFill ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void PickTools_Click(object sender, RoutedEventArgs e)
-    {
-        if (_paletteCapture == null) return;
-        if (_paletteCapture.IsActive)
-        {
-            _paletteCapture.Stop();
-            return;
-        }
-        if (!_paletteCapture.Start())
-        {
-            Toast.Show("Couldn't start picking.", true);
-            return;
-        }
-        _toolPickStep = 0;
-        UpdateToolsLabel();
-        _hotkeys?.Register(HkPaletteEsc, new Hotkey(ModifierKeys.None, Key.Escape), () => _paletteCapture.Stop());
-        WindowState = WindowState.Minimized;
-        Toast.ShowSticky("Click the game's brush (pen) button.  Esc cancels.");
-    }
-
     private void OnPaletteColourPicked(int x, int y, Color colour)
     {
         if (_garticPickStep >= 0)
         {
             GarticButtonPicked(x, y, colour);
-            return;
-        }
-        if (_toolPickStep >= 0)
-        {
-            var spot = new PaletteSwatch { X = x, Y = y, Hex = Theming.ToHex(colour) };
-            if (_toolPickStep == 0)
-            {
-                _settings.BrushTool = spot;
-                _toolPickStep = 1;
-                Toast.ShowSticky("Now click the game's bucket (fill) button.");
-            }
-            else
-            {
-                _settings.FillTool = spot;
-                _paletteCapture?.Stop();
-            }
             return;
         }
 
@@ -1889,15 +1830,6 @@ public partial class MainWindow : Window
             SyncGarticControls();
             Toast.Hide();
             if (cancelled) Toast.Show("Cancelled. Gartic's buttons weren't changed.");
-            SaveSettings();
-            ShowFromTray();
-            return;
-        }
-        if (_toolPickStep >= 0)
-        {
-            _toolPickStep = -1;
-            UpdateToolsLabel();
-            Toast.Hide();
             SaveSettings();
             ShowFromTray();
             return;
@@ -2013,14 +1945,16 @@ public partial class MainWindow : Window
 
         if (_trace.SizeIndex != null)
         {
-            if (GarticStrokes(_trace, rect) is { } painted) StartDrawing(painted, rect, CurrentDrawSettings(countdown));
-            return;
-        }
-
-        bool bucket = _trace.IsFill != null;
-        if (bucket && (_settings.BrushTool == null || _settings.FillTool == null))
-        {
-            Toast.Show("Pick the game's brush and bucket first, so Overskin can switch between them.");
+            if (GarticStrokes(_trace, rect) is { } painted)
+            {
+                var basic = CurrentDrawSettings(countdown);
+                StartDrawing(painted, rect, new DrawSettings
+                {
+                    DelayMs = basic.DelayMs, PointsPerStep = basic.PointsPerStep, SelectPauseMs = basic.SelectPauseMs,
+                    CountdownSeconds = basic.CountdownSeconds, StopOnMouseMove = basic.StopOnMouseMove,
+                    Humanize = true, HumanCruise = GarticCruise(),
+                });
+            }
             return;
         }
 
@@ -2040,16 +1974,7 @@ public partial class MainWindow : Window
                 var swatch = _settings.Palette[index[p]];
                 select = new Point(swatch.X, swatch.Y);
             }
-            if (bucket)
-            {
-                bool fill = _trace.IsFill![p];
-                var tool = fill ? _settings.FillTool! : _settings.BrushTool!;
-                strokes.Add(new DrawStroke(mapped, select, new Point(tool.X, tool.Y), fill));
-            }
-            else
-            {
-                strokes.Add(new DrawStroke(mapped, select));
-            }
+            strokes.Add(new DrawStroke(mapped, select));
         }
 
         StartDrawing(strokes, rect, CurrentDrawSettings(countdown));
@@ -2126,7 +2051,7 @@ public partial class MainWindow : Window
         if (p.Paused)
         {
             SetPauseButton(paused: true);
-            EtaText.Text = "paused";
+            EtaText.Text = "Paused";
             hud = $"Paused.  Press {_settings.HotkeyPause} to carry on, Esc to stop.";
         }
         else if (p.IsCountdown)

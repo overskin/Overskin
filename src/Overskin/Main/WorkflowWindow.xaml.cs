@@ -34,7 +34,22 @@ public partial class WorkflowWindow : Window
         EditorSwitch.IsChecked = workflow.Editor;
         PreviewSwitch.IsChecked = workflow.Preview;
         ShowHotkey();
+        // a new workflow (or one named after what it did) is named after what it does, as you change it
+        _autoName = workflow.Name is "New workflow" or "Workflow" || workflow.Name == workflow.Describe();
+        if (_autoName) NameBox.Text = Current().Describe();
+        AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler((_, _) => Dispatcher.BeginInvoke(AutoName)));
+        NameBox.TextChanged += (_, _) => { if (!_naming) _autoName = NameBox.Text.Length == 0; };
         Loaded += (_, _) => { NameBox.Focus(); NameBox.SelectAll(); };
+    }
+
+    private bool _autoName, _naming;
+
+    private void AutoName()
+    {
+        if (!_autoName) return;
+        _naming = true;
+        NameBox.Text = Current().Describe();
+        _naming = false;
     }
 
     private static void Pick(Panel panel, string tag)
@@ -105,7 +120,15 @@ public partial class WorkflowWindow : Window
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        Result = new Workflow
+        Result = Current();
+        Result.Normalize();
+        DialogResult = true;
+    }
+
+    /// <summary>The workflow as the controls have it now.</summary>
+    private Workflow Current()
+    {
+        return new Workflow
         {
             Name = NameBox.Text,
             Hotkey = _hotkey,
@@ -121,8 +144,6 @@ public partial class WorkflowWindow : Window
             Editor = EditorSwitch.IsChecked == true,
             Preview = PreviewSwitch.IsChecked == true,
         };
-        Result.Normalize();
-        DialogResult = true;
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;

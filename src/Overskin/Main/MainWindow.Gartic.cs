@@ -41,7 +41,7 @@ public partial class MainWindow
         _syncingGartic = true;
         var g = _settings.Gartic;
         int colours = _settings.Palette.Count(p => !p.Skip);
-        bool pickingColours = _paletteCapture?.IsActive == true && _garticPickStep < 0 && _toolPickStep < 0;
+        bool pickingColours = _paletteCapture?.IsActive == true && _garticPickStep < 0;
         bool hasDark = _settings.Palette.Any(p => !p.Skip && TraceEngine.Luma(p.Color) <= 110);
 
         bool[] done = { colours > 0 && hasDark, g.ButtonsPicked, _area != null, g.BrushPx != null };
@@ -184,19 +184,26 @@ public partial class MainWindow
         double sx = (double)rect.Width / t.Width, sy = (double)rect.Height / t.Height;
         var pen = new Point(g.Pen!.X, g.Pen.Y);
         var strokes = new List<DrawStroke>(t.Paths.Count);
+        // drawn like a hand: each stroke eases in and out and wanders a little (see HumanStroke)
+        var rng = new Random(t.Paths.Count);
+        double cruise = GarticCruise();
         for (int p = 0; p < t.Paths.Count; p++)
         {
             var path = t.Paths[p];
             var mapped = new Point[path.Length];
             for (int i = 0; i < path.Length; i++) mapped[i] = new Point(rect.X + path[i].X * sx, rect.Y + path[i].Y * sy);
+            mapped = HumanStroke.Path(mapped, cruise, 0.9, rng);
             int colour = t.ColourIndex![p];
             Point? swatch = colour < _settings.Palette.Count ? new Point(_settings.Palette[colour].X, _settings.Palette[colour].Y) : null;
             var size = g.Sizes[Math.Clamp(t.SizeIndex![p], 0, g.Sizes.Count - 1)];
             int level = g.UseOpacity ? t.OpacityIndex![p] : GarticSetup.OpacityLevels;
-            strokes.Add(new DrawStroke(mapped, swatch, pen, false, new Point(size.X, size.Y), g.OpacityAt(level)));
+            strokes.Add(new DrawStroke(mapped, swatch, pen, new Point(size.X, size.Y), g.OpacityAt(level)));
         }
         return strokes;
     }
+
+    /// <summary>Pixels per tick at full speed for the chosen drawing speed.</summary>
+    private double GarticCruise() => _settings.TraceSpeed switch { "Careful" => 9, "Fast" => 28, _ => 18 };
 
     // ---- measuring the brushes ---------------------------------------------------------------
 
@@ -251,7 +258,7 @@ public partial class MainWindow
         {
             // many small steps, so the game sees a real drag rather than one jump
             var points = Enumerable.Range(0, (int)(length / 4) + 1).Select(k => new Point(Math.Min(x1, x0 + k * 4), lineY[i])).ToArray();
-            strokes.Add(new DrawStroke(points, new Point(dark.X, dark.Y), pen, false, new Point(g.Sizes[i].X, g.Sizes[i].Y), full));
+            strokes.Add(new DrawStroke(points, new Point(dark.X, dark.Y), pen, new Point(g.Sizes[i].X, g.Sizes[i].Y), full));
         }
 
         int pad = (int)Math.Ceiling(guess.Max() * 2) + 8;

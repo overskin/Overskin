@@ -5,7 +5,9 @@ namespace Overskin;
 
 /// <summary>
 /// Paints a picture the way a person would in Gartic Phone: no bucket, just the game's five brush
-/// sizes and its opacity levels. It works from the biggest brush to the smallest. Each pass lays
+/// sizes and its opacity levels. It sketches the picture's dark outlines first, then colours in
+/// from the biggest brush to the smallest, never painting over the outlines. Strokes are
+/// continuous and rounded (no dots). Each pass lays
 /// rows of strokes over the areas that are still wrong, choosing for each area the colour and
 /// opacity that bring the canvas closest to the picture (red at low opacity over white gives
 /// pink, so far more shades are possible than the palette has). Every stroke is painted onto a
@@ -74,6 +76,25 @@ public static class Painter
         var stamp = new int[w * h];
         int strokeId = 0;
 
+        // ---- outlines first: the picture's thin dark lines, as smooth strokes with a small brush ----
+        // what the fills keep off: the middle half of each outline, so colour comes right up to the
+        // line (at most nibbling its edge) instead of leaving a white gap beside it
+        var core = new int[w * h];
+        var scratch = new float[3][] { new float[w * h], new float[w * h], new float[w * h] };
+        foreach (var (path, comboIndex, si) in OutlineStrokes(target, w, h, sizes, combos, levels, ct))
+        {
+            Simulate(canvas, stamp, ++strokeId, w, h, path, sizes[si] / 2, combos[comboIndex]);
+            Simulate(scratch, core, strokeId, w, h, path, Math.Max(0.75, sizes[si] / 4), combos[comboIndex]);
+            paths.Add(path);
+            colourIndex.Add(combos[comboIndex].Colour);
+            sizeIndex.Add(si);
+            opacityIndex.Add(combos[comboIndex].Level);
+        }
+        var protect = new bool[w * h];
+        for (int i = 0; i < protect.Length; i++) protect[i] = core[i] != 0;
+        var guard = new Integral(protect, w, h);
+        double smallest = sizes.Min();
+
         // biggest brush first: it blocks the picture in, the smaller ones only fix what's still off
         foreach (int si in Enumerable.Range(0, sizes.Length).OrderByDescending(i => sizes[i]))
         {
@@ -97,6 +118,11 @@ public static class Painter
                     int x0 = (int)(c * step), x1 = Math.Min(w, (int)((c + 1) * step));
                     if (x1 <= x0) continue;
                 {
+                    // the outlines are already right: a stroke here would paint over them (a stroke
+                    // along this row covers about the cell itself)
+                    double reach = 0;
+                    if (guard.Any(Math.Max(0, (int)(x0 - reach)), Math.Max(0, (int)(y0 - reach)), Math.Min(w, (int)Math.Ceiling(x1 + reach)), Math.Min(h, (int)Math.Ceiling(y1 + reach))))
+                        continue;
                     // keep the neighbour's setting when it's nearly as good: longer strokes, fewer ends showing
                     int left = c > 0 ? choice[r * cols + c - 1] : -1, above = r > 0 ? choice[(r - 1) * cols + c] : -1;
                     choice[r * cols + c] = Choose(canvas, reference, w, x0, y0, x1, y1, combos, layerTolerance, left, above);
@@ -104,8 +130,12 @@ public static class Painter
                 }
             }
 
-            // rows of same-setting cells become strokes, joined into zig-zags where they line up
-            var planned = Strokes(choice, rows, cols, step, d, w, h);
+            // a lone cell or two would be a dot: leave those to a smaller brush (or out, for the smallest)
+            DropSpecks(choice, rows, cols, d <= smallest + 1e-6 ? 2 : 3);
+            // rows of same-setting cells become strokes, joined into zig-zags where they line up,
+            // with the turns rounded off like a hand going back and forth
+            var planned = Strokes(choice, rows, cols, step, d, w, h)
+                .Select(x => (Path: Dash(RoundCorners(x.Path, step * 0.5), d, w), x.Combo)).ToList();
             // lighter settings first, so darker detail lands on top
             planned.Sort((a, b) =>
             {
@@ -287,6 +317,205 @@ public static class Painter
             }
         }
         return strokes;
+    }
+
+    /// <summary>
+    /// The picture's thin dark lines (a cartoon's outlines) as smooth strokes, with the brush that
+    /// matches their thickness and the colour closest to theirs. Nothing for photos or pictures
+    /// without line art, or when the palette has no dark colour.
+    /// </summary>
+    private static List<(Point[] Path, int Combo, int Size)> OutlineStrokes(byte[][] target, int w, int h, double[] sizes, List<Combo> combos, int levels, CancellationToken ct)
+    {
+        var found = new List<(Point[] Path, int Combo, int Size)>();
+        var full = Enumerable.Range(0, combos.Count).Where(k => combos[k].Level == levels && combos[k].Luma < 110).ToList();
+        if (full.Count == 0) return found;
+
+        var dark = new bool[w * h];
+        int darkCount = 0;
+        for (int i = 0; i < dark.Length; i++)
+        {
+            double luma = 0.299 * target[0][i] + 0.587 * target[1][i] + 0.114 * target[2][i];
+            if (luma < 85) { dark[i] = true; darkCount++; }
+        }
+        // mostly dark (a photo at night, a black poster): no line art to speak of
+        if (darkCount == 0 || darkCount > dark.Length * 0.35) return found;
+
+        var ordered = Enumerable.Range(0, sizes.Length).OrderBy(i => sizes[i]).ToArray();
+        // lines no thicker than the third brush; anything thicker is an area, coloured in later
+        double maxHalf = sizes[ordered[Math.Min(2, ordered.Length - 1)]] * 0.75;
+        var inside = TraceEngine.InsideDistance(dark, w, h);
+        var skeleton = TraceEngine.Thin(dark, w, h, ct);
+        var widths = new List<float>();
+        for (int i = 0; i < skeleton.Length; i++)
+        {
+            if (!skeleton[i]) continue;
+            if (inside[i] > maxHalf) skeleton[i] = false;
+            else widths.Add(inside[i]);
+        }
+        if (widths.Count == 0) return found;
+        widths.Sort();
+        double thickness = 2 * widths[widths.Count / 2];
+        int brush = ordered[0];
+        foreach (int si in ordered)
+            if (sizes[si] <= thickness * 1.15) brush = si;
+
+        // the colour the lines really are
+        double r = 0, g = 0, b = 0;
+        int n = 0;
+        for (int i = 0; i < skeleton.Length; i++)
+            if (skeleton[i]) { r += target[0][i]; g += target[1][i]; b += target[2][i]; n++; }
+        r /= n; g /= n; b /= n;
+        int combo = full.OrderBy(k => Distance(combos[k].R, combos[k].G, combos[k].B, r, g, b)).First();
+
+        double minLength = Math.Max(5, sizes[brush] * 2);
+        TraceEngine.RemoveStairs(skeleton, w, h);
+        foreach (var raw in TraceEngine.JoinStraight(TraceEngine.WalkSkeleton(skeleton, w, h, 2, ct), ct))
+        {
+            var smooth = Smooth(raw, 2);
+            var simple = TraceEngine.SimplifyOpen(smooth, 0.7);
+            var curve = RoundCorners(simple, Math.Max(2, sizes[brush]));
+            if (Length(curve) >= minLength) found.Add((curve, combo, brush));
+        }
+        // nearest next, so the pen hops a short way between lines
+        return found.Count < 2 ? found : Nearest(found);
+    }
+
+    private static List<(Point[] Path, int Combo, int Size)> Nearest(List<(Point[] Path, int Combo, int Size)> strokes)
+    {
+        var left = new List<(Point[] Path, int Combo, int Size)>(strokes);
+        var order = new List<(Point[] Path, int Combo, int Size)>();
+        var at = new Point(0, 0);
+        while (left.Count > 0)
+        {
+            int best = 0;
+            bool flip = false;
+            double bestD = double.MaxValue;
+            for (int i = 0; i < left.Count; i++)
+            {
+                var p = left[i].Path;
+                double a = (p[0] - at).LengthSquared, z = (p[^1] - at).LengthSquared;
+                if (a < bestD) { bestD = a; best = i; flip = false; }
+                if (z < bestD) { bestD = z; best = i; flip = true; }
+            }
+            var s = left[best];
+            left.RemoveAt(best);
+            var path = flip ? s.Path.Reverse().ToArray() : s.Path;
+            order.Add((path, s.Combo, s.Size));
+            at = path[^1];
+        }
+        return order;
+    }
+
+    /// <summary>Averages each point with its neighbours (ends stay put), taking the pixel stairs out of a traced line.</summary>
+    private static Point[] Smooth(Point[] p, int radius)
+    {
+        if (p.Length < 3) return p;
+        var o = new Point[p.Length];
+        for (int i = 0; i < p.Length; i++)
+        {
+            int r = Math.Min(radius, Math.Min(i, p.Length - 1 - i));
+            double x = 0, y = 0;
+            for (int j = i - r; j <= i + r; j++) { x += p[j].X; y += p[j].Y; }
+            o[i] = new Point(x / (2 * r + 1), y / (2 * r + 1));
+        }
+        return o;
+    }
+
+    /// <summary>
+    /// Rounds every corner of a polyline into a curve (a quadratic Bézier through the corner, up to
+    /// <paramref name="cut"/> pixels each side), so the pen sweeps round instead of stopping dead.
+    /// </summary>
+    internal static Point[] RoundCorners(Point[] p, double cut)
+    {
+        if (p.Length < 3 || cut <= 0) return p;
+        var o = new List<Point> { p[0] };
+        for (int i = 1; i < p.Length - 1; i++)
+        {
+            Point a = p[i - 1], b = p[i], c = p[i + 1];
+            Vector ab = a - b, cb = c - b;
+            double la = ab.Length, lc = cb.Length;
+            if (la < 1e-6 || lc < 1e-6) continue;
+            double ca = Math.Min(cut, la / 2), cc = Math.Min(cut, lc / 2);
+            Point p0 = b + ab / la * ca, p2 = b + cb / lc * cc;
+            const int steps = 5;
+            for (int k = 0; k <= steps; k++)
+            {
+                double t = k / (double)steps, u = 1 - t;
+                o.Add(new Point(u * u * p0.X + 2 * u * t * b.X + t * t * p2.X, u * u * p0.Y + 2 * u * t * b.Y + t * t * p2.Y));
+            }
+        }
+        o.Add(p[^1]);
+        return o.ToArray();
+    }
+
+    /// <summary>A stroke that would be a single dab becomes a short dash, the way a hand makes a tiny stroke rather than a dot.</summary>
+    private static Point[] Dash(Point[] p, double d, int w)
+    {
+        if (p.Length > 1 && Length(p) >= 1) return p;
+        double half = Math.Max(0.75, d * 0.3);
+        var c = p[0];
+        return new[] { new Point(Math.Max(0, c.X - half), c.Y), new Point(Math.Min(w - 1, c.X + half), c.Y) };
+    }
+
+    private static double Length(Point[] p)
+    {
+        double sum = 0;
+        for (int i = 1; i < p.Length; i++) sum += (p[i] - p[i - 1]).Length;
+        return sum;
+    }
+
+    /// <summary>Clears groups of same-setting cells smaller than <paramref name="min"/> cells.</summary>
+    private static void DropSpecks(int[] choice, int rows, int cols, int min)
+    {
+        var seen = new bool[choice.Length];
+        var stack = new Stack<int>();
+        var group = new List<int>();
+        for (int start = 0; start < choice.Length; start++)
+        {
+            if (seen[start] || choice[start] < 0) continue;
+            int k = choice[start];
+            group.Clear();
+            stack.Push(start);
+            seen[start] = true;
+            while (stack.Count > 0)
+            {
+                int i = stack.Pop();
+                group.Add(i);
+                int r = i / cols, c = i % cols;
+                if (c > 0 && !seen[i - 1] && choice[i - 1] == k) { seen[i - 1] = true; stack.Push(i - 1); }
+                if (c < cols - 1 && !seen[i + 1] && choice[i + 1] == k) { seen[i + 1] = true; stack.Push(i + 1); }
+                if (r > 0 && !seen[i - cols] && choice[i - cols] == k) { seen[i - cols] = true; stack.Push(i - cols); }
+                if (r < rows - 1 && !seen[i + cols] && choice[i + cols] == k) { seen[i + cols] = true; stack.Push(i + cols); }
+            }
+            if (group.Count < min)
+                foreach (int i in group) choice[i] = -1;
+        }
+    }
+
+    /// <summary>A summed-area table of a mask, for "is anything set in this box" in constant time.</summary>
+    private sealed class Integral
+    {
+        private readonly int[] _sum;
+        private readonly int _w;
+
+        public Integral(bool[] m, int w, int h)
+        {
+            _w = w + 1;
+            _sum = new int[(w + 1) * (h + 1)];
+            for (int y = 0; y < h; y++)
+            {
+                int row = 0;
+                for (int x = 0; x < w; x++)
+                {
+                    if (m[y * w + x]) row++;
+                    _sum[(y + 1) * _w + x + 1] = _sum[y * _w + x + 1] + row;
+                }
+            }
+        }
+
+        /// <summary>True when any pixel in [x0, x1) × [y0, y1) is set.</summary>
+        public bool Any(int x0, int y0, int x1, int y1) =>
+            x1 > x0 && y1 > y0 && _sum[y1 * _w + x1] - _sum[y0 * _w + x1] - _sum[y1 * _w + x0] + _sum[y0 * _w + x0] > 0;
     }
 
     /// <summary>

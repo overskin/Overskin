@@ -126,11 +126,6 @@ public sealed class AppSettings
     public int ShadeLevels { get; set; } = 3;
     public bool OutlineToo { get; set; } = true;
     public List<PaletteSwatch> Palette { get; set; } = new();
-    /// <summary>Outline big areas and fill them with the game's bucket instead of hatching them.</summary>
-    public bool BucketFill { get; set; }
-    /// <summary>Where the game's brush and bucket buttons are, for switching between them.</summary>
-    public PaletteSwatch? BrushTool { get; set; }
-    public PaletteSwatch? FillTool { get; set; }
     /// <summary>Gartic Phone style: its pen, brush sizes and opacity buttons.</summary>
     public GarticSetup Gartic { get; set; } = new();
 

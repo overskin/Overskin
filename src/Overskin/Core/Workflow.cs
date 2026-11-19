@@ -74,9 +74,38 @@ public sealed class Workflow
         }
     }
 
+    /// <summary>
+    /// What it does, as a menu would say it: "Copy text from an area", "Capture the window in front
+    /// and pin it", "Capture an area after 3 s".
+    /// </summary>
+    public string Describe()
+    {
+        string from = Capture switch
+        {
+            "Window" => "the window in front", "Screen" => "the whole screen", "LastRegion" => "the same area again", _ => "an area",
+        };
+        string text = CopyText ? $"Copy text from {from}"
+            : Editor ? $"Capture {from} and edit it"
+            : Pin ? $"Capture {from} and pin it"
+            : Copy ? $"Capture {from} and copy it"
+            : Save ? $"Capture {from} and save it"
+            : $"Capture {from}";
+        if (Delay > 0) text += $" after {Delay} s";
+        return text;
+    }
+
+    /// <summary>
+    /// What menus and lists show: the name, unless it's the default or a single word (such as
+    /// "text"), which says too little; then what it does.
+    /// </summary>
+    public string Title =>
+        Name is "New workflow" or "Workflow" || !Name.Trim().Contains(' ') ? Describe() : Name;
+
     public void Normalize()
     {
-        Name = string.IsNullOrWhiteSpace(Name) ? "Workflow" : Name.Trim();
+        Name = string.IsNullOrWhiteSpace(Name) ? Describe() : Name.Trim();
+        // it's shown as a menu item and a list entry, which all start with a capital
+        Name = char.ToUpper(Name[0], System.Globalization.CultureInfo.CurrentCulture) + Name[1..];
         Hotkey ??= "";
         if (!Captures.Contains(Capture)) Capture = "Region";
         if (Delay is not (0 or 3 or 5 or 10)) Delay = 0;
