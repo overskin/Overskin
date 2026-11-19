@@ -28,6 +28,8 @@ public partial class GifEditorWindow : Window
     private bool _playing = true;
     private bool _busy;
     private bool _syncing;
+    private bool _resumeAfterAdjust;
+    private readonly DispatcherTimer _settle = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private bool _kept; // saved or copied at least once
     private string? _savedPath;
 
@@ -48,6 +50,7 @@ public partial class GifEditorWindow : Window
         if (clip.Count == 1) PlayButton.IsEnabled = false;
 
         _timer.Tick += (_, _) => Advance();
+        _settle.Tick += Settle_Tick;
         Rebuild();
         ShowFrame(_sequence.Count > 0 ? _sequence[0].Frame : 0);
         if (clip.Count > 1) Play(true);
@@ -127,10 +130,60 @@ public partial class GifEditorWindow : Window
     private void Trim_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_syncing || !IsInitialized) return;
-        Changed();
-        // show the edge being dragged
-        ShowFrame((int)((Slider)sender).Value);
+        // Playback is paused while a handle moves: otherwise the timer and the drag both draw
+        // frames and the preview flickers between them.
+        BeginAdjust();
+
+        // the handles can't pass each other
+        _syncing = true;
+        if (sender == TrimStart && TrimStart.Value > TrimEnd.Value) TrimStart.Value = TrimEnd.Value;
+        if (sender == TrimEnd && TrimEnd.Value < TrimStart.Value) TrimEnd.Value = TrimStart.Value;
+        _syncing = false;
+
+        Rebuild();
+        // show the edge being dragged, and carry on playing from there
+        int edge = (int)((Slider)sender).Value;
+        int at = _sequence.FindIndex(s => s.Frame == edge);
+        if (at >= 0) _position = at;
+        ShowFrame(edge);
     }
+
+    /// <summary>Pauses playback while the trim handles or the scrubber move, and resumes it once
+    /// they've been let go (if it was playing).</summary>
+    private void BeginAdjust(bool resume = true)
+    {
+        if (_playing)
+        {
+            Play(false);
+            _resumeAfterAdjust = resume;
+        }
+        else if (!resume) _resumeAfterAdjust = false;
+        _settle.Stop();
+        _settle.Start();
+    }
+
+    /// <summary>Whether a handle is still being held (the self-test stands in for a real mouse).</summary>
+    internal static Func<bool> MouseHeld = () => Mouse.LeftButton == MouseButtonState.Pressed;
+
+    private void Settle_Tick(object? sender, EventArgs e)
+    {
+        // still holding a handle: wait for the release
+        if (MouseHeld()) return;
+        _settle.Stop();
+        if (_resumeAfterAdjust)
+        {
+            _resumeAfterAdjust = false;
+            Play(true);
+        }
+    }
+
+    /// <summary>The trimmed range, first and last frame.</summary>
+    internal (int First, int Last) TrimRange =>
+        ((int)Math.Min(TrimStart.Value, TrimEnd.Value), (int)Math.Max(TrimStart.Value, TrimEnd.Value));
+
+    /// <summary>The frame on screen (for the self-test).</summary>
+    internal int ShownFrame { get; private set; }
+    internal bool IsPlaying => _playing;
 
     private void Changed()
     {
@@ -145,6 +198,7 @@ public partial class GifEditorWindow : Window
     private void ShowFrame(int frame)
     {
         frame = Math.Clamp(frame, 0, _clip.Count - 1);
+        ShownFrame = frame;
         Preview.Show(_clip.FrameBitmap(frame), Caption, OutputWidth);
         _syncing = true;
         Scrubber.Value = frame;
@@ -183,8 +237,11 @@ public partial class GifEditorWindow : Window
     private void Scrubber_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_syncing || !IsInitialized) return;
-        Play(false);
-        int frame = (int)Scrubber.Value;
+        // scrubbing pauses, as before, and stays paused when let go
+        BeginAdjust(resume: false);
+        // only the frames that will be in the GIF
+        var (first, last) = TrimRange;
+        int frame = Math.Clamp((int)Scrubber.Value, first, last);
         int at = _sequence.FindIndex(s => s.Frame == frame);
         if (at >= 0) _position = at;
         ShowFrame(frame);
@@ -323,6 +380,7 @@ public partial class GifEditorWindow : Window
             if (answer != MessageBoxResult.Yes) { e.Cancel = true; return; }
         }
         _timer.Stop();
+        _settle.Stop();
         base.OnClosing(e);
     }
 }

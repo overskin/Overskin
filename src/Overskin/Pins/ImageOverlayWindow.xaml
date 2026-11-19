@@ -7,19 +7,6 @@
         WindowStartupLocation="Manual" UseLayoutRounding="True"
         FontFamily="{StaticResource UiFont}">
 
-    <Window.Resources>
-        <Style x:Key="PinHandle" TargetType="Thumb">
-            <Setter Property="Width" Value="14" />
-            <Setter Property="Height" Value="14" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Thumb">
-                        <Border Background="White" BorderBrush="{DynamicResource Accent}" BorderThickness="2" CornerRadius="3" />
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
 
     <!-- the near-invisible fill keeps transparent parts of the picture draggable -->
     <Grid x:Name="Root" Background="#01000000">
@@ -39,14 +26,12 @@
         </Canvas>
         <Border x:Name="Frame" BorderBrush="{DynamicResource Accent}" BorderThickness="1" Opacity="0" IsHitTestVisible="False" />
 
-        <!-- transform mode (double-click): drag a corner to resize -->
-        <Grid x:Name="Handles" Visibility="Collapsed">
-            <Border BorderBrush="{DynamicResource Accent}" BorderThickness="1.5" IsHitTestVisible="False" />
-            <Thumb Tag="TL" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="SizeNWSE" DragDelta="Handle_Drag" Style="{StaticResource PinHandle}" />
-            <Thumb Tag="TR" HorizontalAlignment="Right" VerticalAlignment="Top" Cursor="SizeNESW" DragDelta="Handle_Drag" Style="{StaticResource PinHandle}" />
-            <Thumb Tag="BL" HorizontalAlignment="Left" VerticalAlignment="Bottom" Cursor="SizeNESW" DragDelta="Handle_Drag" Style="{StaticResource PinHandle}" />
-            <Thumb Tag="BR" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="SizeNWSE" DragDelta="Handle_Drag" Style="{StaticResource PinHandle}" />
-        </Grid>
+        <!-- Free Transform (click the picture): box, handles and the size or angle while dragging -->
+        <Canvas x:Name="TransformLayer" IsHitTestVisible="False" />
+        <Border x:Name="Readout" HorizontalAlignment="Left" VerticalAlignment="Top" Visibility="Collapsed" IsHitTestVisible="False"
+                Background="#E6323232" BorderBrush="#FF5A5A5A" BorderThickness="1" CornerRadius="2" Padding="6,3">
+            <TextBlock x:Name="ReadoutText" Foreground="White" FontSize="11" />
+        </Border>
 
         <Grid.ContextMenu>
             <ContextMenu x:Name="Menu" Opened="Menu_Opened">

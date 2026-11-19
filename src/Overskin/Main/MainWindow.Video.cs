@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 
@@ -54,8 +55,10 @@ public partial class MainWindow
         }
         await Task.Delay(400); // the last names of what was clicked are still being looked up
         var accent = ((System.Windows.Media.SolidColorBrush)FindResource("Accent")).Color;
-        var guide = ImageLoader.Normalize(StepTutorial.Build(steps, accent));
-        OpenEditor(guide, null, $"Steps {DateTime.Now:HH.mm.ss}  ·  {steps.Count} step{(steps.Count == 1 ? "" : "s")}");
+        // check and reword the steps, then make the guide as a picture, HTML, Markdown or PDF
+        new StepsWindow(steps, accent, _settings.SaveFolder,
+            (guide, title) => OpenEditor(guide, null, $"{title}  ·  {steps.Count} step{(steps.Count == 1 ? "" : "s")}"),
+            _ => { }).Show();
     }
 
     // ---- Screenshots / Recording -------------------------------------------------------------
@@ -93,8 +96,70 @@ public partial class MainWindow
         VidZoomSpeed.Value = v.ZoomSpeed;
         VidFollow.Value = v.FollowSmoothing;
         VidHold.Value = v.ZoomHold;
+        VidSystemSoundSwitch.IsChecked = v.SystemSound;
+        VidMicSwitch.IsChecked = v.Microphone;
+        VidWebcamSwitch.IsChecked = v.Webcam;
+        foreach (var r in new[] { CamTopLeft, CamTopRight, CamBottomLeft, CamBottomRight }) r.IsChecked = (string)r.Tag == v.WebcamCorner;
+        CamCircle.IsChecked = v.WebcamShape == "Circle";
+        CamRounded.IsChecked = v.WebcamShape == "Rounded";
+        VidCamSize.Value = v.WebcamSize;
         _syncingVideo = false;
         UpdateVideoLabels();
+        _ = UpdateDeviceNamesAsync();
+    }
+
+    /// <summary>Shows which microphone and camera are chosen, by name.</summary>
+    private async Task UpdateDeviceNamesAsync()
+    {
+        var v = _settings.Video;
+        var mics = await Task.Run(AudioSource.Microphones);
+        MicName.Text = mics.FirstOrDefault(m => m.Id == v.MicrophoneId)?.Name ?? (mics.Count == 0 ? "No microphone found" : "Windows default");
+        var cams = await Webcam.CamerasAsync();
+        CameraName.Text = cams.FirstOrDefault(c => c.Id == v.WebcamId)?.Name ?? (cams.Count == 0 ? "No camera found" : cams[0].Name);
+    }
+
+    /// <summary>A dropdown menu under <paramref name="button"/>: a list of names, the chosen one ticked.</summary>
+    private void ShowChoices(Button button, IEnumerable<(string Id, string Name)> choices, string chosen, Action<string> pick)
+    {
+        var menu = new ContextMenu
+        {
+            PlacementTarget = button,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+            MinWidth = button.ActualWidth,
+        };
+        foreach (var (id, name) in choices)
+        {
+            var item = new MenuItem { Header = name, IsChecked = id == chosen };
+            item.Click += (_, _) => pick(id);
+            menu.Items.Add(item);
+        }
+        if (menu.Items.Count == 0) menu.Items.Add(new MenuItem { Header = "Nothing found", IsEnabled = false });
+        menu.IsOpen = true;
+    }
+
+    private async void MicButton_Click(object sender, RoutedEventArgs e)
+    {
+        var mics = await Task.Run(AudioSource.Microphones);
+        var choices = new List<(string, string)> { ("", "Windows default") };
+        choices.AddRange(mics.Select(m => (m.Id, m.Name)));
+        ShowChoices(MicButton, choices, _settings.Video.MicrophoneId, id =>
+        {
+            _settings.Video.MicrophoneId = id;
+            SaveSettings();
+            _ = UpdateDeviceNamesAsync();
+        });
+    }
+
+    private async void CameraButton_Click(object sender, RoutedEventArgs e)
+    {
+        var cams = await Webcam.CamerasAsync();
+        string chosen = cams.Any(c => c.Id == _settings.Video.WebcamId) ? _settings.Video.WebcamId : cams.FirstOrDefault()?.Id ?? "";
+        ShowChoices(CameraButton, cams.Select(c => (c.Id, c.Name)), chosen, id =>
+        {
+            _settings.Video.WebcamId = id;
+            SaveSettings();
+            _ = UpdateDeviceNamesAsync();
+        });
     }
 
     private void UpdateVideoLabels()
@@ -108,6 +173,9 @@ public partial class MainWindow
         VidHoldText.Text = $"{v.ZoomHold:0.#} s";
         foreach (var c in new FrameworkElement[] { VidZoom, VidZoomSpeed, VidFollow, VidHold }) c.IsEnabled = v.AutoZoom;
         foreach (var c in new FrameworkElement[] { VidStyleWhite, VidStyleBlack, VidStyleSystem, VidPointerSize, VidSmoothing }) c.IsEnabled = v.Pointer;
+        MicButton.IsEnabled = v.Microphone;
+        VidCamSizeText.Text = $"{v.WebcamSize}%";
+        foreach (var c in new FrameworkElement[] { CameraButton, CamTopLeft, CamTopRight, CamBottomLeft, CamBottomRight, CamCircle, CamRounded, VidCamSize }) c.IsEnabled = v.Webcam;
     }
 
     private void VideoSetting_Click(object sender, RoutedEventArgs e) => ReadVideoControls();
@@ -130,6 +198,12 @@ public partial class MainWindow
         v.ZoomSpeed = (int)VidZoomSpeed.Value;
         v.FollowSmoothing = (int)VidFollow.Value;
         v.ZoomHold = VidHold.Value;
+        v.SystemSound = VidSystemSoundSwitch.IsChecked == true;
+        v.Microphone = VidMicSwitch.IsChecked == true;
+        v.Webcam = VidWebcamSwitch.IsChecked == true;
+        v.WebcamCorner = new[] { CamTopLeft, CamTopRight, CamBottomLeft, CamBottomRight }.FirstOrDefault(r => r.IsChecked == true)?.Tag as string ?? "BottomRight";
+        v.WebcamShape = CamRounded.IsChecked == true ? "Rounded" : "Circle";
+        v.WebcamSize = (int)VidCamSize.Value;
         UpdateVideoLabels();
         if (_ready) SaveSettings();
     }
@@ -163,7 +237,8 @@ public partial class MainWindow
             }
             _hotkeys?.Register(HkVideoEsc, new Hotkey(ModifierKeys.None, Key.Escape), () => _video.Stop());
             string path = ImageFiles.NewPath(_settings.SaveFolder, ".mp4");
-            _video.Start(area, path, _settings.Video.With(autoZoom));
+            var mark = _settings.Watermark.OnVideos && _settings.Watermark.HasContent ? _settings.Watermark.Copy() : null;
+            _video.Start(area, path, _settings.Video.With(autoZoom), mark);
         });
     }
 
@@ -182,13 +257,25 @@ public partial class MainWindow
             return;
         }
         AddToHistory(path);
-        Toast.Show("Video saved. It's in the Library.");
+        if (_video?.Notice is { } notice) Toast.Show("Video saved, but: " + notice, true);
+        else Toast.Show("Video saved. Click it in the Library to play or trim it.");
     }
 
     // ---- videos in the library ---------------------------------------------------------------
 
     private static bool IsVideo(string path) =>
         Path.GetExtension(path).Equals(".mp4", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Plays a video in Overskin, where it can be trimmed.</summary>
+    private void OpenVideo(string path)
+    {
+        if (!File.Exists(path))
+        {
+            Toast.Show("That file has been moved or deleted.");
+            return;
+        }
+        new VideoEditorWindow(path, AddToHistory).Show();
+    }
 
     private static void OpenWithDefaultApp(string path)
     {

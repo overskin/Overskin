@@ -84,10 +84,11 @@ public partial class MainWindow
     }
 
     /// <summary>Freezes the screen and lets the user choose; null if they cancelled.</summary>
-    private async Task<(CaptureOverlay Overlay, bool WasShown)?> Choose(OverlayMode mode, string hint, bool useDelay, bool tools = false)
+    private async Task<(CaptureOverlay Overlay, bool WasShown)?> Choose(OverlayMode mode, string hint, bool useDelay, bool tools = false, int? delay = null)
     {
         bool wasShown = await ClearTheScreen();
-        if (useDelay && _settings.CaptureDelay > 0) await CountDown(_settings.CaptureDelay);
+        int wait = delay ?? (useDelay ? _settings.CaptureDelay : 0);
+        if (wait > 0) await CountDown(wait);
 
         bool pointer = _settings.AfterCursor && mode is OverlayMode.Region or OverlayMode.Window;
         var overlay = CaptureOverlay.Open(mode, hint, pointer, tools);
@@ -126,78 +127,110 @@ public partial class MainWindow
     private void CaptureScreen_Click(object sender, RoutedEventArgs e) => CaptureFullScreen(useDelay: true);
     private void RepeatRegion_Click(object sender, RoutedEventArgs e) => CaptureLastRegion();
 
-    private void CaptureRegion(bool useDelay = false) => Guarded(async () =>
+    private void CaptureRegion(bool useDelay = false, AfterSteps? steps = null, int? delay = null) => Guarded(async () =>
     {
-        var chosen = await Choose(OverlayMode.Region, "Drag over an area, or click a window.  Esc cancels.", useDelay, tools: true);
+        var chosen = await Choose(OverlayMode.Region, "Drag over an area, or click a window.  Esc cancels.", useDelay, tools: true, delay);
         if (chosen is not { } c) return;
         Reappear(c.WasShown);
         if (c.Overlay.Selection is not { } r) return;
         _settings.LastRegion = new[] { r.X, r.Y, r.Width, r.Height };
-        Finish(WindowAloneOr(c.Overlay, r), r);
+        Finish(await WindowAloneOrAsync(c.Overlay, r), r, steps);
     });
 
-    private void CaptureWindowPick() => Guarded(async () =>
+    private void CaptureWindowPick(AfterSteps? steps = null, int? delay = null) => Guarded(async () =>
     {
-        var chosen = await Choose(OverlayMode.Window, "Click the window to capture.  Esc cancels.", useDelay: true, tools: true);
+        var chosen = await Choose(OverlayMode.Window, "Click the window to capture.  Esc cancels.", useDelay: true, tools: true, delay);
         if (chosen is not { } c) return;
         Reappear(c.WasShown);
-        if (c.Overlay.Selection is { } r) Finish(WindowAloneOr(c.Overlay, r), r);
+        if (c.Overlay.Selection is not { } r)
+        {
+            CrashLog.Note("window pick: closed without a window chosen");
+            return;
+        }
+        Finish(await WindowAloneOrAsync(c.Overlay, r), r, steps);
     });
 
     /// <summary>
     /// With "Windows on a transparent background", a clicked window is grabbed on its own and set
     /// on a transparent backdrop with a shadow; otherwise (or if it can't be) the frozen crop.
     /// </summary>
-    private BitmapSource WindowAloneOr(CaptureOverlay overlay, Int32Rect r)
+    private async Task<BitmapSource> WindowAloneOrAsync(CaptureOverlay overlay, Int32Rect r)
     {
-        if (_settings.WindowAlpha && overlay.SelectedWindow != IntPtr.Zero && !overlay.HasMarks && WindowAlone(overlay.SelectedWindow) is { } alone)
+        CrashLog.Note($"capture: {r.Width}x{r.Height}, window clicked={overlay.SelectedWindow != IntPtr.Zero}, on its own={_settings.WindowAlpha}");
+        if (_settings.WindowAlpha && overlay.SelectedWindow != IntPtr.Zero && !overlay.HasMarks && await WindowAloneAsync(overlay.SelectedWindow) is { } alone)
             return alone;
         return overlay.Crop(r);
     }
 
-    private static BitmapSource? WindowAlone(IntPtr window)
+    /// <summary>
+    /// The window drawn on its own. The window is asked to draw itself, which a busy or stuck app
+    /// can take forever to do, so it's asked off the main thread and given a moment and a half;
+    /// after that the frozen screen is used instead.
+    /// </summary>
+    private static async Task<BitmapSource?> WindowAloneAsync(IntPtr window)
     {
-        var shot = CaptureWindowOnly(window);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var grab = Task.Run(() => CaptureWindowOnly(window));
+        if (await Task.WhenAny(grab, Task.Delay(1500)) != grab)
+        {
+            CrashLog.Note("window on its own: the app didn't draw itself within 1.5 s; used the screen instead");
+            return null;
+        }
+        BitmapSource? shot;
+        try { shot = await grab; }
+        catch (Exception ex)
+        {
+            CrashLog.Note("window on its own failed: " + ex.GetType().Name);
+            return null;
+        }
+        CrashLog.Note($"window on its own: {(shot == null ? "came back blank" : $"{shot.PixelWidth}x{shot.PixelHeight}")} in {sw.ElapsedMilliseconds} ms");
         if (shot == null) return null;
+        return WindowAlone(shot);
+    }
+
+    private static BitmapSource? WindowAlone(BitmapSource shot)
+    {
         bool rounded = Environment.OSVersion.Version.Build >= 22000; // Windows 11 rounds window corners
         return ImageLoader.Normalize(Beautify.Render(shot, new BeautifyOptions { Background = "None", Padding = 36, Corners = rounded ? 8 : 0, Shadow = 45 }));
     }
 
     /// <summary>The hotkey version: whatever window is in front right now, no clicking.</summary>
-    private void CaptureActiveWindow()
+    private void CaptureActiveWindow(AfterSteps? steps = null, int? delay = null)
     {
         IntPtr front = GetForegroundWindow();
         if (front == IntPtr.Zero || _manager.IsOwnWindow(front) || ClassName(front) is "Progman" or "WorkerW")
         {
-            CaptureWindowPick(); // nothing useful in front: let the user click one
+            CaptureWindowPick(steps, delay); // nothing useful in front: let the user click one
             return;
         }
-        CaptureWindowHandle(front);
+        CaptureWindowHandle(front, steps, delay);
     }
 
-    private void CaptureWindowHandle(IntPtr front) => Guarded(async () =>
+    private void CaptureWindowHandle(IntPtr front, AfterSteps? steps = null, int? delay = null) => Guarded(async () =>
     {
         bool wasShown = await ClearTheScreen();
+        if (delay is > 0) await CountDown(delay.Value);
         var b = VisibleBounds(front);
         var vs = VirtualScreen();
         int x = Math.Max(b.Left, vs.Left), y = Math.Max(b.Top, vs.Top);
         int w = Math.Min(b.Right, vs.Right) - x, h = Math.Min(b.Bottom, vs.Bottom) - y;
-        var shot = (_settings.WindowAlpha ? WindowAlone(front) : null) ?? CaptureScreen(x, y, w, h, _settings.AfterCursor);
+        var shot = (_settings.WindowAlpha ? await WindowAloneAsync(front) : null) ?? CaptureScreen(x, y, w, h, _settings.AfterCursor);
         Reappear(wasShown);
-        if (shot != null) Finish(shot, new Int32Rect(x, y, w, h));
+        if (shot != null) Finish(shot, new Int32Rect(x, y, w, h), steps);
     });
 
-    private void CaptureFullScreen(bool useDelay = false) => Guarded(async () =>
+    private void CaptureFullScreen(bool useDelay = false, AfterSteps? steps = null, int? delay = null) => Guarded(async () =>
     {
         bool wasShown = await ClearTheScreen();
-        if (useDelay && _settings.CaptureDelay > 0) await CountDown(_settings.CaptureDelay);
+        int wait = delay ?? (useDelay ? _settings.CaptureDelay : 0);
+        if (wait > 0) await CountDown(wait);
         var r = _settings.FullScreenAllMonitors ? VirtualScreen() : MonitorBounds(CursorPos());
         var shot = CaptureScreen(r.Left, r.Top, r.Width, r.Height, _settings.AfterCursor);
         Reappear(wasShown);
-        if (shot != null) Finish(shot, new Int32Rect(r.Left, r.Top, r.Width, r.Height));
+        if (shot != null) Finish(shot, new Int32Rect(r.Left, r.Top, r.Width, r.Height), steps);
     });
 
-    private void CaptureLastRegion()
+    private void CaptureLastRegion(AfterSteps? steps = null, int? delay = null)
     {
         if (_settings.LastRegion is not { Length: 4 } a)
         {
@@ -207,11 +240,38 @@ public partial class MainWindow
         Guarded(async () =>
         {
             bool wasShown = await ClearTheScreen();
-            if (_settings.CaptureDelay > 0) await CountDown(_settings.CaptureDelay);
+            int wait = delay ?? _settings.CaptureDelay;
+            if (wait > 0) await CountDown(wait);
             var shot = CaptureScreen(a[0], a[1], a[2], a[3], _settings.AfterCursor);
             Reappear(wasShown);
-            if (shot != null) Finish(shot, new Int32Rect(a[0], a[1], a[2], a[3]));
+            if (shot != null) Finish(shot, new Int32Rect(a[0], a[1], a[2], a[3]), steps);
         });
+    }
+
+    /// <summary>What the Capture page says to do after a capture.</summary>
+    private AfterSteps SettingsSteps => new()
+    {
+        AutoHide = _settings.AutoHide,
+        Watermark = _settings.Watermark.OnScreenshots,
+        Save = _settings.AfterSave,
+        Copy = _settings.AfterCopy,
+        Pin = _settings.AfterPin,
+        Editor = _settings.AfterEditor,
+        Preview = _settings.AfterPreview,
+    };
+
+    /// <summary>Runs a workflow: its capture, then its steps.</summary>
+    private void RunWorkflow(Workflow w)
+    {
+        var steps = w.Steps;
+        int delay = w.Delay;
+        switch (w.Capture)
+        {
+            case "Window": CaptureActiveWindow(steps, delay); break;
+            case "Screen": CaptureFullScreen(false, steps, delay); break;
+            case "LastRegion": CaptureLastRegion(steps, delay); break;
+            default: CaptureRegion(false, steps, delay); break;
+        }
     }
 
     // ===================================================================================
@@ -224,7 +284,7 @@ public partial class MainWindow
         var paths = _settings.History.AsEnumerable().Reverse().Select(h => h.Path).Where(File.Exists).Take(10).ToList();
         RecentStrip.Toggle(paths, path =>
         {
-            if (IsVideo(path)) OpenWithDefaultApp(path);
+            if (IsVideo(path)) OpenVideo(path);
             else if (IsGif(path)) OpenClipFile(path);
             else if (TryLoadFile(path, out var image)) OpenEditor(image!, path, Path.GetFileName(path));
         });
@@ -233,10 +293,11 @@ public partial class MainWindow
     private string CaptureName(string? path) =>
         path != null ? Path.GetFileName(path) : $"Capture {DateTime.Now:HH.mm.ss}";
 
-    /// <summary>Copy, save, pin, edit or preview, as set on the Capture page.</summary>
-    private async void Finish(BitmapSource image, Int32Rect where)
+    /// <summary>Copy, save, pin, edit or preview: as set on the Capture page, or as a workflow says.</summary>
+    private async void Finish(BitmapSource image, Int32Rect where, AfterSteps? steps = null)
     {
-        if (_settings.AutoHide)
+        var s = steps ?? SettingsSteps;
+        if (s.AutoHide)
         {
             try
             {
@@ -252,17 +313,33 @@ public partial class MainWindow
                 // a failed read leaves the picture as it is
             }
         }
-        string? path = _settings.AfterSave ? SaveCapture(image) : null;
-        if (_settings.AfterCopy) CopyImage(image, quiet: true, path);
-        if (_settings.AfterPin) PinImage(image, CaptureName(path), path, placeAt: where);
+        if (s.Beautify)
+            image = ImageLoader.Normalize(Beautify.Render(image, new BeautifyOptions()));
+        if (s.Watermark && _settings.Watermark.HasContent)
+            image = Watermark.Apply(image, _settings.Watermark);
+        string? path = s.Save ? SaveCapture(image) : null;
+        if (s.Copy) CopyImage(image, quiet: true, path);
+        bool textCopied = false;
+        if (s.CopyText)
+        {
+            string? text = null;
+            try { text = await TextRecognizer.RecognizeAsync(image); } catch { }
+            if (string.IsNullOrWhiteSpace(text)) Toast.Show("No text found in that capture.", true);
+            else
+            {
+                try { Clipboard.SetText(text); textCopied = true; }
+                catch { Toast.Show("The clipboard is busy. Try again.", true); }
+            }
+        }
+        if (s.Pin) PinImage(image, CaptureName(path), path, placeAt: where);
 
-        if (_settings.AfterEditor)
+        if (s.Editor)
         {
             OpenEditor(image, path, CaptureName(path));
         }
-        else if (_settings.AfterPreview)
+        else if (s.Preview)
         {
-            string what = string.Join(" and ", new[] { _settings.AfterSave ? "saved" : null, _settings.AfterCopy ? "copied" : null }.Where(s => s != null));
+            string what = string.Join(" and ", new[] { s.Save ? "saved" : null, s.Copy ? "copied" : null, textCopied ? "text copied" : null }.Where(x => x != null));
             string caption = $"{image.PixelWidth} × {image.PixelHeight}" + (what.Length > 0 ? $"  ·  {char.ToUpper(what[0])}{what[1..]}" : "");
             CaptureNotice.ShowFor(image, path, caption,
                 edit: () => OpenEditor(image, path, CaptureName(path)),
@@ -273,8 +350,8 @@ public partial class MainWindow
         }
         else
         {
-            string what = string.Join(" and ", new[] { _settings.AfterSave ? "Saved" : null, _settings.AfterCopy ? "copied" : null }.Where(s => s != null));
-            if (what.Length > 0) Toast.Show(what + ".");
+            string what = string.Join(" and ", new[] { s.Save ? "saved" : null, s.Copy ? "copied" : null, textCopied ? "text copied" : null }.Where(x => x != null));
+            if (what.Length > 0) Toast.Show(char.ToUpper(what[0]) + what[1..] + ".");
         }
     }
 
@@ -424,6 +501,8 @@ public partial class MainWindow
         Redaction.Kinds = _settings.AutoHideKinds;
         WindowAlphaSwitch.IsChecked = _settings.WindowAlpha;
         SyncVideoControls();
+        SyncWatermarkControls();
+        RefreshWorkflowRows();
         AfterSaveSwitch.IsChecked = _settings.AfterSave;
         AfterEditorSwitch.IsChecked = _settings.AfterEditor;
         AfterPinSwitch.IsChecked = _settings.AfterPin;
@@ -617,7 +696,7 @@ public partial class MainWindow
         }
         if (IsVideo(item.Path))
         {
-            Toast.Show("That's a video. Click it to play it.");
+            Toast.Show("That's a video. Click it to play or trim it.");
             return null;
         }
         return TryLoadFile(item.Path, out var image) ? image : null;
@@ -637,7 +716,7 @@ public partial class MainWindow
         }
         if (ItemOf(sender) is { } video && IsVideo(video.Path))
         {
-            OpenWithDefaultApp(video.Path);
+            OpenVideo(video.Path);
             return;
         }
         if (ItemOf(sender) is { } gif && Path.GetExtension(gif.Path).Equals(".gif", StringComparison.OrdinalIgnoreCase) && File.Exists(gif.Path))

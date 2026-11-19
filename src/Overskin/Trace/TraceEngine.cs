@@ -21,6 +21,11 @@ public enum TraceMode
     Shade,
     /// <summary>Fills each region with the nearest colour from a game's palette.</summary>
     Colour,
+    /// <summary>
+    /// Paints like Gartic Phone allows: big blobs with the biggest brush first, then smaller
+    /// brushes only where it's still wrong, mixing shades with the game's opacity levels. No bucket.
+    /// </summary>
+    Gartic,
 }
 
 public sealed class TraceOptions
@@ -55,6 +60,12 @@ public sealed class TraceOptions
     public bool BucketFill { get; init; }
     /// <summary>Milliseconds per drawn point at the chosen speed; used to pick the quicker way to cover each area.</summary>
     public double PointMs { get; init; } = 8;
+    /// <summary>Gartic: the game's brush diameters in working pixels, smallest first.</summary>
+    public IReadOnlyList<double> BrushSizes { get; init; } = Array.Empty<double>();
+    /// <summary>Gartic: how many opacity levels the game has (1 = always full).</summary>
+    public int OpacityLevels { get; init; } = 1;
+    /// <summary>Gartic: how wrong (colour distance) an area may stay before a smaller brush fixes it. Lower = more detail, more strokes.</summary>
+    public double Tolerance2 { get; init; } = 28;
 }
 
 /// <summary>A prepared picture: greyscale plus colour, both already flattened onto white.</summary>
@@ -87,6 +98,12 @@ public sealed class TraceResult
     public bool ThinPreview { get; init; }
     /// <summary>Why nothing came out, when that is the case.</summary>
     public string? Message { get; init; }
+    /// <summary>Gartic: which brush (0 = smallest) each path uses.</summary>
+    public List<int>? SizeIndex { get; init; }
+    /// <summary>Gartic: which opacity level (1 = faintest … levels = full) each path uses.</summary>
+    public List<int>? OpacityIndex { get; init; }
+    /// <summary>Gartic: what the canvas should look like when it's done, premultiplied BGRA, Width × Height.</summary>
+    public byte[]? Painted { get; init; }
 }
 
 /// <summary>Turns a picture into pen strokes.</summary>
@@ -193,6 +210,7 @@ public static class TraceEngine
         }
 
         if (o.Mode == TraceMode.Colour) return TraceColour(source, o, w, h, ct);
+        if (o.Mode == TraceMode.Gartic) return Painter.Paint(source, o, w, h, ct);
 
         byte[] gray = Resample(source.Gray, source.Width, source.Height, w, h);
         if (o.Blur > 0) gray = Blur(gray, w, h, o.Blur);
@@ -477,7 +495,7 @@ public static class TraceEngine
     //  resampling and smoothing
     // ===================================================================================
 
-    private static byte[] Resample(byte[] s, int sw, int sh, int w, int h)
+    internal static byte[] Resample(byte[] s, int sw, int sh, int w, int h)
     {
         if (w == sw && h == sh) return (byte[])s.Clone();
 
@@ -526,7 +544,7 @@ public static class TraceEngine
     }
 
     /// <summary>Two passes of a separable box blur: close to a Gaussian, and fast at any radius.</summary>
-    private static byte[] Blur(byte[] src, int w, int h, int radius)
+    internal static byte[] Blur(byte[] src, int w, int h, int radius)
     {
         var a = (byte[])src.Clone();
         var b = new byte[a.Length];

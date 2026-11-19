@@ -1,0 +1,100 @@
+<Window x:Class="Overskin.WorkflowWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Overskin"
+        Title="Workflow" Width="460" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" Background="Transparent" WindowStyle="None" AllowsTransparency="True"
+        FontFamily="{StaticResource UiFont}" FontSize="12" Foreground="{DynamicResource Text}" ShowInTaskbar="False"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" ResizeMode="NoResize">
+
+    <Window.Resources>
+        <Style x:Key="Step" TargetType="Grid">
+            <Setter Property="Height" Value="30" />
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="{DynamicResource RadiusWindow}">
+        <StackPanel>
+            <Grid Height="44" MouseLeftButtonDown="Title_MouseDown" Background="Transparent">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                    <local:Icon Data="{StaticResource IcWorkflow}" Width="16" Height="16" Foreground="{DynamicResource Accent}" />
+                    <TextBlock Text="Workflow" FontSize="13.5" FontWeight="Bold" VerticalAlignment="Center" Margin="9,0,0,1" />
+                </StackPanel>
+                <Button Style="{StaticResource BtnCaptionClose}" HorizontalAlignment="Right" Margin="0,0,10,0" ToolTip="Close" Click="Cancel_Click">
+                    <local:Icon Data="{StaticResource IcX}" Width="14" Height="14" />
+                </Button>
+            </Grid>
+
+            <StackPanel Margin="14,0,14,0">
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid Height="34">
+                            <TextBlock Text="Name" Style="{StaticResource Label}" />
+                            <TextBox x:Name="NameBox" Style="{StaticResource TextField}" Width="250" HorizontalAlignment="Right" />
+                        </Grid>
+                        <Grid Height="34" ToolTip="Click, then press the keys. Include Ctrl, Alt or Win.">
+                            <TextBlock Text="Hotkey" Style="{StaticResource Label}" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button x:Name="HotkeyButton" Style="{StaticResource Btn}" Height="26" MinWidth="150" Click="HotkeyButton_Click" />
+                                <Button Style="{StaticResource BtnIcon}" Width="26" Height="26" Margin="4,0,0,0" ToolTip="No hotkey (run it from the tray menu)" Click="ClearHotkey_Click">
+                                    <local:Icon Data="{StaticResource IcX}" Width="12" Height="12" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <local:Icon Data="{StaticResource IcCamera}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                            <TextBlock Text="Capture" Style="{StaticResource Heading}" />
+                        </StackPanel>
+                        <Border Style="{StaticResource Rule}" />
+                        <WrapPanel x:Name="CaptureChoices" Margin="-5,0,0,6">
+                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="WfCapture" Tag="Region" Content="An area" />
+                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="WfCapture" Tag="Window" Content="Window in front" />
+                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="WfCapture" Tag="Screen" Content="Whole screen" />
+                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="WfCapture" Tag="LastRegion" Content="Same area" />
+                        </WrapPanel>
+                        <Grid Height="30">
+                            <TextBlock Text="Wait first" Style="{StaticResource Label}" />
+                            <StackPanel x:Name="DelayChoices" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="WfDelay" Tag="0" Content="No" />
+                                <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="WfDelay" Tag="3" Content="3 s" />
+                                <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="WfDelay" Tag="5" Content="5 s" />
+                                <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="WfDelay" Tag="10" Content="10 s" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <local:Icon Data="{StaticResource IcListOrdered}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                            <TextBlock Text="Then, in this order" Style="{StaticResource Heading}" />
+                        </StackPanel>
+                        <Border Style="{StaticResource Rule}" />
+                        <Grid Style="{StaticResource Step}"><TextBlock Text="Hide private details" Style="{StaticResource Label}" /><ToggleButton x:Name="AutoHideSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" /></Grid>
+                        <Grid Style="{StaticResource Step}"><TextBlock Text="Beautify (backdrop, corners, shadow)" Style="{StaticResource Label}" /><ToggleButton x:Name="BeautifySwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" /></Grid>
+                        <Grid Style="{StaticResource Step}" ToolTip="Set the watermark up on the Capture page"><TextBlock Text="Add the watermark" Style="{StaticResource Label}" /><ToggleButton x:Name="WatermarkSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" /></Grid>
+                        <Grid Style="{StaticResource Step}"><TextBlock Text="Save to a file" Style="{StaticResource Label}" /><ToggleButton x:Name="SaveSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" /></Grid>
+                        <Grid Style="{StaticResource Step}"><TextBlock Text="Copy the picture" Style="{StaticResource Label}" /><ToggleButton x:Name="CopySwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="Copy_Click" /></Grid>
+                        <Grid Style="{StaticResource Step}" ToolTip="Reads the words in the capture and copies them instead of the picture"><TextBlock Text="Copy its text instead" Style="{StaticResource Label}" /><ToggleButton x:Name="CopyTextSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="Copy_Click" /></Grid>
+                        <Grid Style="{StaticResource Step}"><TextBlock Text="Pin it where it was" Style="{StaticResource Label}" /><ToggleButton x:Name="PinSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" /></Grid>
+                        <Grid Style="{StaticResource Step}"><TextBlock Text="Open in the editor" Style="{StaticResource Label}" /><ToggleButton x:Name="EditorSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" /></Grid>
+                        <Grid Style="{StaticResource Step}"><TextBlock Text="Show a preview" Style="{StaticResource Label}" /><ToggleButton x:Name="PreviewSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" /></Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="14,10" Margin="0,4,0,0">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Content="Cancel" Click="Cancel_Click" IsCancel="True" />
+                    <Button Style="{StaticResource BtnAccent}" MinWidth="80" Content="Save" Click="Save_Click" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Border>
+</Window>

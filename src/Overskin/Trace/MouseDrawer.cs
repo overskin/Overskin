@@ -19,7 +19,8 @@ public readonly record struct DrawProgress(int CountdownSeconds, int PointsDone,
 /// same for <see cref="SelectAt"/> (a palette swatch). A <see cref="Fill"/> stroke is a single
 /// click with the bucket.
 /// </summary>
-public readonly record struct DrawStroke(Point[] Points, Point? SelectAt = null, Point? ToolAt = null, bool Fill = false);
+public readonly record struct DrawStroke(Point[] Points, Point? SelectAt = null, Point? ToolAt = null, bool Fill = false,
+    Point? SizeAt = null, Point? OpacityAt = null);
 
 public sealed class DrawSettings
 {
@@ -194,7 +195,7 @@ public sealed class MouseDrawer
             // default timer granularity is ~15 ms, far too coarse for per-point delays
             highRes = timeBeginPeriod(1) == 0;
             clock.Start();
-            Point? selected = null, tool = null;
+            Point? selected = null, tool = null, size = null, opacity = null;
             int sinceDelay = 0;
 
             void Click(Point at, int pauseMs)
@@ -219,6 +220,16 @@ public sealed class MouseDrawer
                 {
                     Click(button, s.SelectPauseMs);
                     tool = button;
+                }
+                if (stroke.SizeAt is { } brush && brush != size)
+                {
+                    Click(brush, s.SelectPauseMs);
+                    size = brush;
+                }
+                if (stroke.OpacityAt is { } level && level != opacity)
+                {
+                    Click(level, s.SelectPauseMs);
+                    opacity = level;
                 }
                 if (stroke.SelectAt is { } swatch && swatch != selected)
                 {

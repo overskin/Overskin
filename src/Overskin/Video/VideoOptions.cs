@@ -24,8 +24,31 @@ public sealed class VideoOptions
     /// <summary>Seconds without a click before zooming back out.</summary>
     public double ZoomHold { get; set; } = 2.5;
 
+    /// <summary>Record what the speakers play.</summary>
+    public bool SystemSound { get; set; } = true;
+    /// <summary>Record a microphone.</summary>
+    public bool Microphone { get; set; }
+    /// <summary>Which microphone; empty for the Windows default.</summary>
+    public string MicrophoneId { get; set; } = "";
+
+    /// <summary>Show the webcam in a bubble.</summary>
+    public bool Webcam { get; set; }
+    /// <summary>Which camera; empty for the first one.</summary>
+    public string WebcamId { get; set; } = "";
+    /// <summary>"TopLeft", "TopRight", "BottomLeft" or "BottomRight".</summary>
+    public string WebcamCorner { get; set; } = "BottomRight";
+    /// <summary>"Circle" or "Rounded".</summary>
+    public string WebcamShape { get; set; } = "Circle";
+    /// <summary>Bubble height as a percentage of the video's height.</summary>
+    public int WebcamSize { get; set; } = 24;
+
     public void Normalize()
     {
+        MicrophoneId ??= "";
+        WebcamId ??= "";
+        if (WebcamCorner is not ("TopLeft" or "TopRight" or "BottomLeft" or "BottomRight")) WebcamCorner = "BottomRight";
+        if (WebcamShape is not ("Circle" or "Rounded")) WebcamShape = "Circle";
+        WebcamSize = Math.Clamp(WebcamSize, 12, 45);
         Fps = Fps >= 60 ? 60 : 30;
         if (PointerStyle is not ("White" or "Black" or "System")) PointerStyle = "White";
         PointerSize = Math.Clamp(PointerSize, 0.75, 3);

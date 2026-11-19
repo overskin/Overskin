@@ -179,13 +179,7 @@ public sealed class CaptureOverlay : Window
             _toolbar.Changed += () => { Update(CursorPos()); Focus(); };
             _toolbar.UndoRequested += Undo;
             _toolbar.CloseRequested += Close;
-            _toolbar.PickFromScreenRequested += () =>
-            {
-                _pickingColour = true;
-                Cursor = Cursors.Cross;
-                Toast.Show("Click anywhere to take its colour");
-                Focus();
-            };
+            _toolbar.PickFromScreenRequested += BeginPickColour;
             _canvas.Children.Add(_toolbar);
         }
         Content = _canvas;
@@ -552,6 +546,19 @@ public sealed class CaptureOverlay : Window
     protected override void OnMouseMove(MouseEventArgs e) => Update(CursorPos());
 
     private bool _pickingColour;
+    /// <summary>The press picked a colour, so its release mustn't also capture.</summary>
+    private bool _swallowRelease;
+
+    /// <summary>The capture bar's Pick: the next click takes a colour instead of capturing.</summary>
+    internal void BeginPickColour()
+    {
+        _pickingColour = true;
+        Cursor = Cursors.Cross;
+        Toast.Show("Click anywhere to take its colour");
+        Focus();
+    }
+
+    internal bool IsPickingColour => _pickingColour;
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
@@ -560,6 +567,8 @@ public sealed class CaptureOverlay : Window
         {
             // the colour under the click, from the frozen screen
             _pickingColour = false;
+            _swallowRelease = true;
+            Cursor = null;
             Toast.Hide();
             _toolbar.SetColour(PixelAt(CursorPos()));
             if (Tool == CaptureTool.None) _toolbar.SetTool(CaptureTool.Pen);
@@ -584,8 +593,15 @@ public sealed class CaptureOverlay : Window
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
+        if (_swallowRelease && e != null)
+        {
+            _swallowRelease = false;
+            CrashLog.Note("capture screen: release after picking a colour, ignored");
+            return;
+        }
         if (_drawing != null)
         {
+            CrashLog.Note($"capture screen: click drew with the {Tool} tool instead of capturing");
             ReleaseMouseCapture();
             if (_drawing.IsUseful) _marks.Add(_drawing);
             _drawing = null;
@@ -593,7 +609,11 @@ public sealed class CaptureOverlay : Window
             _ink.InvalidateVisual();
             return;
         }
-        if (e != null && _toolbar?.IsMouseOver == true && !_dragging) return;
+        if (e != null && _toolbar?.IsMouseOver == true && !_dragging)
+        {
+            CrashLog.Note("capture screen: release over the capture bar, ignored");
+            return;
+        }
         var end = CursorPos();
         bool moved = Math.Abs(end.X - _start.X) > 3 || Math.Abs(end.Y - _start.Y) > 3;
         if (_dragging)
@@ -611,11 +631,13 @@ public sealed class CaptureOverlay : Window
                     SelectedWindow = HoveredWindow(end)?.Handle ?? IntPtr.Zero;
                 r = ClipToScreen(r);
                 if (r.Width >= 2 && r.Height >= 2) Selection = new Int32Rect(r.Left, r.Top, r.Width, r.Height);
+                CrashLog.Note($"capture screen: {(box ? "dragged" : "clicked")}, pick={Pick}, {r.Width}x{r.Height}, window={SelectedWindow != IntPtr.Zero}");
                 Close();
                 break;
             case OverlayMode.Window:
                 if (_hasCurrent) Selection = new Int32Rect(_current.Left, _current.Top, _current.Width, _current.Height);
                 if (Pick == CapturePick.Window) SelectedWindow = HoveredWindow(end)?.Handle ?? IntPtr.Zero;
+                CrashLog.Note($"window screen: clicked, highlighted={_hasCurrent}, pick={Pick}, window={SelectedWindow != IntPtr.Zero}");
                 Close();
                 break;
             case OverlayMode.Colour:

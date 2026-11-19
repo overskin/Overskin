@@ -689,6 +689,82 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
+
+                            <!-- watermark -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcStamp}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Watermark" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31">
+                                        <TextBlock Text="Add to screenshots" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="WmShotsSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="Watermark_Changed" />
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Add to videos" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="WmVideosSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="Watermark_Changed" />
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Stamp" Style="{StaticResource Label}" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton x:Name="WmText" Style="{StaticResource Seg}" GroupName="WmKind" Content="Text" Checked="Watermark_Changed" />
+                                            <RadioButton x:Name="WmImage" Style="{StaticResource Seg}" GroupName="WmKind" Content="Picture" Checked="Watermark_Changed" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid x:Name="WmTextRow" Height="34">
+                                        <TextBlock Text="Text" Style="{StaticResource Label}" />
+                                        <TextBox x:Name="WmTextBox" Style="{StaticResource TextField}" Width="230" HorizontalAlignment="Right" TextChanged="WatermarkText_Changed" />
+                                    </Grid>
+                                    <Grid x:Name="WmImageRow" Height="34" Visibility="Collapsed" ToolTip="A PNG with a transparent background works best">
+                                        <TextBlock Text="Picture" Style="{StaticResource Label}" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <TextBlock x:Name="WmImageName" Style="{StaticResource Dim}" MaxWidth="150" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <Button Style="{StaticResource Btn}" Height="25" Content="Choose" Click="WatermarkImage_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid Height="34">
+                                        <TextBlock Text="Where" Style="{StaticResource Label}" />
+                                        <Button x:Name="WmPositionButton" Style="{StaticResource Btn}" Height="26" MinWidth="150" HorizontalAlignment="Right"
+                                                HorizontalContentAlignment="Stretch" Padding="8,0" Click="WatermarkPosition_Click">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="WmPositionName" VerticalAlignment="Center" />
+                                                <local:Icon Grid.Column="1" Data="{StaticResource IcChevronRight}" Width="11" Height="11" Margin="10,0,0,0" RenderTransformOrigin="0.5,0.5">
+                                                    <local:Icon.RenderTransform><RotateTransform Angle="90" /></local:Icon.RenderTransform>
+                                                </local:Icon>
+                                            </Grid>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Size" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="WmSize" Minimum="2" Maximum="30" SmallChange="1" LargeChange="2" TickFrequency="1" IsSnapToTickEnabled="True" ValueChanged="WatermarkSlider_Changed" />
+                                            <TextBlock x:Name="WmSizeText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Opacity" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="WmOpacity" Minimum="10" Maximum="100" SmallChange="5" LargeChange="10" TickFrequency="5" IsSnapToTickEnabled="True" ValueChanged="WatermarkSlider_Changed" />
+                                            <TextBlock x:Name="WmOpacityText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid x:Name="WmColourRow" Height="31">
+                                        <TextBlock Text="Text colour" Style="{StaticResource Label}" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton x:Name="WmWhite" Style="{StaticResource Seg}" GroupName="WmColour" Content="White" Checked="Watermark_Changed" />
+                                            <RadioButton x:Name="WmBlack" Style="{StaticResource Seg}" GroupName="WmColour" Content="Black" Checked="Watermark_Changed" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border CornerRadius="{DynamicResource RadiusSmall}" ClipToBounds="True" Margin="0,8,0,2" HorizontalAlignment="Center">
+                                        <Image x:Name="WmPreview" Width="320" Height="180" Stretch="Uniform" />
+                                    </Border>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                         <StackPanel x:Name="CaptureRecord" Visibility="Collapsed">
                             <UniformGrid Columns="3" Margin="0,0,-8,0">
@@ -741,6 +817,87 @@
                                             <RadioButton x:Name="VidQualityStandard" Style="{StaticResource Seg}" GroupName="VidQuality" Content="Smaller file" Checked="VideoSetting_Click" />
                                             <RadioButton x:Name="VidQualityHigh" Style="{StaticResource Seg}" GroupName="VidQuality" Content="Sharper" Checked="VideoSetting_Click" />
                                         </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcVolume2}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Sound" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31" ToolTip="Whatever your speakers or headphones play: videos, games, calls">
+                                        <TextBlock Text="System sound" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="VidSystemSoundSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Microphone" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="VidMicSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
+                                    </Grid>
+                                    <Grid Height="34">
+                                        <TextBlock Text="Which microphone" Style="{StaticResource Label}" />
+                                        <Button x:Name="MicButton" Style="{StaticResource Btn}" Height="26" MinWidth="190" MaxWidth="260" HorizontalAlignment="Right"
+                                                HorizontalContentAlignment="Stretch" Padding="8,0" Click="MicButton_Click">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="MicName" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                <local:Icon Grid.Column="1" Data="{StaticResource IcChevronRight}" Width="11" Height="11" Margin="10,0,0,0" RenderTransformOrigin="0.5,0.5">
+                                                    <local:Icon.RenderTransform><RotateTransform Angle="90" /></local:Icon.RenderTransform>
+                                                </local:Icon>
+                                            </Grid>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcVideo}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Webcam" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31" ToolTip="Puts you in a bubble in a corner of the video">
+                                        <TextBlock Text="Show my webcam" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="VidWebcamSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
+                                    </Grid>
+                                    <Grid Height="34">
+                                        <TextBlock Text="Camera" Style="{StaticResource Label}" />
+                                        <Button x:Name="CameraButton" Style="{StaticResource Btn}" Height="26" MinWidth="190" MaxWidth="260" HorizontalAlignment="Right"
+                                                HorizontalContentAlignment="Stretch" Padding="8,0" Click="CameraButton_Click">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="CameraName" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                <local:Icon Grid.Column="1" Data="{StaticResource IcChevronRight}" Width="11" Height="11" Margin="10,0,0,0" RenderTransformOrigin="0.5,0.5">
+                                                    <local:Icon.RenderTransform><RotateTransform Angle="90" /></local:Icon.RenderTransform>
+                                                </local:Icon>
+                                            </Grid>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Corner" Style="{StaticResource Label}" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton x:Name="CamTopLeft" Style="{StaticResource Seg}" MinWidth="0" GroupName="CamCorner" Tag="TopLeft" Content="Top left" Checked="VideoSetting_Click" />
+                                            <RadioButton x:Name="CamTopRight" Style="{StaticResource Seg}" MinWidth="0" GroupName="CamCorner" Tag="TopRight" Content="Top right" Checked="VideoSetting_Click" />
+                                            <RadioButton x:Name="CamBottomLeft" Style="{StaticResource Seg}" MinWidth="0" GroupName="CamCorner" Tag="BottomLeft" Content="Bottom left" Checked="VideoSetting_Click" />
+                                            <RadioButton x:Name="CamBottomRight" Style="{StaticResource Seg}" MinWidth="0" GroupName="CamCorner" Tag="BottomRight" Content="Bottom right" Checked="VideoSetting_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Shape" Style="{StaticResource Label}" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton x:Name="CamCircle" Style="{StaticResource Seg}" GroupName="CamShape" Content="Circle" Checked="VideoSetting_Click" />
+                                            <RadioButton x:Name="CamRounded" Style="{StaticResource Seg}" GroupName="CamShape" Content="Rounded" Checked="VideoSetting_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="How tall the bubble is, as a share of the video's height">
+                                        <TextBlock Text="Size" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="VidCamSize" Minimum="12" Maximum="45" SmallChange="1" LargeChange="3" TickFrequency="1"
+                                                    IsSnapToTickEnabled="True" ValueChanged="VideoSetting_Changed" />
+                                            <TextBlock x:Name="VidCamSizeText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -900,6 +1057,10 @@
                                         <TextBlock Text="Combine" />
                                     </StackPanel>
                                 </Button>
+                                <Button Style="{StaticResource BtnIcon}" Margin="0,0,4,0" Click="SelectCompare_Click"
+                                        ToolTip="Compare the two picked pictures: before and after, with a slider">
+                                    <local:Icon Data="{StaticResource IcColumns2}" Width="14" Height="14" />
+                                </Button>
                                 <Button x:Name="SelectConvertButton" Style="{StaticResource Btn}" Height="25" Margin="0,0,4,0" Click="SelectConvert_Click"
                                         ToolTip="Make copies in another format">
                                     <StackPanel Orientation="Horizontal">
@@ -1025,6 +1186,12 @@
                                 <TextBlock Text="Drop a file, paste, or snip the screen" Style="{StaticResource Dim}" Margin="0,2,10,0" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="PinClipboard_Click" ToolTip="Pin the picture on the clipboard (Ctrl+Alt+V from anywhere)">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcClipboardPaste}" Width="14" Height="14" Margin="0,0,6,0" />
+                                        <TextBlock Text="Paste" />
+                                    </StackPanel>
+                                </Button>
                                 <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="Snip_Click" ToolTip="Drag over part of the screen to pin a copy of it">
                                     <StackPanel Orientation="Horizontal">
                                         <local:Icon Data="{StaticResource IcScissors}" Width="14" Height="14" Margin="0,0,6,0" />
@@ -1182,6 +1349,7 @@
                                         <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Hatch" Tag="Hatch" Checked="Mode_Checked" />
                                         <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Shade" Tag="Shade" Checked="Mode_Checked" />
                                         <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Colour" Tag="Colour" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Gartic Phone" Tag="Gartic" Checked="Mode_Checked" />
                                     </WrapPanel>
                                 </StackPanel>
                             </Border>
@@ -1213,6 +1381,111 @@
                                     <WrapPanel x:Name="PaletteSwatches" />
                                     <TextBlock x:Name="PaletteHint" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap"
                                                Foreground="{DynamicResource TextFaint}" Margin="1,4,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Gartic Phone: its pen, brush sizes and opacity -->
+                            <Border x:Name="GarticCard" Style="{StaticResource Card}" Visibility="Collapsed">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcPenTool}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Gartic Phone" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Margin="0,3,0,3" ToolTip="Click Pick colours, then every colour in Gartic's palette. Right-click or Esc when done.">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="28" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="GarticStep1Dot" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                BorderBrush="{DynamicResource TextFaint}">
+                                            <TextBlock x:Name="GarticStep1Num" Text="1" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextDim}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="Game colours" Style="{StaticResource Label}" />
+                                            <TextBlock x:Name="GarticColoursText" Style="{StaticResource Dim}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFaint}" />
+                                        </StackPanel>
+                                        <Button x:Name="GarticColoursButton" Grid.Column="2" Style="{StaticResource Btn}" Height="25" Click="PickColours_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <local:Icon Data="{StaticResource IcPipette}" Width="13" Height="13" Margin="0,0,6,0" />
+                                                <TextBlock x:Name="GarticColoursButtonLabel" Text="Pick colours" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Margin="0,3,0,3" ToolTip="Click the pen, the five brush sizes (smallest first), then the faintest and the full opacity. A message says what to click next.">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="28" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="GarticStep2Dot" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                BorderBrush="{DynamicResource TextFaint}">
+                                            <TextBlock x:Name="GarticStep2Num" Text="2" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextDim}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="Gartic's buttons" Style="{StaticResource Label}" />
+                                            <TextBlock x:Name="GarticButtonsText" Style="{StaticResource Dim}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFaint}" />
+                                        </StackPanel>
+                                        <Button x:Name="GarticPickButton" Grid.Column="2" Style="{StaticResource Btn}" Height="25" Click="GarticPick_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <local:Icon Data="{StaticResource IcPipette}" Width="13" Height="13" Margin="0,0,6,0" />
+                                                <TextBlock x:Name="GarticPickButtonLabel" Text="Pick buttons" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Margin="0,3,0,3" ToolTip="Drag over Gartic's white canvas">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="28" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="GarticStep3Dot" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                BorderBrush="{DynamicResource TextFaint}">
+                                            <TextBlock x:Name="GarticStep3Num" Text="3" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextDim}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="Canvas area" Style="{StaticResource Label}" />
+                                            <TextBlock x:Name="GarticAreaText" Style="{StaticResource Dim}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFaint}" />
+                                        </StackPanel>
+                                        <Button x:Name="GarticAreaButton" Grid.Column="2" Style="{StaticResource Btn}" Height="25" Click="SetArea_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <local:Icon Data="{StaticResource IcSquareDashed}" Width="13" Height="13" Margin="0,0,6,0" />
+                                                <TextBlock x:Name="GarticAreaButtonLabel" Text="Set area" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Margin="0,3,0,3" ToolTip="Draws a short line with each brush in the corner of the canvas, reads how thick they came out, then undoes them with Ctrl+Z">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="28" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="GarticStep4Dot" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                BorderBrush="{DynamicResource TextFaint}">
+                                            <TextBlock x:Name="GarticStep4Num" Text="4" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextDim}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="Brush sizes" Style="{StaticResource Label}" />
+                                            <TextBlock x:Name="GarticSizesText" Style="{StaticResource Dim}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFaint}" />
+                                        </StackPanel>
+                                        <Button x:Name="GarticMeasureButton" Grid.Column="2" Style="{StaticResource Btn}" Height="25" Click="GarticMeasure_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <local:Icon Data="{StaticResource IcRuler}" Width="13" Height="13" Margin="0,0,6,0" />
+                                                <TextBlock x:Name="GarticMeasureButtonLabel" Text="Measure" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31" ToolTip="Layering a colour at low opacity makes in-between shades the palette doesn't have">
+                                        <TextBlock Text="Mix shades with opacity" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="GarticOpacitySwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="GarticSetting_Click" />
+                                    </Grid>
+                                    <TextBlock x:Name="GarticNextText" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" Margin="1,4,0,0" />
                                 </StackPanel>
                             </Border>
 
@@ -1299,7 +1572,6 @@
                                             <RadioButton Style="{StaticResource Seg}" GroupName="Speed" Content="Optimized" Tag="Optimized" Checked="Speed_Checked" />
                                             <RadioButton Style="{StaticResource Seg}" GroupName="Speed" Content="Careful" Tag="Careful" Checked="Speed_Checked" />
                                             <RadioButton Style="{StaticResource Seg}" GroupName="Speed" Content="Fast" Tag="Fast" Checked="Speed_Checked" />
-                                            <RadioButton Style="{StaticResource Seg}" GroupName="Speed" Content="Instant" Tag="Instant" Checked="Speed_Checked" />
                                         </StackPanel>
                                     </Grid>
                                     <TextBlock x:Name="SpeedHint" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap"
@@ -1524,6 +1796,11 @@
                                     <Button x:Name="HkRecentButton" Style="{StaticResource Btn}" Tag="HotkeyRecent" MinWidth="124" Height="25"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
+                                <Grid Height="31">
+                                    <TextBlock Text="Pin the clipboard picture" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkPinClipboardButton" Style="{StaticResource Btn}" Tag="HotkeyPinClipboard" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
                                 <Border Style="{StaticResource Rule}" Margin="0,4,0,4" />
                                 <Grid Height="31">
                                     <TextBlock Text="Pin the window under the mouse" Style="{StaticResource Label}" />
@@ -1569,6 +1846,28 @@
                                                 Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                     </StackPanel>
                                 </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- workflows -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcWorkflow}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Workflows" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="AddWorkflow_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <local:Icon Data="{StaticResource IcPlus}" Width="12" Height="12" Margin="0,0,5,0" />
+                                            <TextBlock Text="New" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <Border Style="{StaticResource Rule}" />
+                                <TextBlock x:Name="WorkflowsEmpty" Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="0,0,0,4"
+                                           Text="One hotkey for a whole routine, e.g. capture an area, hide private details, add your watermark and copy it. They're in the tray menu too." />
+                                <StackPanel x:Name="WorkflowRows" />
                             </StackPanel>
                         </Border>
 

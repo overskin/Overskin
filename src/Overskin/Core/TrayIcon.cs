@@ -30,20 +30,30 @@ public sealed class TrayIcon : IDisposable
         _taskbarCreated = RegisterWindowMessage("TaskbarCreated");
         _hIcon = LoadAppIcon(GetSystemMetrics(SM_CXSMICON));
 
+        _fillMenu = fillMenu;
+        _menu = new ContextMenu { Placement = PlacementMode.MousePoint };
+        Rebuild();
+
+        _source.AddHook(WndProc);
+        Add();
+    }
+
+    private readonly Action<ItemCollection> _fillMenu;
+
+    /// <summary>Fills the menu again, e.g. after workflows were added or renamed.</summary>
+    public void Rebuild()
+    {
+        _menu.Items.Clear();
         var show = new MenuItem { Header = "Show Overskin", FontWeight = FontWeights.SemiBold };
         show.Click += (_, _) => ShowRequested?.Invoke();
         var exit = new MenuItem { Header = "Exit" };
         exit.Click += (_, _) => ExitRequested?.Invoke();
-        _menu = new ContextMenu { Placement = PlacementMode.MousePoint };
         _menu.Items.Add(show);
         _menu.Items.Add(new Separator());
         int before = _menu.Items.Count;
-        fillMenu(_menu.Items);
+        _fillMenu(_menu.Items);
         if (_menu.Items.Count > before) _menu.Items.Add(new Separator());
         _menu.Items.Add(exit);
-
-        _source.AddHook(WndProc);
-        Add();
     }
 
     private readonly string _tooltip;

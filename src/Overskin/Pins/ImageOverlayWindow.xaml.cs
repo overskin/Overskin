@@ -18,6 +18,8 @@ namespace Overskin;
 /// </summary>
 public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
 {
+    /// <summary>Room left around the picture's box for the handles and for rotating outside it.</summary>
+    private double _appliedPad;
     private const double MinSide = 24;
 
     private readonly BitmapSource _original;
@@ -155,7 +157,7 @@ public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
     public bool Locked
     {
         get => _locked;
-        set { if (_locked != value) { _locked = value; Raise(); } }
+        set { if (_locked != value) { _locked = value; if (value) Transforming = false; Raise(); } }
     }
 
     public bool IsClickThrough
@@ -164,6 +166,7 @@ public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
         set
         {
             if (_clickThrough == value || Handle == IntPtr.Zero) return;
+            if (value) Transforming = false;
             _clickThrough = value;
             _grabbed = false;
             ApplyMouseTransparency(value);
@@ -232,6 +235,7 @@ public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
 
         _imageW = s.Width;
         _imageH = _imageW / _aspect;
+        if (s.Height >= MinSide) _imageH = s.Height; // stretched with the side handles
         Rotation = s.Rotation;
         ApplySize();
         Left = s.Left;
@@ -251,9 +255,11 @@ public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
     {
         Path = SourcePath ?? "",
         Name = DisplayName,
-        Left = Left,
-        Top = Top,
+        // where the picture's box is, not the room around it while transforming
+        Left = Left + _appliedPad,
+        Top = Top + _appliedPad,
         Width = _imageW,
+        Height = _imageH,
         Opacity = OpacityPercent,
         Rotation = _angle,
         FlipHorizontal = FlipHorizontal,
@@ -383,19 +389,19 @@ public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
         double boxW = Math.Max(MinSide, _imageW * cos + _imageH * sin);
         double boxH = Math.Max(MinSide, _imageW * sin + _imageH * cos);
 
+        // while the transform box shows, the window has room around the picture for rotating
+        double pad = Pad;
         if (keepCentre && !double.IsNaN(Left) && !double.IsNaN(Top))
         {
-            Left += (Width - boxW) / 2;
-            Top += (Height - boxH) / 2;
+            Left += (Width - boxW - 2 * pad) / 2;
+            Top += (Height - boxH - 2 * pad) / 2;
         }
+        _appliedPad = pad;
 
-        Sheet.Width = _imageW;
-        Sheet.Height = _imageH;
-        Canvas.SetLeft(Sheet, (boxW - _imageW) / 2);
-        Canvas.SetTop(Sheet, (boxH - _imageH) / 2);
-        DrawGrid();
-        Width = boxW;
-        Height = boxH;
+        Frame.Margin = new Thickness(pad);
+        Width = boxW + 2 * pad;
+        Height = boxH + 2 * pad;
+        LayoutContent(new Point(pad + boxW / 2, pad + boxH / 2));
     }
 
     private void ApplyMouseTransparency(bool transparent)
@@ -412,7 +418,7 @@ public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
 
     private void Resize(double factor, Point anchor)
     {
-        double newW = _imageW * factor, newH = newW / _aspect;
+        double newW = _imageW * factor, newH = _imageH * factor;
         if (newW < MinSide || newH < MinSide || newW > SystemParameters.VirtualScreenWidth * 2) return;
 
         // the bounding box scales by the same factor, so the pixel under the cursor stays put
@@ -438,46 +444,6 @@ public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
         else if (!_locked) Resize(direction > 0 ? 1.08 : 1 / 1.08, e.GetPosition(this));
     }
 
-    /// <summary>Double-click: corner handles for resizing; double-click or Esc again to finish.</summary>
-    public bool Transforming
-    {
-        get => Handles.Visibility == Visibility.Visible;
-        set => Handles.Visibility = value && !_locked ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void Handle_Drag(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
-    {
-        if (sender is not FrameworkElement { Tag: string corner }) return;
-        bool left = corner[1] == 'L', top = corner[0] == 'T';
-        // the bigger of the two movements decides, so dragging feels the same in any direction
-        double dx = left ? -e.HorizontalChange : e.HorizontalChange;
-        double dy = (top ? -e.VerticalChange : e.VerticalChange) * _aspect;
-        double grow = Math.Abs(dx) > Math.Abs(dy) ? dx : dy;
-        double newW = Math.Max(MinSide * 2, _imageW + grow);
-        if (newW / _aspect < MinSide) return;
-
-        double oldW = Width, oldH = Height;
-        _imageW = newW;
-        _imageH = newW / _aspect;
-        ApplySize();
-        if (left) Left -= Width - oldW;
-        if (top) Top -= Height - oldH;
-    }
-
-    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
-    {
-        if (e.ClickCount == 2)
-        {
-            Transforming = !Transforming;
-            e.Handled = true;
-            return;
-        }
-        base.OnMouseLeftButtonDown(e);
-        if (_locked || e.ButtonState != MouseButtonState.Pressed) return;
-        try { DragMove(); }
-        catch (InvalidOperationException) { /* button was released before the drag began */ }
-    }
-
     protected override void OnContentRendered(EventArgs e)
     {
         base.OnContentRendered(e);
@@ -486,20 +452,10 @@ public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
         Root.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
     }
 
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        base.OnKeyDown(e);
-        if (e.Key == Key.Escape)
-        {
-            if (Transforming) Transforming = false;
-            else Close();
-        }
-    }
-
     protected override void OnMouseEnter(MouseEventArgs e)
     {
         base.OnMouseEnter(e);
-        if (!_clickThrough) ShowFrame(true);
+        if (!_clickThrough && !_transforming) ShowFrame(true);
     }
 
     protected override void OnMouseLeave(MouseEventArgs e)

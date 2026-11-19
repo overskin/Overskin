@@ -88,7 +88,7 @@ public partial class EditorWindow : Window
         _size = _lastSize;
         _opacity = _lastOpacity;
         SetColour(_lastColour);
-        SelectTool(_lastTool);
+        SelectTool(Tool.Select); // opens ready to click into the text and edit it
         ApplyBase();
         Render();
 
@@ -379,7 +379,7 @@ public partial class EditorWindow : Window
                     BeginText(hit.Points[0], hit);
                     return;
                 }
-                if (hit == null && TryBeginTextSelect(p))
+                if (hit == null && TryBeginTextSelect(p, e.ClickCount))
                 {
                     _selected = null;
                     ShowSelection();
@@ -848,7 +848,8 @@ public partial class EditorWindow : Window
             Key.C when ctrl && shift => () => CopyAllText_Click(this, new RoutedEventArgs()),
             Key.C when ctrl => () => Copy_Click(this, new RoutedEventArgs()),
             Key.A when ctrl && _tool == Tool.Select => SelectAllText,
-            Key.Delete or Key.Back when HasTextSelection && _selected == null => () => _ = EraseSelectedTextAsync(),
+            Key.Delete or Key.Back when (HasTextSelection || HasTextCaret) && _selected == null => () => _ = DeleteTextAsync(e.Key == Key.Back),
+            Key.Left or Key.Right when (HasTextSelection || HasTextCaret) && _selected == null && !ctrl => () => MoveCaret(e.Key == Key.Right ? 1 : -1, shift),
             Key.S when ctrl && shift => () => SaveAs_Click(this, new RoutedEventArgs()),
             Key.S when ctrl => () => Save_Click(this, new RoutedEventArgs()),
             Key.Delete or Key.Back when _selected != null => DeleteSelected,
@@ -858,6 +859,9 @@ public partial class EditorWindow : Window
             Key.OemPlus or Key.Add when ctrl => () => SetZoom(_zoom * 1.25, false),
             Key.OemMinus or Key.Subtract when ctrl => () => SetZoom(_zoom / 1.25, false),
             _ when ctrl || mods.HasFlag(ModifierKeys.Alt) => null,
+            Key.Space when (HasTextCaret || HasTextSelection) && _selected == null && !ctrl => () => TypeKey(' '),
+            // with a text cursor, letters type rather than switch tools (Esc first to use the shortcuts)
+            _ when (HasTextCaret || HasTextSelection) && _selected == null => null,
             Key.V => () => SelectTool(Tool.Select),
             Key.A => () => SelectTool(Tool.Arrow),
             Key.R => () => SelectTool(Tool.Rectangle),

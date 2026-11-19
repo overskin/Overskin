@@ -20,15 +20,15 @@ public partial class MainWindow
         ("Capture", "IcCamera", new Command[]
         {
             new("region", "Region", "IcSquareDashed", () => CaptureRegion(), true),
-            new("window", "Window", "IcAppWindow", CaptureWindowPick, true),
+            new("window", "Window", "IcAppWindow", () => CaptureWindowPick(), true),
             new("screen", "Full screen", "IcMonitor", () => CaptureFullScreen(), true),
-            new("repeat", "Repeat last region", "IcRepeat", CaptureLastRegion),
+            new("repeat", "Repeat last region", "IcRepeat", () => CaptureLastRegion()),
             new("scrolling", "Scrolling page", "IcArrowUpDown", CaptureScrolling, true),
             new("gif", "Record a GIF", "IcFilm", ToggleGifRecording, true),
             new("video", "Record a video", "IcCircleDot", () => ToggleVideo(false), true),
             new("zoomvideo", "Record a video with auto-zoom", "IcZoomIn", () => ToggleVideo(true), true),
             new("steps", "Record steps (how-to guide)", "IcListOrdered", ToggleSteps, true),
-        }),
+        }.Concat(_settings.Workflows.Select((w, i) => new Command($"workflow{i + 1}", w.Name, "IcWorkflow", () => RunWorkflow(w)))).ToArray()),
         ("Tools", "IcZap", new Command[]
         {
             new("snip", "Snip and pin", "IcScissors", SnipAndPin, true),
@@ -39,7 +39,7 @@ public partial class MainWindow
         ("Pin", "IcPin", new Command[]
         {
             new("pinwindow", "Pin a window", "IcPin", PinWindowFromMenu),
-            new("pinclipboard", "Pin the clipboard picture", "IcClipboardPaste", PasteImage),
+            new("pinclipboard", "Pin the clipboard picture", "IcClipboardPaste", PinClipboard, true),
             new("pinfile", "Pin a picture file…", "IcImagePlus", () => BrowseImage_Click(this, NoArgs)),
             new("clickable", "Make pinned pictures clickable", "IcMousePointerClick", MakeImagesClickable),
             new("restore", "Restore all windows", "IcUndo2", () => RestoreAll_Click(this, NoArgs)),
@@ -52,6 +52,7 @@ public partial class MainWindow
             new("combinestack", "Combine pictures stacked…", "IcArrowUpDown", () => CombineFiles(CombineLayout.Stacked)),
             new("combinegrid", "Make a collage…", "IcGrid2x2", () => CombineFiles(CombineLayout.Grid)),
             new("caption", "Caption a GIF…", "IcType", () => CaptionGif_Click(this, NoArgs)),
+            new("compare", "Compare two pictures…", "IcColumns2", CompareFiles),
         }),
         ("Open", "IcLayers", new Command[]
         {

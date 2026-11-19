@@ -18,6 +18,8 @@ public sealed class PinnedImageState
     public double Left { get; set; }
     public double Top { get; set; }
     public double Width { get; set; }
+    /// <summary>0 for pins saved before free stretching: the picture's own shape.</summary>
+    public double Height { get; set; }
     public double Opacity { get; set; } = 100;
     public double Rotation { get; set; }
     public bool FlipHorizontal { get; set; }
@@ -49,6 +51,7 @@ public sealed class AppSettings
     public string HotkeyColour { get; set; } = "Ctrl+Alt+K";
     public string HotkeyGif { get; set; } = "Ctrl+Alt+G";
     public string HotkeyRecent { get; set; } = "Ctrl+Alt+H";
+    public string HotkeyPinClipboard { get; set; } = "Ctrl+Alt+V";
     /// <summary>Library order: Newest, Oldest, Name or Largest.</summary>
     public string LibrarySort { get; set; } = "Newest";
 
@@ -73,6 +76,9 @@ public sealed class AppSettings
     public bool FullScreenAllMonitors { get; set; }
     public int[]? LastRegion { get; set; }
     public List<HistoryEntry> History { get; set; } = new();
+    public WatermarkOptions Watermark { get; set; } = new();
+    /// <summary>Hotkeys that each run a chain of steps: capture this, hide that, copy, save…</summary>
+    public List<Workflow> Workflows { get; set; } = new();
 
     public static string DefaultSaveFolder() =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Overskin");
@@ -125,12 +131,14 @@ public sealed class AppSettings
     /// <summary>Where the game's brush and bucket buttons are, for switching between them.</summary>
     public PaletteSwatch? BrushTool { get; set; }
     public PaletteSwatch? FillTool { get; set; }
+    /// <summary>Gartic Phone style: its pen, brush sizes and opacity buttons.</summary>
+    public GarticSetup Gartic { get; set; } = new();
 
     // drawing
     public int DelayMs { get; set; } = 1;
     public int PointsPerStep { get; set; } = 1;
     public int CountdownSeconds { get; set; } = 3;
-    /// <summary>"Optimized", "Careful", "Fast" or "Instant".</summary>
+    /// <summary>"Optimized", "Careful" or "Fast".</summary>
     public string TraceSpeed { get; set; } = "Optimized";
     public bool StopOnMouseMove { get; set; } = true;
 
@@ -227,7 +235,8 @@ public sealed class AppSettings
         Blur = Math.Clamp(Blur, 0, 4);
         ShadeLevels = Math.Clamp(ShadeLevels, 2, 5);
         if (CountdownSeconds is not (0 or 1 or 3 or 5)) CountdownSeconds = 3;
-        if (TraceSpeed is not ("Optimized" or "Careful" or "Fast" or "Instant")) TraceSpeed = "Optimized";
+        if (TraceSpeed == "Instant") TraceSpeed = "Fast"; // Instant was removed
+        if (TraceSpeed is not ("Optimized" or "Careful" or "Fast")) TraceSpeed = "Optimized";
         if (HatchAngle is not (0 or 45 or 90 or 135)) HatchAngle = 0;
         Palette ??= new();
         PinnedImages ??= new();
@@ -253,5 +262,12 @@ public sealed class AppSettings
         if (Theming.Themes.All(t => t.Name != LastLightTheme || !t.Light)) LastLightTheme = Theming.DefaultLightTheme;
         Video ??= new VideoOptions();
         Video.Normalize();
+        Gartic ??= new GarticSetup();
+        Gartic.Normalize();
+        Watermark ??= new WatermarkOptions();
+        Watermark.Normalize();
+        Workflows ??= new();
+        Workflows.RemoveAll(w => w == null);
+        foreach (var w in Workflows) w.Normalize();
     }
 }

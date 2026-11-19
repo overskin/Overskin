@@ -93,6 +93,15 @@ public partial class App : Application
 
 #if DEBUG
         // Developer aid: "Overskin.exe --selftest <logfile>" runs the window manager against a fresh Notepad.
+        if (e.Args.Length >= 2 && e.Args[0] == "--selftest" && e.Args.Contains("--more"))
+        {
+            // just the newest tests, for quick checks while working on them
+            var quick = new List<string>();
+            try { MoreFeatureTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); }
+            System.IO.File.WriteAllLines(e.Args[1], quick);
+            Shutdown();
+            return;
+        }
         if (e.Args.Length >= 2 && e.Args[0] == "--selftest")
         {
             SelfTest(e.Args[1], mouse: !e.Args.Contains("--no-mouse"));
@@ -309,6 +318,21 @@ public partial class App : Application
             var bar = new RecordBarWindow(new FakeRecorder(), new Int32Rect(100, 100, 400, 300));
             bar.Show();
             for (int i = 0; i < 10; i++) { DoEvents(); Thread.Sleep(30); }
+            // the same through the fast video reader: hidden windows must stay hidden there too
+            (int, string) CountFast(Window w)
+            {
+                var src = PresentationSource.FromVisual(w);
+                double k = src?.CompositionTarget?.TransformToDevice.M11 ?? 1;
+                var area = new Int32Rect((int)(w.Left * k) + 10, (int)(w.Top * k) + 10, 60, 60);
+                using var fast = FrameGrabbers.For(area, 60, 60);
+                var px = fast.Grab(area.X, area.Y, 60, 60, null);
+                int n = 0;
+                for (int i = 0; i < px.Length; i += 4) if (px[i] > 200 && px[i + 1] < 60 && px[i + 2] > 200) n++;
+                return (n, fast.Kind);
+            }
+            var (fastGuarded, kind) = CountFast(guarded);
+            var (fastPlain, _) = CountFast(plain);
+            log.Add($"capture guard, {kind}: guarded window seen={fastGuarded} (expect 0) ordinary seen={fastPlain} (expect >3000)");
             log.Add($"capture guard: guarded window seen={Count(guarded)} (expect 0) ordinary seen={Count(plain)} (expect >3000) " +
                     $"toast hidden from captures={Toast.IsGuarded} record bar={bar.IsGuarded} (expect True True); " +
                     $"leaf corners: toast={Toast.IsShaped} record bar={bar.IsShaped} test window={guarded.IsShaped} (expect True True True)");
@@ -608,7 +632,32 @@ public partial class App : Application
             sw.Restart();
             for (int i = 0; i < 20; i++) grabber.Grab(mon.Left + 100, mon.Top + 100, gw / 1.8, gh / 1.8, dc => NativeMethods.DrawCursorAt(dc, 200, 200, 60));
             double zoomMs = sw.Elapsed.TotalMilliseconds / 20;
-            log.Add($"video grab {gw}x{gh}: plain={plainMs:0.0}ms zoomed+pointer={zoomMs:0.0}ms (need < 33 ms for 30 fps)");
+            log.Add($"video grab GDI {gw}x{gh}: plain={plainMs:0.0}ms zoomed+pointer={zoomMs:0.0}ms");
+
+            // the fast way: same screen, and the two should agree (compared in memory, nothing kept)
+            var area = new Int32Rect(mon.Left, mon.Top, gw, gh);
+            using var fast = FrameGrabbers.For(area, gw, gh);
+            fast.Grab(mon.Left, mon.Top, gw, gh, null); // the first picture can take a moment
+            sw.Restart();
+            for (int i = 0; i < 20; i++) fast.Grab(mon.Left, mon.Top, gw, gh, null);
+            double fastPlain = sw.Elapsed.TotalMilliseconds / 20;
+            sw.Restart();
+            for (int i = 0; i < 20; i++) fast.Grab(mon.Left + 100, mon.Top + 100, gw / 1.8, gh / 1.8, dc => NativeMethods.DrawCursorAt(dc, 200, 200, 60));
+            double fastZoom = sw.Elapsed.TotalMilliseconds / 20;
+            var a = fast.Grab(mon.Left, mon.Top, gw, gh, null);
+            var b = grabber.Grab(mon.Left, mon.Top, gw, gh, null);
+            // most pixels should match exactly; whatever moved between the two reads (a video, a clock) won't,
+            // so two GDI reads a moment apart are the yardstick
+            var b2 = grabber.Grab(mon.Left, mon.Top, gw, gh, null);
+            double Match(byte[] p, byte[] q)
+            {
+                int same = 0, sampled = 0;
+                for (int i = 0; i < p.Length; i += 4 * 97, sampled++)
+                    if (Math.Abs(p[i] - q[i]) <= 2 && Math.Abs(p[i + 1] - q[i + 1]) <= 2 && Math.Abs(p[i + 2] - q[i + 2]) <= 2) same++;
+                return 100.0 * same / sampled;
+            }
+            log.Add($"video grab {fast.Kind} {gw}x{gh}: plain={fastPlain:0.0}ms zoomed+pointer={fastZoom:0.0}ms (need < 33 ms for 30 fps, < 16 for 60) " +
+                    $"same picture as GDI: {Match(a, b):0.0}% of pixels match; GDI against itself a moment later: {Match(b, b2):0.0}% (expect about the same)");
         }
         catch (Exception ex) { log.Add("video grab: FAILED " + ex.Message); }
 
@@ -1185,6 +1234,7 @@ public partial class App : Application
             }
 
             NewFeatureTests(log);
+            MoreFeatureTests(log);
         }
         catch (Exception ex)
         {

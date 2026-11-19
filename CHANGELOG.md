@@ -1,5 +1,60 @@
 # Changelog
 
+## Unreleased
+
+- **Sound in videos**: system sound, a microphone (pick which), or both, saved as AAC.
+- **Webcam in videos**: a circle or rounded square in any corner, any size.
+- **Faster video capture**: the screen is read straight from the graphics card (DXGI desktop
+  duplication), about three times faster than before, falling back to the old way when it
+  can't (an area across two screens, a rotated or HDR screen).
+- **Trim videos**: click a video in the Library to play it, set Start and End (or press I and
+  O) and save the part in between as a new file, sound included.
+- **Watermark**: text or a picture on screenshots and/or videos, in a corner, the middle or
+  tiled, with size and opacity, and a live preview on the Capture page.
+- **Workflows** (Settings): one hotkey runs a whole routine: capture an area, the window, the
+  screen or the same area, then any of hide private details, beautify, watermark, save, copy
+  the picture or its text, pin and open in the editor. They're in the tray menu too.
+- **Steps as a guide**: after recording steps, reword or drop any of them, give the guide a
+  title, and save it as one picture, a single HTML page, Markdown with a folder of pictures,
+  or a PDF (one page per step).
+- **Compare**: two pictures pinned on top, with a divider to drag between before and after,
+  or one faded over the other. Pick two in the Library, or Edit → Compare in the tray.
+- **Trace: Gartic Phone style**: paints with the game's five brush sizes and its ten opacity
+  levels, biggest brush first and smaller ones only where it's still off, layering colours at
+  partial opacity for shades the palette lacks. No bucket. Setup is a four-step checklist
+  (colours, the game's buttons, the canvas area, *Measure*) that ticks itself off and says
+  what's next; *Measure* draws a test line with each brush, reads how thick it is and undoes them.
+- **Free Transform for pins**: click a pin for a Photoshop-style box: drag inside to move,
+  corners to scale in proportion (Shift: freely, Alt: from the middle), sides to stretch, outside
+  to rotate (Shift: 15° steps). Enter commits, Esc puts it back, Ctrl+T toggles it, arrows nudge.
+  Stretched pins come back stretched. Dragging is smooth: the window doesn't resize on every move.
+- **Live text by the letter**: dragging in the editor now selects single letters, not just whole
+  words, and a double-click takes a word. Letters are found from the ink in the picture, so
+  they line up in any font. Click inside a word for a text cursor: Backspace and Delete remove
+  letters and the rest of the line closes up (on a plain background; on a busy one they're
+  smart-erased in place), and the arrow keys move it.
+- **Type into screenshots**: with the text cursor in a line, just type. Overskin works out the
+  line's font (Segoe UI, Arial, Calibri, Cambria, Georgia, Times New Roman, Verdana, Tahoma,
+  Trebuchet MS, Consolas or Courier New, regular or bold), its size and colour from the picture,
+  draws the new letters to match and moves the rest of the line along. Typing over a selection
+  replaces it. Text on a plain background only. The hint bar says which font it matched.
+  It also matches how the text was smoothed: ClearType's coloured edges (either way round, with
+  how soft and how strongly coloured they are), grey edges, or Windows' pixel-snapped text, and
+  lines each word up with the screenshot to a fraction of a pixel, so new letters blend in. The editor now opens
+  with the Select tool, ready to click into the text.
+- **Pin the clipboard** from anywhere: Ctrl+Alt+V (change it in Settings), the Paste button on the
+  Pins page, the tray or the taskbar jump list. It's pinned centred on the mouse.
+- Removed the *Instant* drawing speed, which skipped too much to be useful.
+- Fixed: clicking a window to capture it could do nothing when *Windows on a transparent
+  background* was on and the app was slow to draw itself. Overskin now waits at most a moment
+  and a half, then uses the frozen screen. Each step of a capture is noted in
+  `%LocalAppData%\Overskin\logs\capture.txt` (sizes and timings only).
+- Fixed: on the capture bar, picking a colour from the screen also took the screenshot and
+  closed. The click now only takes the colour.
+- Fixed: trimming a GIF while it played made the preview jump between frames. Moving a trim
+  handle now pauses playback and resumes from the new edge when you let go; the handles can't
+  cross, and the scrubber stays inside the trimmed part.
+
 ## 2.5.0
 
 - **Live text in the editor**: with the Select tool (V), drag over the words in a screenshot to

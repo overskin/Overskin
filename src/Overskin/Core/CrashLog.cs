@@ -16,6 +16,22 @@ public static class CrashLog
     public static string Version =>
         Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "?";
 
+    /// <summary>
+    /// A line in logs\capture.txt about what a capture did (sizes, steps and timings only), so a
+    /// capture that does nothing can be traced. Kept under 64 KB.
+    /// </summary>
+    public static void Note(string line)
+    {
+        try
+        {
+            Directory.CreateDirectory(Folder);
+            string path = Path.Combine(Folder, "capture.txt");
+            if (File.Exists(path) && new FileInfo(path).Length > 64 * 1024) File.Delete(path);
+            File.AppendAllText(path, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}  {line}" + Environment.NewLine);
+        }
+        catch { /* only a diagnostic */ }
+    }
+
     /// <summary>Returns the log's path, or null when it couldn't be written.</summary>
     public static string? Write(Exception error, string where)
     {

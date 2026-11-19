@@ -22,6 +22,8 @@ public sealed class RecordedStep
     public string? Target { get; set; }
     /// <summary>True when <see cref="Target"/> is text read off the screen rather than a control's name.</summary>
     public bool TargetIsText { get; set; }
+    /// <summary>The sentence as the user rewrote it, if they did.</summary>
+    public string? Text { get; set; }
     /// <summary>Finding out what was clicked, which can take a moment.</summary>
     public Task? Naming { get; set; }
 }
@@ -242,12 +244,34 @@ public static class StepTutorial
 
     public static string Caption(RecordedStep s)
     {
+        if (!string.IsNullOrWhiteSpace(s.Text)) return s.Text.Trim();
         string verb = s.Right ? "Right-click" : "Click";
         if (s.Target == null) return $"{verb} in {s.Window}";
         return s.TargetIsText ? $"{verb} {s.Target} in {s.Window}" : $"{verb} the {s.Target} in {s.Window}";
     }
 
-    public static BitmapSource Build(IReadOnlyList<RecordedStep> steps, Color accent)
+    /// <summary>One step's screenshot at full size with the click marked: a ring, a soft halo and a pointer.</summary>
+    public static BitmapSource Marked(RecordedStep step, Color accent)
+    {
+        int w = step.Shot.PixelWidth, h = step.Shot.PixelHeight;
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.DrawImage(step.Shot, new Rect(0, 0, w, h));
+            var accentBrush = new SolidColorBrush(accent);
+            dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(0x40, accent.R, accent.G, accent.B)), null, step.At, 26, 26);
+            dc.DrawEllipse(null, new Pen(accentBrush, 3.5), step.At, 17, 17);
+            dc.PushTransform(new TranslateTransform(step.At.X, step.At.Y));
+            dc.DrawGeometry(Brushes.White, new Pen(Brushes.Black, 1.4) { LineJoin = PenLineJoin.Round }, PointerShape);
+            dc.Pop();
+        }
+        var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(visual);
+        rtb.Freeze();
+        return rtb;
+    }
+
+    public static BitmapSource Build(IReadOnlyList<RecordedStep> steps, Color accent, string heading = "Steps")
     {
         const double Width = 1100, Margin = 36, Gap = 34;
         var typeface = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
@@ -261,7 +285,7 @@ public static class StepTutorial
             new(s, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, face, size, brush, pixels) { MaxTextWidth = maxWidth };
 
         // measure first, then draw
-        var title = Text("Steps", 30, typeface, ink);
+        var title = Text(string.IsNullOrWhiteSpace(heading) ? "Steps" : heading.Trim(), 30, typeface, ink);
         var sub = Text($"{steps.Count} step{(steps.Count == 1 ? "" : "s")}  ·  {DateTime.Now:d MMMM yyyy, HH:mm}", 15, plain, dim);
         double y = Margin + title.Height + 4 + sub.Height + Gap;
         var layout = new List<(FormattedText Caption, Rect Image, double Scale)>();

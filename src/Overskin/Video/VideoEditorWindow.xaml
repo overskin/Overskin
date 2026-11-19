@@ -1,0 +1,168 @@
+<Window x:Class="Overskin.VideoEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Overskin"
+        Title="Overskin video" Width="1080" Height="700" MinWidth="760" MinHeight="480"
+        WindowStartupLocation="CenterScreen" Background="Transparent" WindowStyle="None" AllowsTransparency="True"
+        FontFamily="{StaticResource UiFont}" FontSize="12" Foreground="{DynamicResource Text}"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" ResizeMode="CanResize">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="44" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Style x:Key="Row" TargetType="Grid">
+            <Setter Property="Height" Value="30" />
+        </Style>
+    </Window.Resources>
+
+    <Border x:Name="Frame" Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+            CornerRadius="{DynamicResource RadiusWindow}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="52" />
+            </Grid.RowDefinitions>
+
+            <!-- title bar -->
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                    <local:Icon Data="{StaticResource IcVideo}" Width="16" Height="16" Foreground="{DynamicResource Accent}" />
+                    <TextBlock Text="Video" FontSize="13.5" FontWeight="Bold" VerticalAlignment="Center" Margin="9,0,0,1" />
+                    <TextBlock x:Name="TitleText" Style="{StaticResource Dim}" Margin="12,1,0,0" TextTrimming="CharacterEllipsis" MaxWidth="520" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <Button Style="{StaticResource BtnCaption}" ToolTip="Minimize" Click="Minimize_Click" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <local:Icon Data="{StaticResource IcMinus}" Width="14" Height="14" />
+                    </Button>
+                    <Button Style="{StaticResource BtnCaption}" ToolTip="Maximize" Click="Maximize_Click" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <local:Icon x:Name="MaxIcon" Data="{StaticResource IcSquare}" Width="12" Height="12" />
+                    </Button>
+                    <Button Style="{StaticResource BtnCaptionClose}" ToolTip="Close" Click="Close_Click" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <local:Icon Data="{StaticResource IcX}" Width="14" Height="14" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="300" />
+                </Grid.ColumnDefinitions>
+
+                <!-- player -->
+                <Grid Background="{DynamicResource Stage}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <MediaElement x:Name="Player" Margin="20" LoadedBehavior="Manual" UnloadedBehavior="Close" ScrubbingEnabled="True"
+                                  Stretch="Uniform" MediaOpened="Player_Opened" MediaFailed="Player_Failed" MouseLeftButtonUp="Player_Click" />
+                    <TextBlock x:Name="PlayerMessage" Style="{StaticResource Dim}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               TextWrapping="Wrap" MaxWidth="360" TextAlignment="Center" Visibility="Collapsed" />
+                    <Border Grid.Row="1" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="12,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="PlayButton" Style="{StaticResource BtnIcon}" Width="32" Height="30" Click="Play_Click" ToolTip="Play / pause  (Space)">
+                                <local:Icon x:Name="PlayIcon" Data="{StaticResource IcPlay}" Width="16" Height="16" />
+                            </Button>
+                            <Slider x:Name="Scrubber" Grid.Column="1" Margin="10,0" Minimum="0" SmallChange="0.1" LargeChange="1"
+                                    ValueChanged="Scrubber_Changed" />
+                            <TextBlock x:Name="TimeText" Grid.Column="2" Style="{StaticResource Dim}" MinWidth="96" TextAlignment="Right" />
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- trim -->
+                <Border Grid.Column="1" BorderBrush="{DynamicResource Line}" BorderThickness="1,0,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                        <StackPanel Margin="12,12,12,8">
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcScissors}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Trim" Style="{StaticResource Heading}" />
+                                        <TextBlock x:Name="TrimText" Style="{StaticResource Dim}" Margin="8,0,0,0" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Style="{StaticResource Row}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="44" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Start" Style="{StaticResource Label}" />
+                                        <Slider x:Name="TrimStart" Grid.Column="1" Minimum="0" SmallChange="0.1" LargeChange="1" ValueChanged="Trim_Changed" />
+                                        <TextBlock x:Name="StartText" Grid.Column="2" Style="{StaticResource Value}" />
+                                    </Grid>
+                                    <Grid Style="{StaticResource Row}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="44" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="End" Style="{StaticResource Label}" />
+                                        <Slider x:Name="TrimEnd" Grid.Column="1" Minimum="0" SmallChange="0.1" LargeChange="1" ValueChanged="Trim_Changed" />
+                                        <TextBlock x:Name="EndText" Grid.Column="2" Style="{StaticResource Value}" />
+                                    </Grid>
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <Button Style="{StaticResource Btn}" Height="26" Margin="0,0,6,0" Click="StartHere_Click" ToolTip="Start where the video is now  (I)" Content="Start here" />
+                                        <Button Style="{StaticResource Btn}" Height="26" Click="EndHere_Click" ToolTip="End where the video is now  (O)" Content="End here" />
+                                    </StackPanel>
+                                    <TextBlock Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,10,0,0"
+                                               Text="Playing loops the part you keep. The original file isn't changed: Save makes a trimmed copy." />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcInfo}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="File" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <TextBlock x:Name="InfoText" Style="{StaticResource Dim}" TextWrapping="Wrap" />
+                                    <Button Style="{StaticResource Btn}" Height="26" HorizontalAlignment="Left" Margin="0,8,0,0" Click="OpenOutside_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <local:Icon Data="{StaticResource IcExternalLink}" Width="13" Height="13" Margin="0,0,6,0" />
+                                            <TextBlock Text="Open in your video player" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+
+            <!-- actions -->
+            <Border Grid.Row="2" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="14,0">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ProgressBar x:Name="SaveProgress" Width="120" Minimum="0" Maximum="1" Margin="0,0,10,0" Visibility="Collapsed" />
+                        <TextBlock x:Name="StatusText" Style="{StaticResource Dim}" />
+                    </StackPanel>
+                    <StackPanel x:Name="Actions" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="SaveAs_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcDownload}" Width="13" Height="13" Margin="0,0,6,0" />
+                                <TextBlock Text="Save as" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource BtnAccent}" MinWidth="80" Click="Save_Click" ToolTip="Save the trimmed part as a new video next to this one">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcSave}" Width="13" Height="13" StrokeWidth="1.6" Margin="0,0,6,0" />
+                                <TextBlock Text="Save" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

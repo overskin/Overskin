@@ -37,7 +37,7 @@ public sealed class VideoRecorder : IRecorder
     public void Stop() => _stop = true;
     public void Cancel() => _cancel = true;
 
-    public void Start(Int32Rect area, string path, VideoOptions options)
+    public void Start(Int32Rect area, string path, VideoOptions options, WatermarkOptions? watermark = null)
     {
         if (IsRecording) return;
         IsRecording = true;
@@ -50,8 +50,12 @@ public sealed class VideoRecorder : IRecorder
         _bar = new RecordBarWindow(this, area);
         _bar.Show();
 
-        _clock.Restart();
-        var thread = new Thread(() => Run(area, path, options, sprites)) { IsBackground = true, Name = "Overskin video recorder" };
+        _clock.Reset(); // started by the recording thread once the camera and sound are ready
+        // the watermark is drawn here, on the UI thread, once: each frame only blends it in
+        double fit = Fit(area);
+        int ow = Math.Max(2, (int)(area.Width * fit) & ~1), oh = Math.Max(2, (int)(area.Height * fit) & ~1);
+        byte[]? mark = watermark != null ? Watermark.Layer(watermark, ow, oh) : null;
+        var thread = new Thread(() => Run(area, path, options, sprites, mark)) { IsBackground = true, Name = "Overskin video recorder" };
         thread.Start();
     }
 
@@ -74,21 +78,60 @@ public sealed class VideoRecorder : IRecorder
     /// <summary>Pointer height in output pixels at no zoom.</summary>
     private static double PointerBase(Int32Rect area, VideoOptions o) => Math.Max(12, 26 * o.PointerSize * Fit(area));
 
-    private void Run(Int32Rect area, string path, VideoOptions o, Dictionary<(PointerArt.Shape, int), PointerSprite>? sprites)
+    /// <summary>Something worth telling the user after the recording, such as a microphone that couldn't be opened.</summary>
+    public string? Notice { get; private set; }
+    private readonly List<string> _problems = new();
+
+    /// <summary>How the screen is being read: "DXGI" (fast) or "GDI".</summary>
+    public string GrabberKind { get; private set; } = "";
+
+    /// <summary>The speakers and/or microphone, mixed. Nothing when sound is off or no device would open.</summary>
+    private (AudioMixer?, BlockingCollection<AudioChunk>?) OpenSound(VideoOptions o)
+    {
+        var sources = new List<(AudioSource, float)>();
+        if (o.SystemSound)
+        {
+            try { sources.Add((AudioSource.Open(loopback: true), 1f)); }
+            catch (Exception ex) { _problems.Add("Couldn't record the system sound: " + ex.Message); }
+        }
+        if (o.Microphone)
+        {
+            try { sources.Add((AudioSource.Open(loopback: false, o.MicrophoneId), 1f)); }
+            catch (Exception ex) { _problems.Add("Couldn't record the microphone: " + ex.Message); }
+        }
+        if (sources.Count == 0) return (null, null);
+        var sound = new BlockingCollection<AudioChunk>(boundedCapacity: 400);
+        return (new AudioMixer(_clock, sources, sound), sound);
+    }
+
+    private void Run(Int32Rect area, string path, VideoOptions o, Dictionary<(PointerArt.Shape, int), PointerSprite>? sprites, byte[]? mark)
     {
         double fit = Fit(area);
         int w = Math.Max(2, (int)(area.Width * fit) & ~1), h = Math.Max(2, (int)(area.Height * fit) & ~1);
         int fps = o.Fps;
 
         var queue = new BlockingCollection<VideoFrame>(boundedCapacity: 8);
-        var encoding = Task.Run(() => VideoEncoder.EncodeAsync(path, w, h, fps, queue, o.HighQuality));
+        _problems.Clear();
+        Notice = null;
+        Webcam? cam = null;
+        if (o.Webcam)
+        {
+            try { cam = Webcam.OpenAsync(o.WebcamId).GetAwaiter().GetResult(); }
+            catch (Exception ex) { _problems.Add(ex.Message); }
+        }
+        var (mixer, sound) = OpenSound(o);
+        if (_problems.Count > 0) Notice = string.Join(" ", _problems);
+        _clock.Restart();
+        var encoding = Task.Run(() => VideoEncoder.EncodeAsync(path, w, h, fps, queue, o.HighQuality, sound));
         string? error = null;
         bool highRes = timeBeginPeriod(1) == 0;
         int frames = 0;
         var systemPointers = new SystemPointers();
+        IFrameGrabber? grabber = null;
         try
         {
-            using var grabber = new ScaledGrabber(w, h);
+            grabber = FrameGrabbers.For(area, w, h);
+            GrabberKind = grabber.Kind;
             var camera = new SmartCamera(area.Width, area.Height)
             {
                 ZoomIn = o.AutoZoom ? o.Zoom : 1,
@@ -141,11 +184,24 @@ public sealed class VideoRecorder : IRecorder
                         sprite = sprites.Where(s => s.Key.Item1 == shape).OrderBy(s => Math.Abs(s.Key.Item2 - size)).First().Value;
                 }
 
-                var pixels = grabber.Grab(area.X + view.X, area.Y + view.Y, view.Width, view.Height, dc =>
+                void Overlay(IntPtr dc)
                 {
                     // any other pointer (hand, resize, an app's own) is the Windows picture, loaded at the size needed
                     if (kind != SystemPointers.Kind.None && sprite == null) systemPointers.Draw(dc, px, py, size);
-                });
+                }
+                byte[] pixels;
+                try
+                {
+                    pixels = grabber.Grab(area.X + view.X, area.Y + view.Y, view.Width, view.Height, Overlay);
+                }
+                catch when (grabber is not ScaledGrabber)
+                {
+                    // the fast way stopped working (HDR switched on, a driver reset): carry on the old way
+                    grabber.Dispose();
+                    grabber = new ScaledGrabber(w, h);
+                    GrabberKind = grabber.Kind;
+                    pixels = grabber.Grab(area.X + view.X, area.Y + view.Y, view.Width, view.Height, Overlay);
+                }
                 foreach (var (at, age) in rings)
                 {
                     double grow = 1 - Math.Pow(1 - age / 0.5, 3);
@@ -153,6 +209,8 @@ public sealed class VideoRecorder : IRecorder
                         (8 + 26 * grow) * k * fit, Math.Max(1.5, 2.6 * k * fit), 1 - age / 0.5);
                 }
                 if (sprite != null) PointerArt.Blend(pixels, w, h, sprite, px, py);
+                if (cam?.Latest() is { } face) WebcamBubble.Draw(pixels, w, h, face.Pixels, face.Width, face.Height, o);
+                if (mark != null) Watermark.Blend(pixels, mark);
 
                 if (queue.TryAdd(new VideoFrame(pixels, _clock.Elapsed))) frames++;
                 n = (int)(_clock.ElapsedMilliseconds * fps / 1000) + 1; // skip ahead rather than fall behind
@@ -165,8 +223,12 @@ public sealed class VideoRecorder : IRecorder
         finally
         {
             if (highRes) timeEndPeriod(1);
+            grabber?.Dispose();
+            mixer?.Finish();
             _clock.Stop();
             queue.CompleteAdding();
+            mixer?.Dispose();
+            cam?.Dispose();
             systemPointers.Dispose();
         }
 
@@ -286,7 +348,7 @@ internal sealed class SystemPointers : IDisposable
 }
 
 /// <summary>Copies any screen rectangle into a fixed-size bitmap, scaling with GDI's smooth filter.</summary>
-internal sealed class ScaledGrabber : IDisposable
+internal sealed class ScaledGrabber : IFrameGrabber
 {
     private readonly int _w, _h;
     private readonly IntPtr _screen, _mem, _dib, _old, _bits;
@@ -310,6 +372,8 @@ internal sealed class ScaledGrabber : IDisposable
         SetStretchBltMode(_mem, HALFTONE);
         SetBrushOrgEx(_mem, 0, 0, IntPtr.Zero);
     }
+
+    public string Kind => "GDI";
 
     public byte[] Grab(double x, double y, double width, double height, Action<IntPtr>? overlay)
     {

@@ -15,6 +15,7 @@ public sealed class PathPreview : FrameworkElement
     private BitmapSource? _backdrop;
     private double _imageWidth, _imageHeight;
     private bool _thin;
+    private double _backdropOpacity = 1;
 
     public static readonly DependencyProperty StrokeProperty = DependencyProperty.Register(
         nameof(Stroke), typeof(Brush), typeof(PathPreview),
@@ -42,6 +43,15 @@ public sealed class PathPreview : FrameworkElement
             _imageWidth = result.Width;
             _imageHeight = result.Height;
             _thin = result.ThinPreview;
+            _backdropOpacity = 1;
+            if (result.Painted != null)
+            {
+                // a painting: show what the canvas will look like (see-through on screen, over the game), not the stroke lines
+                _backdrop = TraceEngine.BuildBackdropBitmap(result);
+                _backdropOpacity = showBackdrop ? 1 : 0.55;
+                InvalidateVisual();
+                return;
+            }
             if (showBackdrop) _backdrop = TraceEngine.BuildBackdropBitmap(result);
 
             if (result.ColourIndex != null && result.Colours != null)
@@ -75,7 +85,11 @@ public sealed class PathPreview : FrameworkElement
         dc.PushTransform(new ScaleTransform(sx, sy));
 
         if (_backdrop != null)
+        {
+            if (_backdropOpacity < 1) dc.PushOpacity(_backdropOpacity);
             dc.DrawImage(_backdrop, new Rect(0, 0, _imageWidth, _imageHeight));
+            if (_backdropOpacity < 1) dc.Pop();
+        }
 
         double scale = Math.Max(1e-6, Math.Min(sx, sy));
         // hatching: one traced pixel wide (never under a third of a screen pixel), so tone shows as density

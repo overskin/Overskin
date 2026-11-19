@@ -18,7 +18,7 @@ public partial class MainWindow : Window
 {
     private const int HkPin = 1, HkOpacityUp = 2, HkOpacityDown = 3, HkClickThrough = 4;
     private const int HkAbort = 5, HkAbortEsc = 6, HkPickEsc = 7, HkDraw = 8, HkPause = 9, HkPaletteEsc = 10, HkSnip = 11;
-    private const int HkRegion = 12, HkWindow = 13, HkScreen = 14, HkText = 15, HkColour = 16, HkRecent = 21;
+    private const int HkRegion = 12, HkWindow = 13, HkScreen = 14, HkText = 15, HkColour = 16, HkRecent = 21, HkPinClipboard = 22;
     private const double BaseWidth = 540, BaseHeight = 700, SmallestWidth = 530, SmallestHeight = 560;
     private const int TabCaptureIndex = 0, TabLibraryIndex = 1, TabPinsIndex = 2, TabTraceIndex = 3, TabSettingsIndex = 4;
 
@@ -346,6 +346,7 @@ public partial class MainWindow : Window
         HkColourButton.Content = _settings.HotkeyColour;
         HkGifButton.Content = _settings.HotkeyGif;
         HkRecentButton.Content = _settings.HotkeyRecent;
+        HkPinClipboardButton.Content = _settings.HotkeyPinClipboard;
         TileGifKey.Text = _settings.HotkeyGif;
         TileRegionKey.Text = _settings.HotkeyRegion;
         TileWindowKey.Text = _settings.HotkeyWindow;
@@ -881,12 +882,14 @@ public partial class MainWindow : Window
         Bind(HkDraw, _settings.HotkeyDraw, HotkeyStartDrawing);
         Bind(HkSnip, _settings.HotkeySnip, SnipAndPin);
         Bind(HkRegion, _settings.HotkeyRegion, () => CaptureRegion());
-        Bind(HkWindow, _settings.HotkeyWindow, CaptureActiveWindow);
+        Bind(HkWindow, _settings.HotkeyWindow, () => CaptureActiveWindow());
         Bind(HkScreen, _settings.HotkeyScreen, () => CaptureFullScreen());
         Bind(HkText, _settings.HotkeyText, TextFromScreen);
         Bind(HkColour, _settings.HotkeyColour, PickScreenColour);
         Bind(HkGif, _settings.HotkeyGif, ToggleGifRecording);
         Bind(HkRecent, _settings.HotkeyRecent, ShowRecent);
+        Bind(HkPinClipboard, _settings.HotkeyPinClipboard, PinClipboard);
+        failed.AddRange(RegisterWorkflowHotkeys());
 
         if (failed.Count > 0 && announceFailures && !App.Quiet)
             Toast.Show($"{string.Join(", ", failed)} is already used by another program. Change it in Settings.", true);
@@ -1037,8 +1040,9 @@ public partial class MainWindow : Window
             ["HotkeyColour"] = _settings.HotkeyColour,
             ["HotkeyGif"] = _settings.HotkeyGif,
             ["HotkeyRecent"] = _settings.HotkeyRecent,
+            ["HotkeyPinClipboard"] = _settings.HotkeyPinClipboard,
         };
-        if (all.Any(kv => kv.Key != property && kv.Value == text))
+        if (all.Any(kv => kv.Key != property && kv.Value == text) || _settings.Workflows.Any(w => w.Hotkey == text))
         {
             Toast.Show($"{text} is already used by another Overskin hotkey.");
             return;
@@ -1061,6 +1065,7 @@ public partial class MainWindow : Window
             case "HotkeyColour": _settings.HotkeyColour = text; break;
             case "HotkeyGif": _settings.HotkeyGif = text; break;
             case "HotkeyRecent": _settings.HotkeyRecent = text; break;
+            case "HotkeyPinClipboard": _settings.HotkeyPinClipboard = text; break;
         }
 
         _capturing = null;
@@ -1097,6 +1102,28 @@ public partial class MainWindow : Window
         }
         base.OnPreviewKeyDown(e);
     }
+
+    /// <summary>
+    /// Pins whatever picture is on the clipboard (a copied image, or a copied picture file),
+    /// centred on the mouse, from anywhere: the hotkey, the tray, the jump list or the Pins page.
+    /// </summary>
+    private void PinClipboard()
+    {
+        BitmapSource? image;
+        string? name;
+        try { image = ImageLoader.FromClipboard(out name); }
+        catch (Exception ex) { Toast.Show(ex.Message, true); return; }
+        if (image == null)
+        {
+            Toast.Show("There's no picture on the clipboard. Copy one first (or a picture file).");
+            return;
+        }
+        var at = CursorPos();
+        var place = new Int32Rect(at.X - image.PixelWidth / 2, at.Y - image.PixelHeight / 2, 0, 0);
+        PinImage(image, name ?? "Clipboard", null, placeAt: place);
+    }
+
+    private void PinClipboard_Click(object sender, RoutedEventArgs e) => PinClipboard();
 
     private void PasteImage()
     {
@@ -1332,6 +1359,7 @@ public partial class MainWindow : Window
         [TraceMode.Hatch] = "Fills dark areas with parallel strokes. Set the spacing to your brush size for solid fills.",
         [TraceMode.Shade] = "Hatching that builds up in darker tones, for a shaded pencil look.",
         [TraceMode.Colour] = "Paints each area in the closest colour from the game's palette, switching colours as it goes.",
+        [TraceMode.Gartic] = "Made for Gartic Phone: paints with its five brush sizes and opacity levels, big blobs first and finer brushes after. No bucket.",
     };
 
     private void LoadTrace_Click(object sender, RoutedEventArgs e)
@@ -1391,7 +1419,8 @@ public partial class MainWindow : Window
         static Visibility Show(bool on) => on ? Visibility.Visible : Visibility.Collapsed;
         bool fills = _mode is TraceMode.Hatch or TraceMode.Shade or TraceMode.Colour;
 
-        ThresholdRow.Visibility = Show(_mode != TraceMode.Colour);
+        bool gartic = _mode == TraceMode.Gartic;
+        ThresholdRow.Visibility = Show(_mode is not (TraceMode.Colour or TraceMode.Gartic));
         ThresholdLabel.Text = _mode == TraceMode.Sketch ? "Sensitivity" : "Threshold";
         ThresholdRow.ToolTip = _mode == TraceMode.Sketch
             ? "Higher finds fainter edges"
@@ -1401,11 +1430,14 @@ public partial class MainWindow : Window
         BucketRow.Visibility = Show(bucketMode);
         // with the bucket, Outline needs to know the brush size too, to keep clicks off the outline
         SpacingRow.Visibility = Show(fills || (bucketMode && _settings.BucketFill));
+        if (gartic) SpacingRow.Visibility = Visibility.Collapsed; // its brushes are measured instead
+        GarticCard.Visibility = Show(gartic);
+        if (gartic) SyncGarticControls();
         // with the bucket on, the slider is the game's brush size: outlines and clicks are planned around it
         SpacingLabel.Text = _mode == TraceMode.Outline || (bucketMode && _settings.BucketFill) ? "Brush size" : "Line spacing";
         UpdateToolsLabel();
-        InvertRow.Visibility = Show(_mode is not (TraceMode.Sketch or TraceMode.Colour));
-        PaletteCard.Visibility = Show(_mode == TraceMode.Colour);
+        InvertRow.Visibility = Show(_mode is not (TraceMode.Sketch or TraceMode.Colour or TraceMode.Gartic));
+        PaletteCard.Visibility = Show(_mode is TraceMode.Colour or TraceMode.Gartic);
         UpdatePaletteHint();
     }
 
@@ -1438,7 +1470,6 @@ public partial class MainWindow : Window
     {
         "Careful" => (FrameMs() * 2, 1),
         "Fast" => (1, 1),
-        "Instant" => (0, 8),
         _ => (FrameMs(), 1),
     };
 
@@ -1464,7 +1495,6 @@ public partial class MainWindow : Window
         {
             "Careful" => $"Two screen refreshes per point ({frame * 2} ms). For laggy games, a busy PC, or when lines come out wobbly.",
             "Fast" => "For installed programs like Paint, Krita or Photoshop. Too quick for browser games: corners get cut.",
-            "Instant" => "As fast as Windows allows. Installed programs only, and some may skip points.",
             _ => $"One point per screen refresh ({hz} Hz, every {frame} ms): the fastest a browser game like skribbl or Gartic can follow. Works everywhere.",
         };
     }
@@ -1504,6 +1534,17 @@ public partial class MainWindow : Window
         {
             if (k != last) switches++;
             last = k;
+        }
+        // Gartic: brush size and opacity are buttons to click too
+        foreach (var list in new[] { trace.SizeIndex, trace.OpacityIndex })
+        {
+            if (list == null) continue;
+            last = -1;
+            foreach (int k in list)
+            {
+                if (k != last) switches++;
+                last = k;
+            }
         }
         return switches;
     }
@@ -1545,7 +1586,7 @@ public partial class MainWindow : Window
         return fit.Width / (double)_traceImage.Width;
     }
 
-    private TraceOptions CurrentOptions() => new()
+    private TraceOptions CurrentOptions() => _mode == TraceMode.Gartic ? GarticOptions() : new()
     {
         Mode = _mode,
         Threshold = (int)ThresholdSlider.Value,
@@ -1699,6 +1740,7 @@ public partial class MainWindow : Window
             {
                 s.Skip = chip.IsChecked != true;
                 chip.ToolTip = PaletteTip(s);
+                SyncGarticControls();
                 ScheduleTrace();
             };
             chip.MouseRightButtonUp += (_, a) =>
@@ -1715,6 +1757,7 @@ public partial class MainWindow : Window
         PaletteCount.Text = count == 0 ? "" : count.ToString();
         PaletteSwatches.Visibility = count == 0 ? Visibility.Collapsed : Visibility.Visible;
         UpdatePaletteHint();
+        SyncGarticControls();
     }
 
     private static string PaletteTip(PaletteSwatch s) =>
@@ -1744,6 +1787,7 @@ public partial class MainWindow : Window
             return;
         }
         PickColoursLabel.Text = "Done";
+        SyncGarticControls();
         _hotkeys?.Register(HkPaletteEsc, new Hotkey(ModifierKeys.None, Key.Escape), () => _paletteCapture.Stop());
         UpdatePaletteHint();
         WindowState = WindowState.Minimized; // out of the way of the game's palette; it comes back when done
@@ -1795,6 +1839,11 @@ public partial class MainWindow : Window
 
     private void OnPaletteColourPicked(int x, int y, Color colour)
     {
+        if (_garticPickStep >= 0)
+        {
+            GarticButtonPicked(x, y, colour);
+            return;
+        }
         if (_toolPickStep >= 0)
         {
             var spot = new PaletteSwatch { X = x, Y = y, Hex = Theming.ToHex(colour) };
@@ -1832,6 +1881,18 @@ public partial class MainWindow : Window
     private void OnPaletteCaptureEnded()
     {
         _hotkeys?.Unregister(HkPaletteEsc);
+        if (_garticPickStep >= 0)
+        {
+            bool cancelled = _garticPending != null;
+            _garticPickStep = -1;
+            _garticPending = null;
+            SyncGarticControls();
+            Toast.Hide();
+            if (cancelled) Toast.Show("Cancelled. Gartic's buttons weren't changed.");
+            SaveSettings();
+            ShowFromTray();
+            return;
+        }
         if (_toolPickStep >= 0)
         {
             _toolPickStep = -1;
@@ -1843,6 +1904,7 @@ public partial class MainWindow : Window
         }
         PickColoursLabel.Text = "Pick from screen";
         UpdatePaletteHint();
+        SyncGarticControls();
         Toast.Hide();
         SaveSettings();
         ShowFromTray();
@@ -1874,6 +1936,7 @@ public partial class MainWindow : Window
             _area = selection;
             UpdateSpeedHint();
             AreaText.Text = $"{selection.Width} × {selection.Height} at {selection.X}, {selection.Y}";
+            SyncGarticControls();
             _ghostSuppressed = false;
             UpdateTraceLabels();
             // detail is measured against the area, so the trace changes with it
@@ -1945,6 +2008,12 @@ public partial class MainWindow : Window
         if (DrawingRect() is not { } rect)
         {
             Toast.Show("Choose where to draw first: click Set area.");
+            return;
+        }
+
+        if (_trace.SizeIndex != null)
+        {
+            if (GarticStrokes(_trace, rect) is { } painted) StartDrawing(painted, rect, CurrentDrawSettings(countdown));
             return;
         }
 
@@ -2087,13 +2156,23 @@ public partial class MainWindow : Window
         if (outcome == DrawOutcome.Completed) DrawProgress.Value = 1;
         _ghostSuppressed = true; // the real drawing is there now; the ghost would only cover it
 
-        if (_minimizedForDrawing)
+        bool restore = _minimizedForDrawing;
+        _minimizedForDrawing = false;
+        if (_garticMeasure is { } measure)
         {
-            _minimizedForDrawing = false;
-            WindowState = WindowState.Normal;
+            _garticMeasure = null;
+            // the test lines are read off the screen first, so Overskin's window mustn't be over them yet
+            if (outcome == DrawOutcome.Completed)
+            {
+                _ = FinishGarticMeasureAsync(measure, restore);
+                return;
+            }
+            Toast.Show(message, warning: outcome == DrawOutcome.Failed);
         }
-        Toast.Show(message, warning: outcome == DrawOutcome.Failed);
+        else Toast.Show(message, warning: outcome == DrawOutcome.Failed);
+        if (restore) WindowState = WindowState.Normal;
     }
+
 
 #if DEBUG
     /// <summary>Developer aid: renders each tab to a PNG so layout can be checked without a screen.</summary>
@@ -2143,6 +2222,34 @@ public partial class MainWindow : Window
                 enc.Save(f);
             }
             CaptureShotsTab.IsChecked = true;
+
+            // the watermark card (bottom of Screenshots) and the workflows card (Settings)
+            async Task Shot(string name)
+            {
+                await Task.Delay(300);
+                var shot = new RenderTargetBitmap((int)(ActualWidth * 2), (int)(ActualHeight * 2), 192, 192, PixelFormats.Pbgra32);
+                shot.Render((FrameworkElement)Content);
+                var enc = new PngBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(shot));
+                using var f = System.IO.File.Create(System.IO.Path.Combine(folder, name));
+                enc.Save(f);
+            }
+            _settings.Watermark.Text = "@overskin";
+            SyncWatermarkControls();
+            await Task.Delay(300);
+            PageCapture.ScrollToEnd();
+            await Shot("capture-watermark.png");
+            PageCapture.ScrollToTop();
+            if (_settings.Workflows.Count == 0)
+            {
+                _settings.Workflows.Add(new Workflow { Name = "Share safely", Hotkey = "Ctrl+Alt+1", AutoHide = true, Watermark = true, Save = true, Copy = true });
+                RefreshWorkflowRows();
+            }
+            SelectTab(TabSettingsIndex);
+            await Task.Delay(300);
+            WorkflowRows.BringIntoView();
+            await Shot("settings-workflows.png");
+            SelectTab(TabCaptureIndex);
 
             // the capture bar, on its own (the real capture screen shows the user's screen, so never rendered)
             {
@@ -2206,7 +2313,7 @@ public partial class MainWindow : Window
             };
             BuildPaletteChips();
             SelectTab(TabTraceIndex);
-            foreach (var mode in new[] { "Lines", "Sketch", "Hatch", "Shade", "Colour" })
+            foreach (var mode in new[] { "Lines", "Sketch", "Hatch", "Shade", "Colour", "Gartic" })
             {
                 SelectMode(mode);
                 _traceDebounce.Stop();
