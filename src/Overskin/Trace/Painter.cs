@@ -399,7 +399,7 @@ public static class Painter
             }
             var s = left[best];
             left.RemoveAt(best);
-            var path = flip ? s.Path.Reverse().ToArray() : s.Path;
+            var path = flip ? Enumerable.Reverse(s.Path).ToArray() : s.Path;
             order.Add((path, s.Combo, s.Size));
             at = path[^1];
         }
