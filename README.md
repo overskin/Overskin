@@ -37,6 +37,7 @@ One installer, no administrator rights, no account, and nothing leaves your PC.
 | **Auto-zoom videos** | MP4 recordings glide in on every click and follow the pointer, with sound, your webcam in a corner, and an optional backdrop. |
 | **Smooth cursor** | The pointer in your videos glides with no lag, lands exactly on each click and gets motion blur, like a professionally edited demo. |
 | **Edit text in screenshots** | Select, delete or type words inside any screenshot. New letters come out in the picture's own font, size and colour. |
+| **Move things in screenshots** | Lift a word, an icon or a picture off and drag it anywhere; the gap fills in. Swap a picture for another. |
 | **Live text** | Copy the words in any screenshot, and search your whole library by them. Offline. |
 | **Auto-hide** | Finds and blurs emails, card numbers, addresses, IPs and keys before you share. |
 | **Smart erase** | Paint over text or an icon and it's filled in from what's around it. |
@@ -73,7 +74,7 @@ Overskin runs on **Windows** today. **Linux** and **macOS** versions are planned
 | **Trace**: draw a picture in a drawing game, colour by colour | **Light** theme |
 
 ![Editor](docs/screenshots/editor.png)
-**Editor**: arrows, boxes, text, steps, highlighter, hide (blur, pixelate, mosaic, or Auto-hide
+**Editor**: arrows, boxes, text, highlighter, move, hide (blur, pixelate, mosaic, or Auto-hide
 for private details), smart erase, crop, rotate, and Beautify.
 
 ![Capture bar](docs/screenshots/capture-bar.png)
@@ -100,10 +101,15 @@ for private details), smart erase, crop, rotate, and Beautify.
   (or when you press Esc). Fixed headers and footers appear once.
 - **Delay timer**: 3, 5 or 10 seconds.
 - **After capturing**, any mix of copy to the clipboard, save to a folder (PNG or JPG),
-  open in the editor, pin it where it was, and a preview card with Edit, Pin, Copy, Trace
-  and Show in folder. Optionally with the mouse pointer drawn in.
+  open in the viewer or the editor, pin it where it was, and a preview card with Edit, Pin,
+  Copy, Trace and Show in folder. Optionally with the mouse pointer drawn in.
+- **Viewer**: a quick, smooth look at what you captured. The arrow keys go through all your
+  captures, the wheel zooms towards the mouse, drag to look around, double-click for actual
+  size. GIFs and videos play. Copy, rotate, pin, show in the folder, move to the Recycle Bin,
+  or press E for the editor. Clicking anything in the Library opens it here too.
 - **Watermark**: your name, handle or logo on every screenshot and video, in a corner, the
-  middle or tiled across. Text or a picture, with size and opacity.
+  middle or tiled across (at any angle and spacing). Text, outlined text or a picture, with
+  size and opacity.
 - **Workflows** (Settings): give a whole routine its own hotkey. Capture an area, the window in
   front, the screen or the same area again, wait first if you like, then any of: hide private
   details, beautify, watermark, save, copy the picture or its text, pin, open in the editor.
@@ -129,8 +135,9 @@ Capture → **Recording** has the Video and GIF buttons and every video setting.
 - **Auto-zoom**: the video glides in towards each click, follows the pointer while you work
   and eases back out after a few quiet seconds. Zoom amount, zoom speed, how loosely the view
   follows, and how long it waits before zooming out are all adjustable.
-- **Trim**: click a video in the Library to play it, drag Start and End (or press I and O),
-  and save the part in between as a new file. Sound is kept.
+- **Edit**: click a video in the Library to play it. Trim the start and end (I and O), cut
+  idle parts automatically or any part by hand (X), and add text labels and arrows that show
+  at the times you choose. Save makes an edited copy; sound is kept.
 - **Steps**: click through anything and get a numbered how-to guide: one screenshot per
   click, the click circled, and a sentence such as *Click the "Save" button in Notepad*.
   Reword or drop steps, then save it as one picture, an HTML page, Markdown or a PDF.
@@ -149,9 +156,9 @@ Capture → **Recording** has the Video and GIF buttons and every video setting.
 
 ## Edit
 
-Arrows, boxes, ellipses, lines, pen, highlighter, text, numbered steps, hide and crop. Nine
+Arrows, boxes, ellipses, lines, pen, highlighter, text (normal, bold or italic), move, hide and crop. Nine
 colours plus a colour wheel, adjustable size and opacity, undo and redo, and keyboard shortcuts
-for every tool (A, R, E, L, P, H, T, N, B, X, C, V). Copy, save, pin or trace the result.
+for every tool (A, R, E, L, P, H, T, B, X, M, C, V). Copy, save, pin or trace the result.
 
 - **Live text**: with the Select tool (V), drag over the text in a screenshot to select it
   letter by letter, like in a PDF; a double-click takes a whole word. Click inside a word for a
@@ -170,6 +177,10 @@ for every tool (A, R, E, L, P, H, T, N, B, X, C, V). Copy, save, pin or trace th
   do that to every screenshot before it's copied or saved.
 - **Smart erase** (X): paint over text, an icon or a person and it's filled in from what's
   around it. Best on plain or gently shaded backgrounds, which is most of a screenshot.
+- **Move** (M): click a word or a picture, or drag a box around anything, and it lifts off as a
+  piece you can drag anywhere or resize; the gap it leaves fills in. Right-click a picture
+  inside the screenshot to swap it for a picture file or the clipboard picture, keeping its
+  place, size and rounded corners.
 - **Beautify**: puts the picture on a gradient or plain backdrop with padding, rounded
   corners and a shadow, optionally 16:9, 4:3, 1:1 or 9:16, ready to post.
 
@@ -258,6 +269,7 @@ drawing time for accuracy.
 | Ctrl+Alt+V | Pin the picture on the clipboard |
 | Ctrl+Alt+O | Text from screen |
 | Ctrl+Alt+K | Colour picker |
+| Ctrl+Alt+R | Record a video (again to stop) |
 | Ctrl+Alt+G | Record a GIF (again to stop) |
 | Ctrl+Alt+T | Pin / unpin the window under the mouse |
 | Ctrl+Alt+Up / Down | Opacity of the window or picture under the mouse |

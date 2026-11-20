@@ -994,7 +994,6 @@ public partial class App : Application
             Pump(400);
             editor.AddForTest(new Annotation { Kind = AnnotationKind.Rectangle, Points = { new Point(40, 30), new Point(160, 90) }, Color = System.Windows.Media.Colors.Red, Size = 4 });
             editor.AddForTest(new Annotation { Kind = AnnotationKind.Arrow, Points = { new Point(10, 110), new Point(60, 60) }, Color = System.Windows.Media.Colors.Blue, Size = 3 });
-            editor.AddForTest(new Annotation { Kind = AnnotationKind.Step, Points = { new Point(180, 20) }, Color = System.Windows.Media.Colors.Green, Size = 3, Number = 1 });
             Pump(200);
             var exported = editor.Export();
             string Px(int x, int y)

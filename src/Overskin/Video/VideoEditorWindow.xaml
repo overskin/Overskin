@@ -59,7 +59,11 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <MediaElement x:Name="Player" Margin="20" LoadedBehavior="Manual" UnloadedBehavior="Close" ScrubbingEnabled="True"
-                                  Stretch="Uniform" MediaOpened="Player_Opened" MediaFailed="Player_Failed" MouseLeftButtonUp="Player_Click" />
+                                  Stretch="Uniform" MediaOpened="Player_Opened" MediaFailed="Player_Failed" />
+                    <!-- text and arrows over the video: click to play or pause, drag one to move it -->
+                    <Canvas x:Name="OverlayCanvas" Margin="20" Background="Transparent" ClipToBounds="True"
+                            MouseLeftButtonDown="Overlay_MouseDown" MouseMove="Overlay_MouseMove" MouseLeftButtonUp="Overlay_MouseUp"
+                            SizeChanged="Overlay_SizeChanged" />
                     <TextBlock x:Name="PlayerMessage" Style="{StaticResource Dim}" HorizontalAlignment="Center" VerticalAlignment="Center"
                                TextWrapping="Wrap" MaxWidth="360" TextAlignment="Center" Visibility="Collapsed" />
                     <Border Grid.Row="1" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="12,8">
@@ -74,6 +78,8 @@
                             </Button>
                             <Slider x:Name="Scrubber" Grid.Column="1" Margin="10,0" Minimum="0" SmallChange="0.1" LargeChange="1"
                                     ValueChanged="Scrubber_Changed" />
+                            <!-- the parts that will be cut, in red under the scrubber -->
+                            <Canvas x:Name="Bands" Grid.Column="1" Margin="15,0,15,0" Height="4" VerticalAlignment="Bottom" IsHitTestVisible="False" />
                             <TextBlock x:Name="TimeText" Grid.Column="2" Style="{StaticResource Dim}" MinWidth="96" TextAlignment="Right" />
                         </Grid>
                     </Border>
@@ -116,7 +122,44 @@
                                         <Button Style="{StaticResource Btn}" Height="26" Click="EndHere_Click" ToolTip="End where the video is now  (O)" Content="End here" />
                                     </StackPanel>
                                     <TextBlock Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,10,0,0"
-                                               Text="Playing loops the part you keep. The original file isn't changed: Save makes a trimmed copy." />
+                                               Text="Playing loops the part you keep. The original file isn't changed: Save makes an edited copy." />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcScissors}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Cut" Style="{StaticResource Heading}" />
+                                        <TextBlock x:Name="CutsText" Style="{StaticResource Dim}" Margin="8,0,0,0" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <WrapPanel>
+                                        <Button x:Name="IdleButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,6" Click="CutIdle_Click"
+                                                ToolTip="Finds the stretches where nothing on screen moves for 2 seconds or more, and cuts them" Content="Cut idle parts" />
+                                        <Button x:Name="CutButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,6" Click="Cut_Click"
+                                                ToolTip="Click here, play or scrub to where the cut should end, then click again  (X)" Content="Cut from here" />
+                                        <Button Style="{StaticResource Btn}" Height="26" Margin="0,0,6,6" Click="ClearCuts_Click" Content="Clear cuts" />
+                                    </WrapPanel>
+                                    <TextBlock Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,4,0,0"
+                                               Text="Cut parts show in red under the video and are skipped while it plays." />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcType}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Text and arrows" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <TextBox x:Name="OverlayTextBox" Style="{StaticResource TextField}" Height="26" Margin="0,0,6,0" KeyDown="OverlayText_KeyDown" />
+                                        <Button Grid.Column="1" Style="{StaticResource Btn}" Height="26" Click="AddText_Click" Content="Add text"
+                                                ToolTip="Shows the words over the video from here for 3 seconds; drag them where you like" />
+                                    </Grid>
+                                    <Button x:Name="ArrowButton" Style="{StaticResource Btn}" Height="26" HorizontalAlignment="Left" Click="AddArrow_Click" Content="Add an arrow"
+                                            ToolTip="Then drag on the video from the tail to the point" />
+                                    <StackPanel x:Name="OverlayList" Margin="0,8,0,0" />
                                 </StackPanel>
                             </Border>
                             <Border Style="{StaticResource Card}">
@@ -154,7 +197,7 @@
                                 <TextBlock Text="Save as" />
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource BtnAccent}" MinWidth="80" Click="Save_Click" ToolTip="Save the trimmed part as a new video next to this one">
+                        <Button Style="{StaticResource BtnAccent}" MinWidth="80" Click="Save_Click" ToolTip="Save the edited video as a new file next to this one">
                             <StackPanel Orientation="Horizontal">
                                 <local:Icon Data="{StaticResource IcSave}" Width="13" Height="13" StrokeWidth="1.6" Margin="0,0,6,0" />
                                 <TextBlock Text="Save" />

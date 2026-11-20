@@ -18,7 +18,7 @@ public partial class MainWindow : Window
 {
     private const int HkPin = 1, HkOpacityUp = 2, HkOpacityDown = 3, HkClickThrough = 4;
     private const int HkAbort = 5, HkAbortEsc = 6, HkPickEsc = 7, HkDraw = 8, HkPause = 9, HkPaletteEsc = 10, HkSnip = 11;
-    private const int HkRegion = 12, HkWindow = 13, HkScreen = 14, HkText = 15, HkColour = 16, HkRecent = 21, HkPinClipboard = 22;
+    private const int HkRegion = 12, HkWindow = 13, HkScreen = 14, HkText = 15, HkColour = 16, HkRecent = 21, HkPinClipboard = 22, HkVideo = 23;
     private const double BaseWidth = 540, BaseHeight = 700, SmallestWidth = 530, SmallestHeight = 560;
     private const int TabCaptureIndex = 0, TabLibraryIndex = 1, TabPinsIndex = 2, TabTraceIndex = 3, TabSettingsIndex = 4;
 
@@ -347,6 +347,7 @@ public partial class MainWindow : Window
         HkGifButton.Content = _settings.HotkeyGif;
         HkRecentButton.Content = _settings.HotkeyRecent;
         HkPinClipboardButton.Content = _settings.HotkeyPinClipboard;
+        HkVideoButton.Content = _settings.HotkeyVideo;
         TileGifKey.Text = _settings.HotkeyGif;
         TileRegionKey.Text = _settings.HotkeyRegion;
         TileWindowKey.Text = _settings.HotkeyWindow;
@@ -727,6 +728,18 @@ public partial class MainWindow : Window
         ImagesEmpty.Visibility = images == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>
+    /// The pin list is only as tall as its pins (so the shortcut list sits right under them,
+    /// not at the bottom of the page), up to the room there is; then it scrolls.
+    /// </summary>
+    private void PageImage_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        double used = 0;
+        foreach (UIElement child in PageImage.Children)
+            if (child is FrameworkElement f && Grid.GetRow(f) is 0 or 2) used += f.ActualHeight + f.Margin.Top + f.Margin.Bottom;
+        ImageList.MaxHeight = Math.Max(90, PageImage.ActualHeight - used - 40);
+    }
+
     // =====================================================================================
     //  feature 1: windows
     // =====================================================================================
@@ -889,6 +902,7 @@ public partial class MainWindow : Window
         Bind(HkGif, _settings.HotkeyGif, ToggleGifRecording);
         Bind(HkRecent, _settings.HotkeyRecent, ShowRecent);
         Bind(HkPinClipboard, _settings.HotkeyPinClipboard, PinClipboard);
+        Bind(HkVideo, _settings.HotkeyVideo, () => ToggleVideo(false));
         failed.AddRange(RegisterWorkflowHotkeys());
 
         if (failed.Count > 0 && announceFailures && !App.Quiet)
@@ -1041,6 +1055,7 @@ public partial class MainWindow : Window
             ["HotkeyGif"] = _settings.HotkeyGif,
             ["HotkeyRecent"] = _settings.HotkeyRecent,
             ["HotkeyPinClipboard"] = _settings.HotkeyPinClipboard,
+            ["HotkeyVideo"] = _settings.HotkeyVideo,
         };
         if (all.Any(kv => kv.Key != property && kv.Value == text) || _settings.Workflows.Any(w => w.Hotkey == text))
         {
@@ -1066,6 +1081,7 @@ public partial class MainWindow : Window
             case "HotkeyGif": _settings.HotkeyGif = text; break;
             case "HotkeyRecent": _settings.HotkeyRecent = text; break;
             case "HotkeyPinClipboard": _settings.HotkeyPinClipboard = text; break;
+            case "HotkeyVideo": _settings.HotkeyVideo = text; break;
         }
 
         _capturing = null;
@@ -2282,7 +2298,6 @@ public partial class MainWindow : Window
                 await Task.Delay(400);
                 ed.AddForTest(new Annotation { Kind = AnnotationKind.Arrow, Points = { new Point(80, 820), new Point(330, 600) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 5 });
                 ed.AddForTest(new Annotation { Kind = AnnotationKind.Rectangle, Points = { new Point(600, 200), new Point(1080, 740) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 5 });
-                ed.AddForTest(new Annotation { Kind = AnnotationKind.Step, Points = { new Point(600, 200) }, Color = Color.FromRgb(0x3B, 0x82, 0xF6), Size = 6, Number = 1 });
                 ed.AddForTest(new Annotation { Kind = AnnotationKind.Text, Points = { new Point(620, 760) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 6, Text = "five tools in one" });
                 ed.AddForTest(new Annotation { Kind = AnnotationKind.Highlighter, Points = { new Point(560, 120), new Point(900, 120) }, Color = Color.FromRgb(0xFA, 0xCC, 0x15), Size = 8 });
                 await Task.Delay(500);

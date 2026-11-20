@@ -24,7 +24,7 @@ public sealed class EditorHost
 /// <summary>Marks up a screenshot: arrows, boxes, text, steps, pixelate and crop.</summary>
 public partial class EditorWindow : Window
 {
-    private enum Tool { Select, Arrow, Rectangle, Ellipse, Line, Pen, Highlighter, Text, Step, Pixelate, Erase, Crop }
+    private enum Tool { Select, Arrow, Rectangle, Ellipse, Line, Pen, Highlighter, Text, Pixelate, Erase, Crop, Move }
 
     private static readonly (string Name, string Hex)[] Colours =
     {
@@ -226,7 +226,7 @@ public partial class EditorWindow : Window
     {
         Tool.Select => ToolSelect, Tool.Arrow => ToolArrow, Tool.Rectangle => ToolRectangle, Tool.Ellipse => ToolEllipse,
         Tool.Line => ToolLine, Tool.Pen => ToolPen, Tool.Highlighter => ToolHighlighter, Tool.Text => ToolText,
-        Tool.Step => ToolStep, Tool.Pixelate => ToolPixelate, Tool.Erase => ToolErase, _ => ToolCrop,
+        Tool.Pixelate => ToolPixelate, Tool.Erase => ToolErase, Tool.Move => ToolMove, _ => ToolCrop,
     };
 
     private void SelectTool(Tool t) => ToolButton(t).IsChecked = true;
@@ -252,9 +252,9 @@ public partial class EditorWindow : Window
             Tool.Pen => "Drag to draw freehand.",
             Tool.Highlighter => "Drag over text to highlight it.",
             Tool.Text => "Click where the text should go. Enter to finish, Shift+Enter for a new line.",
-            Tool.Step => "Click to place numbered steps: 1, 2, 3…",
             Tool.Pixelate => "Drag over anything private to hide it. Auto-hide finds emails, numbers and keys for you.",
             Tool.Erase => "Paint over text or an object to remove it. Works best on plain backgrounds. The slider sets the brush.",
+            Tool.Move => "Click a word or a picture, or drag a box around anything, to lift it off and move it. The gap fills in.",
             _ => "Drag the area to keep.",
         };
     }
@@ -358,6 +358,12 @@ public partial class EditorWindow : Window
             return;
         }
 
+        if (_tool == Tool.Move)
+        {
+            MoveToolDown(p);
+            return;
+        }
+
         switch (_tool)
         {
             case Tool.Select:
@@ -400,14 +406,6 @@ public partial class EditorWindow : Window
             case Tool.Text:
                 BeginText(p, null);
                 return;
-            case Tool.Step:
-            {
-                PushUndo();
-                int next = _items.Where(a => a.Kind == AnnotationKind.Step).Select(a => a.Number).DefaultIfEmpty(0).Max() + 1;
-                _items.Add(new Annotation { Kind = AnnotationKind.Step, Points = { p }, Color = _colour, Size = _size, Number = next, Opacity = _opacity });
-                Render();
-                return;
-            }
         }
 
         _down = true;
@@ -451,6 +449,7 @@ public partial class EditorWindow : Window
     private void Doc_MouseMove(object sender, MouseEventArgs e)
     {
         if (_textDragging) { DragTextSelect(e.GetPosition(Doc)); return; }
+        if (_tool == Tool.Move && !_down) { MoveToolMove(e.GetPosition(Doc)); return; }
         if (!_down)
         {
             // over a word, the Select tool shows the text cursor
@@ -459,7 +458,7 @@ public partial class EditorWindow : Window
         }
         var p = e.GetPosition(Doc);
 
-        if (_tool == Tool.Select)
+        if (_tool is Tool.Select or Tool.Move)
         {
             if (_selected == null) return;
             if (!_moved)
@@ -470,6 +469,9 @@ public partial class EditorWindow : Window
             }
             if (_handle >= 0)
             {
+                // a lifted piece scales in proportion from the opposite corner unless Shift is held
+                if (_selected.Kind == AnnotationKind.Piece && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+                    p = KeepShape(_selected, _handle, p);
                 MoveHandle(_selected, _handle, p);
                 Render();
                 ShowSelection();
@@ -521,12 +523,13 @@ public partial class EditorWindow : Window
     private void Doc_MouseUp(object sender, MouseButtonEventArgs e)
     {
         if (_textDragging) { EndTextSelect(); return; }
+        if (_tool == Tool.Move && !_down) { MoveToolUp(e.GetPosition(Doc)); return; }
         if (!_down) return;
         _down = false;
         Doc.ReleaseMouseCapture();
         var p = e.GetPosition(Doc);
 
-        if (_tool == Tool.Select)
+        if (_tool is Tool.Select or Tool.Move)
         {
             // a resized pixelate box needs its blocky picture remade
             if (_handle >= 0 && _selected is { Kind: AnnotationKind.Pixelate } px)
@@ -607,7 +610,7 @@ public partial class EditorWindow : Window
         return a.Kind switch
         {
             AnnotationKind.Line or AnnotationKind.Arrow => new() { p0, p1 },
-            AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Pixelate =>
+            AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Pixelate or AnnotationKind.Piece =>
                 new() { p0, new Point(p1.X, p0.Y), p1, new Point(p0.X, p1.Y) },
             _ => new(),
         };
@@ -621,6 +624,19 @@ public partial class EditorWindow : Window
         for (int i = 0; i < hs.Count; i++)
             if ((hs[i] - p).Length <= reach) return i;
         return -1;
+    }
+
+    /// <summary>Where a dragged corner goes so the box keeps its shape, scaled from the opposite corner.</summary>
+    private static Point KeepShape(Annotation a, int handle, Point p)
+    {
+        var r = new Rect(a.Points[0], a.Points[1]);
+        if (r.Width < 1 || r.Height < 1) return p;
+        var corners = new[] { r.TopLeft, r.TopRight, r.BottomRight, r.BottomLeft };
+        var fixedCorner = corners[(handle + 2) % 4];
+        var dragged = corners[handle];
+        double sx = (p.X - fixedCorner.X) / (dragged.X - fixedCorner.X), sy = (p.Y - fixedCorner.Y) / (dragged.Y - fixedCorner.Y);
+        double k = Math.Max(0.02, (Math.Abs(sx) + Math.Abs(sy)) / 2);
+        return new Point(fixedCorner.X + (dragged.X - fixedCorner.X) * k, fixedCorner.Y + (dragged.Y - fixedCorner.Y) * k);
     }
 
     private static void MoveHandle(Annotation a, int handle, Point p)
@@ -648,7 +664,11 @@ public partial class EditorWindow : Window
         if (!Doc.IsMouseOver) return;
         if (ShowTextMenu(e.GetPosition(Doc))) { e.Handled = true; return; }
         var hit = HitTest(e.GetPosition(Doc));
-        if (hit == null) return;
+        if (hit == null)
+        {
+            if (ShowPictureMenu(e.GetPosition(Doc))) e.Handled = true;
+            return;
+        }
         e.Handled = true;
         CommitText();
         if (_tool != Tool.Select) SelectTool(Tool.Select);
@@ -665,15 +685,13 @@ public partial class EditorWindow : Window
         if (hit.Kind == AnnotationKind.Text) Item("Edit text", () => BeginText(hit.Points[0], hit));
         if (hit.Kind is AnnotationKind.Rectangle or AnnotationKind.Ellipse)
             Item("Filled", () => { PushUndo(); hit.Filled = !hit.Filled; Render(); }, hit.Filled);
-        if (hit.Kind != AnnotationKind.Pixelate)
+        if (hit.Kind is not (AnnotationKind.Pixelate or AnnotationKind.Piece))
             Item("Use the current colour, size and opacity", () => { PushUndo(); hit.Color = _colour; hit.Size = _size; hit.Opacity = _opacity; Render(); ShowSelection(); });
         Item("Duplicate", () =>
         {
             PushUndo();
             var copy = hit.Clone();
             copy.Translate(14, 14);
-            if (copy.Kind == AnnotationKind.Step)
-                copy.Number = _items.Where(a => a.Kind == AnnotationKind.Step).Select(a => a.Number).DefaultIfEmpty(0).Max() + 1;
             _items.Add(copy);
             _selected = copy;
             Render();
@@ -773,13 +791,15 @@ public partial class EditorWindow : Window
         _textOriginal = existing;
         var colour = existing?.Color ?? _colour;
         double size = existing?.Size ?? _size;
-        var probe = new Annotation { Size = size };
+        string style = existing?.TextStyle ?? _textStyle;
+        var probe = new Annotation { Size = size, TextStyle = style };
 
         _textBox = new TextBox
         {
             Text = existing?.Text ?? "",
             FontSize = probe.FontSize,
-            FontWeight = FontWeights.SemiBold,
+            FontWeight = probe.TextWeight,
+            FontStyle = probe.TextSlant,
             FontFamily = (FontFamily)FindResource("UiFont"),
             Foreground = new SolidColorBrush(colour),
             CaretBrush = new SolidColorBrush(colour),
@@ -789,7 +809,7 @@ public partial class EditorWindow : Window
             Padding = new Thickness(0),
             MinWidth = 40,
             AcceptsReturn = true,
-            Tag = (colour, size),
+            Tag = (colour, size, style),
         };
         Canvas.SetLeft(_textBox, at.X - 1);
         Canvas.SetTop(_textBox, at.Y - 1);
@@ -797,6 +817,7 @@ public partial class EditorWindow : Window
         _textBox.Focus();
         _textBox.CaretIndex = _textBox.Text.Length;
         _start = at;
+        UpdateHideOptions();
     }
 
     private void CommitText()
@@ -805,12 +826,12 @@ public partial class EditorWindow : Window
         var box = _textBox;
         _textBox = null;
         Adorn.Children.Remove(box);
-        var (colour, size) = ((Color, double))box.Tag;
+        var (colour, size, style) = ((Color, double, string))box.Tag;
         string text = box.Text.TrimEnd();
         if (text.Length > 0)
         {
             if (_textOriginal == null) PushUndo();
-            _items.Add(new Annotation { Kind = AnnotationKind.Text, Points = { _start }, Color = colour, Size = size, Text = text, Opacity = _textOriginal?.Opacity ?? _opacity });
+            _items.Add(new Annotation { Kind = AnnotationKind.Text, Points = { _start }, Color = colour, Size = size, Text = text, TextStyle = style, Opacity = _textOriginal?.Opacity ?? _opacity });
         }
         _textOriginal = null;
         Render();
@@ -870,9 +891,9 @@ public partial class EditorWindow : Window
             Key.P => () => SelectTool(Tool.Pen),
             Key.H => () => SelectTool(Tool.Highlighter),
             Key.T => () => SelectTool(Tool.Text),
-            Key.N => () => SelectTool(Tool.Step),
             Key.B => () => SelectTool(Tool.Pixelate),
             Key.X => () => SelectTool(Tool.Erase),
+            Key.M => () => SelectTool(Tool.Move),
             Key.C => () => SelectTool(Tool.Crop),
             _ => null,
         };
@@ -961,8 +982,41 @@ public partial class EditorWindow : Window
         a.Pixels = Redaction.Render(_base, r, a.Mode, a.Size) ?? a.Pixels;
     }
 
+    /// <summary>Normal, bold or italic, for new text and the selected text.</summary>
+    private string _textStyle = "Bold";
+
+    private void TextStyle_Checked(object sender, RoutedEventArgs e)
+    {
+        if (_syncing || sender is not RadioButton { Tag: string style }) return;
+        _textStyle = style;
+        if (_textBox != null)
+        {
+            // the text being typed changes at once
+            var (colour, size, _) = ((Color, double, string))_textBox.Tag;
+            var probe = new Annotation { TextStyle = style };
+            _textBox.FontWeight = probe.TextWeight;
+            _textBox.FontStyle = probe.TextSlant;
+            _textBox.Tag = (colour, size, style);
+        }
+        else if (_selected is { Kind: AnnotationKind.Text } t && t.TextStyle != style)
+        {
+            PushUndo();
+            t.TextStyle = style;
+            Render();
+            ShowSelection();
+        }
+    }
+
     private void UpdateHideOptions()
     {
+        bool text = _tool == Tool.Text || _selected?.Kind == AnnotationKind.Text || _textBox != null;
+        TextStyleOptions.Visibility = text ? Visibility.Visible : Visibility.Collapsed;
+        string current = _selected is { Kind: AnnotationKind.Text } sel ? sel.TextStyle : _textStyle;
+        _syncing = true;
+        TextNormal.IsChecked = current == "Normal";
+        TextBold.IsChecked = current == "Bold";
+        TextItalic.IsChecked = current == "Italic";
+        _syncing = false;
         bool show = _tool == Tool.Pixelate || _selected?.Kind == AnnotationKind.Pixelate;
         HideOptions.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         var mode = _selected is { Kind: AnnotationKind.Pixelate } s ? s.Mode : _lastHide;
@@ -1194,10 +1248,10 @@ public partial class EditorWindow : Window
         CommitText();
         if (_dirty && _items.Count > 0 || _dirty && _undo.Count > 0)
         {
-            var answer = MessageBox.Show(this, "Save your changes before closing?", "Overskin",
-                MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-            if (answer == MessageBoxResult.Cancel) { e.Cancel = true; return; }
-            if (answer == MessageBoxResult.Yes)
+            int answer = AskDialog.Ask(this, "Save your changes?", "The marks and edits on this picture haven't been saved yet.", "IcSave",
+                ("Don't save", false), ("Cancel", false), ("Save", true));
+            if (answer is 1 or -1) { e.Cancel = true; return; }
+            if (answer == 2)
             {
                 Save_Click(this, new RoutedEventArgs());
                 if (_dirty) { e.Cancel = true; return; }

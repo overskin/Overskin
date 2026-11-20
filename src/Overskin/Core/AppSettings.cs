@@ -52,6 +52,8 @@ public sealed class AppSettings
     public string HotkeyGif { get; set; } = "Ctrl+Alt+G";
     public string HotkeyRecent { get; set; } = "Ctrl+Alt+H";
     public string HotkeyPinClipboard { get; set; } = "Ctrl+Alt+V";
+    /// <summary>Record a video (again to stop).</summary>
+    public string HotkeyVideo { get; set; } = "Ctrl+Alt+R";
     /// <summary>Library order: Newest, Oldest, Name or Largest.</summary>
     public string LibrarySort { get; set; } = "Newest";
 
@@ -59,6 +61,8 @@ public sealed class AppSettings
     public bool AfterCopy { get; set; } = true;
     public bool AfterSave { get; set; } = true;
     public bool AfterEditor { get; set; }
+    /// <summary>Open the capture in the viewer (to look, zoom, go through the others, then edit if wanted).</summary>
+    public bool AfterViewer { get; set; }
     public bool AfterPin { get; set; }
     public bool AfterPreview { get; set; } = true;
     /// <summary>Draw the mouse pointer into screenshots and recordings.</summary>

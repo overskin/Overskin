@@ -1,5 +1,71 @@
 # Changelog
 
+## 2.7.0
+
+### New
+
+- **Viewer**: a click in the Library (or, if you like, every capture) opens in a viewer instead of the
+  editor. Arrow keys go through all your captures, the wheel zooms smoothly towards the mouse,
+  drag to look around, double-click for actual size, and pixels stay sharp up close. GIFs and
+  videos play. Copy, rotate (saved to the file), pin, show in the folder, delete, or press E
+  for the editor. Turn on *Open in the viewer* on the Capture page to see each capture there.
+- **Hotkey for video**: Ctrl+Alt+R starts and stops a video recording (change it in Settings).
+- **Text styles** in the editor: normal, bold or italic.
+
+### Fixed
+
+- **The capture screen no longer stutters on several monitors.** It was one window stretched
+  across every monitor, and with monitors at different refresh rates (360, 144 and 60 Hz, say)
+  Windows showed it at the slowest pace. Each monitor now has its own window.
+- **Scrolling capture in chats**: when the page doesn't move down (a chat already at its newest
+  message), it scrolls up through the history instead, and waits a moment when the app loads
+  more. The "Scrolling…" message no longer shows up as a black box in the picture.
+- Questions such as *Save your changes?* are in Overskin's own style instead of Windows' grey box.
+
+- **Clicking or hovering a window on the capture screen** picked the whole screen when an
+  app such as Medal, the NVIDIA overlay or Discord's overlay kept an invisible layer over
+  everything. Those see-through layers are now skipped, so windows highlight and capture again.
+- **The capture screen is smoother**: a fast mouse sends many moves per screen refresh; only
+  the newest is drawn now, and the dimming isn't rebuilt on every move.
+- **Snap to pictures works on real screens**: pictures placed half a pixel off (soft edges),
+  memes and cartoons with flat colours, and pictures with things lined up right beside them
+  are found, edge to edge.
+- **Scrolling capture no longer stops at the first animation**: rows are compared closely
+  rather than exactly, so a blinking cursor, a spinner, a floating button or a header that
+  gains a shadow don't stop it, and it looks again when the page is still gliding.
+
+### Editor
+
+- **Move things in a screenshot** (Move tool, M): click a word or a picture, or drag a box
+  around anything (even a single letter), and it lifts off as a piece you can drag anywhere or
+  scale from a corner (Shift stretches freely). The tool stays picked, ready for the next. The gap fills
+  in from what was around it. On a plain background the piece comes off without its
+  background, soft edges and all. Right-click selected text for *Move it*.
+- **Swap a picture**: right-click a picture inside a screenshot for *Replace with a picture
+  file* or *Replace with the clipboard picture*. The new one fills the same box with the same
+  rounded corners. *Move this picture* is there too.
+
+### Video
+
+- **Cut idle parts**: one click finds every stretch of 2 seconds or more where nothing on
+  screen moves and cuts it out.
+- **Cut anything out**: *Cut from here*, then *End the cut here* (or X). Cuts show in red
+  under the video and are skipped while it plays.
+- **Text and arrows**: type a label and *Add text*, or *Add an arrow* and drag on the video.
+  Each shows for 3 seconds from where the video is; drag it into place and set *From* and *To*.
+
+### Everything else
+
+- Numbered steps are gone from the editor.
+- **Watermark tiling** has its own settings: angle, spacing and staggered rows, and text can
+  be an outline only.
+- **Pins page**: the shortcut list sits right under your pins, and the subtitle no longer
+  cuts off.
+- **Recording page**: auto-zoom's fine-tuning (speed, follow, zoom-out time) is under *More*;
+  the backdrop list shows each one as a swatch.
+- **Settings**: hotkeys are grouped under Capture, Pins and windows, and Drawing.
+- **Screen tools**: *Pin the clipboard* fills the empty spot.
+
 ## 2.6.1
 
 - **Snap to pictures**: on the capture screen, hovering over a picture inside a window (a photo

@@ -95,9 +95,9 @@ public partial class MainWindow
     private void SelectDelete_Click(object sender, RoutedEventArgs e)
     {
         if (!AnyPicked(out var picked)) return;
-        var answer = MessageBox.Show(this, $"Move {picked.Count} capture{(picked.Count == 1 ? "" : "s")} to the Recycle Bin?", "Overskin",
-            MessageBoxButton.OKCancel, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.OK) return;
+        int answer = AskDialog.Ask(this, $"Move {picked.Count} capture{(picked.Count == 1 ? "" : "s")} to the Recycle Bin?",
+            "You can get them back from the Recycle Bin.", "IcTrash", ("Cancel", false), ("Move to the Recycle Bin", true));
+        if (answer != 1) return;
         int moved = 0;
         foreach (var item in picked)
         {

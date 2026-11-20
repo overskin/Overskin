@@ -375,9 +375,9 @@ public partial class GifEditorWindow : Window
         if (_busy) { e.Cancel = true; return; }
         if (!_kept && _clip.Count > 1 && !App.Quiet)
         {
-            var answer = MessageBox.Show(this, "Throw this clip away? It hasn't been saved or copied.", "Overskin",
-                MessageBoxButton.YesNo, MessageBoxImage.Question);
-            if (answer != MessageBoxResult.Yes) { e.Cancel = true; return; }
+            int answer = AskDialog.Ask(this, "Throw this clip away?", "It hasn't been saved or copied.", "IcTrash",
+                ("Keep it", false), ("Throw away", true));
+            if (answer != 1) { e.Cancel = true; return; }
         }
         _timer.Stop();
         _settle.Stop();

@@ -24,6 +24,16 @@ public sealed class WatermarkOptions
     /// <summary>Text colour: "White" or "Black" (each with a soft shadow of the other).</summary>
     public string Color { get; set; } = "White";
 
+    // ---- tiled across ----
+    /// <summary>Tilt of the rows, in degrees (-90 to 90; 0 is level).</summary>
+    public int TileAngle { get; set; } = -30;
+    /// <summary>Space between marks, as a percentage of the usual (25 close together to 300 far apart).</summary>
+    public int TileSpacing { get; set; } = 100;
+    /// <summary>Shift every other row half a step, like bricks.</summary>
+    public bool TileStagger { get; set; } = true;
+    /// <summary>Text as an outline only, so the picture shows through the letters.</summary>
+    public bool Outline { get; set; }
+
     public static readonly string[] Positions = { "TopLeft", "TopRight", "BottomLeft", "BottomRight", "Center", "Tiled" };
 
     public static string PositionName(string p) => p switch
@@ -45,6 +55,8 @@ public sealed class WatermarkOptions
         Size = Math.Clamp(Size, 2, 30);
         Opacity = Math.Clamp(Opacity, 10, 100);
         if (Color is not ("White" or "Black")) Color = "White";
+        TileAngle = Math.Clamp(TileAngle, -90, 90);
+        TileSpacing = Math.Clamp(TileSpacing == 0 ? 100 : TileSpacing, 25, 300);
     }
 
     public WatermarkOptions Copy() => (WatermarkOptions)MemberwiseClone();
@@ -87,14 +99,15 @@ public static class Watermark
         dc.PushOpacity(o.Opacity / 100.0);
         if (o.Position == "Tiled")
         {
-            // rows of marks, turned 30°, every other row shifted half a step
-            double stepX = b.Width + height * 3, stepY = b.Height + height * 2.5;
+            // rows of marks, tilted, spaced as chosen, every other row shifted half a step (if wanted)
+            double k = o.TileSpacing / 100.0;
+            double stepX = b.Width + height * 3 * k, stepY = b.Height + height * 2.5 * k;
             dc.PushClip(new RectangleGeometry(new Rect(0, 0, w, h)));
-            dc.PushTransform(new RotateTransform(-30, w / 2, h / 2));
+            dc.PushTransform(new RotateTransform(o.TileAngle, w / 2, h / 2));
             double reach = Math.Sqrt(w * w + h * h);
             int row = 0;
             for (double y = h / 2 - reach; y < h / 2 + reach; y += stepY, row++)
-                for (double x = w / 2 - reach + (row % 2) * stepX / 2; x < w / 2 + reach; x += stepX)
+                for (double x = w / 2 - reach + (o.TileStagger ? (row % 2) * stepX / 2 : 0); x < w / 2 + reach; x += stepX)
                 {
                     dc.PushTransform(new TranslateTransform(x - b.X, y - b.Y));
                     dc.DrawDrawing(mark);
@@ -147,8 +160,18 @@ public static class Watermark
                 bool white = o.Color == "White";
                 var shadow = geometry.Clone();
                 shadow.Transform = new TranslateTransform(height * 0.04, height * 0.05);
-                dc.DrawGeometry(new SolidColorBrush(white ? Color.FromArgb(110, 0, 0, 0) : Color.FromArgb(110, 255, 255, 255)), null, shadow);
-                dc.DrawGeometry(white ? Brushes.White : Brushes.Black, null, geometry);
+                if (o.Outline)
+                {
+                    // just the outline, with a thin contrasting edge so it reads on any background
+                    double pen = Math.Max(1, height * 0.045);
+                    dc.DrawGeometry(null, new Pen(white ? new SolidColorBrush(Color.FromArgb(120, 0, 0, 0)) : new SolidColorBrush(Color.FromArgb(120, 255, 255, 255)), pen * 2.2), geometry);
+                    dc.DrawGeometry(null, new Pen(white ? Brushes.White : Brushes.Black, pen), geometry);
+                }
+                else
+                {
+                    dc.DrawGeometry(new SolidColorBrush(white ? Color.FromArgb(110, 0, 0, 0) : Color.FromArgb(110, 255, 255, 255)), null, shadow);
+                    dc.DrawGeometry(white ? Brushes.White : Brushes.Black, null, geometry);
+                }
             }
         }
         group.Freeze();

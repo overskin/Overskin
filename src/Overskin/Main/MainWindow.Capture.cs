@@ -257,6 +257,7 @@ public partial class MainWindow
         Copy = _settings.AfterCopy,
         Pin = _settings.AfterPin,
         Editor = _settings.AfterEditor,
+        Viewer = _settings.AfterViewer && !_settings.AfterEditor,
         Preview = _settings.AfterPreview,
     };
 
@@ -336,6 +337,10 @@ public partial class MainWindow
         if (s.Editor)
         {
             OpenEditor(image, path, CaptureName(path));
+        }
+        else if (s.Viewer)
+        {
+            OpenViewer(path, image);
         }
         else if (s.Preview)
         {
@@ -505,6 +510,7 @@ public partial class MainWindow
         RefreshWorkflowRows();
         AfterSaveSwitch.IsChecked = _settings.AfterSave;
         AfterEditorSwitch.IsChecked = _settings.AfterEditor;
+        AfterViewerSwitch.IsChecked = _settings.AfterViewer && !_settings.AfterEditor;
         AfterPinSwitch.IsChecked = _settings.AfterPin;
         AfterPreviewSwitch.IsChecked = _settings.AfterPreview;
         AfterCursorSwitch.IsChecked = _settings.AfterCursor;
@@ -514,20 +520,24 @@ public partial class MainWindow
             chip.IsChecked = (string)chip.Tag == _settings.CaptureDelay.ToString();
         SaveFolderText.Text = _settings.SaveFolder;
         SaveFolderText.ToolTip = _settings.SaveFolder;
-        AfterPreviewSwitch.IsEnabled = !_settings.AfterEditor;
+        AfterPreviewSwitch.IsEnabled = !_settings.AfterEditor && !_settings.AfterViewer;
     }
 
     private void CaptureSwitch_Click(object sender, RoutedEventArgs e)
     {
         _settings.AfterCopy = AfterCopySwitch.IsChecked == true;
         _settings.AfterSave = AfterSaveSwitch.IsChecked == true;
+        // the viewer and the editor both show the picture: one or the other
+        if (sender == AfterEditorSwitch && AfterEditorSwitch.IsChecked == true) AfterViewerSwitch.IsChecked = false;
+        if (sender == AfterViewerSwitch && AfterViewerSwitch.IsChecked == true) AfterEditorSwitch.IsChecked = false;
         _settings.AfterEditor = AfterEditorSwitch.IsChecked == true;
+        _settings.AfterViewer = AfterViewerSwitch.IsChecked == true;
         _settings.AfterPin = AfterPinSwitch.IsChecked == true;
         _settings.AfterPreview = AfterPreviewSwitch.IsChecked == true;
         _settings.AfterCursor = AfterCursorSwitch.IsChecked == true;
         _settings.AutoHide = AutoHideSwitch.IsChecked == true;
         _settings.WindowAlpha = WindowAlphaSwitch.IsChecked == true;
-        AfterPreviewSwitch.IsEnabled = !_settings.AfterEditor; // the editor already shows the picture
+        AfterPreviewSwitch.IsEnabled = !_settings.AfterEditor && !_settings.AfterViewer; // they already show the picture
         SaveSettings();
     }
 
@@ -714,18 +724,45 @@ public partial class MainWindow
             UpdateCombineBar();
             return;
         }
-        if (ItemOf(sender) is { } video && IsVideo(video.Path))
+        // pictures, GIFs and videos all open in the viewer, which goes through what the Library shows
+        if (ItemOf(sender) is { } item)
         {
-            OpenVideo(video.Path);
-            return;
+            var paths = _library.Select(i => (string?)i.Path).ToList();
+            var viewer = new ViewerWindow(paths, Math.Max(0, paths.IndexOf(item.Path)), ViewerHostFor());
+            viewer.Show();
+            viewer.Activate();
         }
-        if (ItemOf(sender) is { } gif && Path.GetExtension(gif.Path).Equals(".gif", StringComparison.OrdinalIgnoreCase) && File.Exists(gif.Path))
+    }
+
+    /// <summary>What the viewer can ask for.</summary>
+    private ViewerHost ViewerHostFor() => new()
+    {
+        Edit = (image, path, name) => OpenEditor(image, path, name),
+        EditVideo = OpenVideo,
+        EditGif = OpenClipFile,
+        Pin = (image, name, path) => PinImage(image, name, path),
+        ShowInFolder = ShowInFolder,
+        Changed = RefreshLibrary,
+    };
+
+    /// <summary>
+    /// Opens a capture in the viewer, with the rest of the Library either side of it; an unsaved
+    /// capture is shown on its own.
+    /// </summary>
+    private void OpenViewer(string? path, BitmapSource image)
+    {
+        List<string?> paths;
+        int index = 0;
+        if (path != null)
         {
-            OpenClipFile(gif.Path);
-            return;
+            paths = _settings.History.AsEnumerable().Reverse().Select(h => (string?)h.Path).Where(p => File.Exists(p)).Distinct().ToList();
+            index = paths.IndexOf(path);
+            if (index < 0) { paths.Insert(0, path); index = 0; }
         }
-        if (ItemOf(sender) is { } item && LoadLibraryImage(item) is { } image)
-            OpenEditor(image, item.Path, Path.GetFileName(item.Path));
+        else paths = new List<string?> { null };
+        var viewer = new ViewerWindow(paths, index, ViewerHostFor(), path == null ? image : null);
+        viewer.Show();
+        viewer.Activate();
     }
 
     /// <summary>Right-click → Convert to: makes a copy in another format next to the original.</summary>

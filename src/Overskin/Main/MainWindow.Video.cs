@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace Overskin;
@@ -153,14 +154,49 @@ public partial class MainWindow
         });
     }
 
+    /// <summary>The backdrops as a menu of colour swatches.</summary>
     private void BackdropButton_Click(object sender, RoutedEventArgs e)
     {
-        ShowChoices(BackdropButton, Beautify.Backgrounds.Select(b => (b.Name, b.Name)), _settings.Video.Backdrop, name =>
+        var menu = new ContextMenu
         {
-            _settings.Video.Backdrop = name;
-            SaveSettings();
-            UpdateVideoLabels();
-        });
+            PlacementTarget = BackdropButton,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+            MinWidth = BackdropButton.ActualWidth,
+        };
+        foreach (var (name, _, _) in Beautify.Backgrounds)
+        {
+            var item = new MenuItem
+            {
+                Header = name == "None" ? "None (just the screen)" : name,
+                IsChecked = name == _settings.Video.Backdrop,
+                Icon = BackdropChip(name),
+            };
+            string chosen = name;
+            item.Click += (_, _) =>
+            {
+                _settings.Video.Backdrop = chosen;
+                SaveSettings();
+                UpdateVideoLabels();
+            };
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
+    }
+
+    /// <summary>A small rounded swatch of a backdrop (a crossed-out box for none).</summary>
+    private Border BackdropChip(string name)
+    {
+        var chip = new Border { Width = 22, Height = 14, CornerRadius = new CornerRadius(3), BorderThickness = new Thickness(1) };
+        chip.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
+        chip.Background = name == "None" ? Brushes.Transparent : Beautify.BackgroundBrush(name);
+        return chip;
+    }
+
+    private void VidZoomMore_Click(object sender, RoutedEventArgs e)
+    {
+        bool show = VidZoomMore.Visibility != Visibility.Visible;
+        VidZoomMore.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        VidZoomMoreButton.Content = show ? "Less" : "More";
     }
 
     private async void CameraButton_Click(object sender, RoutedEventArgs e)
@@ -181,7 +217,8 @@ public partial class MainWindow
         VidPointerSizeText.Text = $"{v.PointerSize:0.##}×";
         VidSmoothingText.Text = v.PointerSmoothing == 0 ? "Off" : $"{v.PointerSmoothing}";
         VidMotionBlurText.Text = v.MotionBlur == 0 ? "Off" : $"{v.MotionBlur}";
-        BackdropName.Text = v.Backdrop;
+        BackdropName.Text = v.Backdrop == "None" ? "None" : v.Backdrop;
+        BackdropSwatch.Background = v.Backdrop == "None" ? Brushes.Transparent : Beautify.BackgroundBrush(v.Backdrop);
         VidZoomText.Text = $"{v.Zoom:0.0}×";
         VidZoomSpeedText.Text = $"{v.ZoomSpeed}";
         VidFollowText.Text = $"{v.FollowSmoothing}";

@@ -624,6 +624,15 @@
                                                 </StackPanel>
                                             </Grid>
                                         </Button>
+                                        <Button Style="{StaticResource ToolRow}" Click="PinClipboard_Click" ToolTip="Pin the picture on the clipboard on top of everything (Ctrl+Alt+V)">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <local:Icon Data="{StaticResource IcPin}" Width="16" Height="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Pin the clipboard" Style="{StaticResource Label}" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
                                     </UniformGrid>
                                 </StackPanel>
                             </Border>
@@ -662,6 +671,10 @@
                                             <RadioButton x:Name="FormatJpg" Style="{StaticResource Seg}" Margin="0,0,8,0" MinWidth="0" GroupName="Format" Content="JPG" Tag="jpg" Checked="Format_Checked" ToolTip="Smaller files, best for photos" />
                                         </StackPanel>
                                         <Button Grid.Column="2" Style="{StaticResource Btn}" Height="25" Content="Change" Click="ChangeFolder_Click" />
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="A quick, smooth look at it: arrow keys go through your captures, the wheel zooms, E opens the editor">
+                                        <TextBlock Text="Open in the viewer" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="AfterViewerSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
                                     </Grid>
                                     <Grid Height="31">
                                         <TextBlock Text="Open in the editor" Style="{StaticResource Label}" />
@@ -753,6 +766,32 @@
                                             <TextBlock x:Name="WmOpacityText" Grid.Column="1" Style="{StaticResource Value}" />
                                         </Grid>
                                     </Grid>
+                                    <StackPanel x:Name="WmTileRows">
+                                        <Grid Height="31" ToolTip="How much the rows are tilted; 0 is level">
+                                            <TextBlock Text="Angle" Style="{StaticResource Label}" />
+                                            <Grid HorizontalAlignment="Right" Width="230">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                                <Slider x:Name="WmAngle" Minimum="-90" Maximum="90" SmallChange="5" LargeChange="15" TickFrequency="5" IsSnapToTickEnabled="True" ValueChanged="WatermarkSlider_Changed" />
+                                                <TextBlock x:Name="WmAngleText" Grid.Column="1" Style="{StaticResource Value}" />
+                                            </Grid>
+                                        </Grid>
+                                        <Grid Height="31" ToolTip="How far apart the marks are">
+                                            <TextBlock Text="Spacing" Style="{StaticResource Label}" />
+                                            <Grid HorizontalAlignment="Right" Width="230">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                                <Slider x:Name="WmSpacing" Minimum="25" Maximum="300" SmallChange="5" LargeChange="25" TickFrequency="5" IsSnapToTickEnabled="True" ValueChanged="WatermarkSlider_Changed" />
+                                                <TextBlock x:Name="WmSpacingText" Grid.Column="1" Style="{StaticResource Value}" />
+                                            </Grid>
+                                        </Grid>
+                                        <Grid Height="31" ToolTip="Shift every other row half a step, like bricks">
+                                            <TextBlock Text="Staggered rows" Style="{StaticResource Label}" />
+                                            <ToggleButton x:Name="WmStaggerSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="Watermark_Changed" />
+                                        </Grid>
+                                    </StackPanel>
+                                    <Grid x:Name="WmOutlineRow" Height="31" ToolTip="Draws the letters as outlines, so the picture shows through them">
+                                        <TextBlock Text="Outline only" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="WmOutlineSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="Watermark_Changed" />
+                                    </Grid>
                                     <Grid x:Name="WmColourRow" Height="31">
                                         <TextBlock Text="Text colour" Style="{StaticResource Label}" />
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
@@ -824,7 +863,11 @@
                                                 HorizontalContentAlignment="Stretch" Padding="8,0" Click="BackdropButton_Click">
                                             <Grid>
                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                                <TextBlock x:Name="BackdropName" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border x:Name="BackdropSwatch" Width="22" Height="14" CornerRadius="3" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                            BorderBrush="{DynamicResource LineStrong}" BorderThickness="1" />
+                                                    <TextBlock x:Name="BackdropName" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
                                                 <local:Icon Grid.Column="1" Data="{StaticResource IcChevronRight}" Width="11" Height="11" Margin="10,0,0,0" RenderTransformOrigin="0.5,0.5">
                                                     <local:Icon.RenderTransform><RotateTransform Angle="90" /></local:Icon.RenderTransform>
                                                 </local:Icon>
@@ -994,6 +1037,12 @@
                                             <TextBlock x:Name="VidZoomText" Grid.Column="1" Style="{StaticResource Value}" />
                                         </Grid>
                                     </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Fine-tuning" Style="{StaticResource Dim}" VerticalAlignment="Center" />
+                                        <Button x:Name="VidZoomMoreButton" Style="{StaticResource Btn}" Height="25" MinWidth="70" HorizontalAlignment="Right"
+                                                Content="More" Click="VidZoomMore_Click" ToolTip="Zoom speed, how loosely it follows, and when it zooms out" />
+                                    </Grid>
+                                    <StackPanel x:Name="VidZoomMore" Visibility="Collapsed">
                                     <Grid Height="31" ToolTip="Low is slow and gentle; high snaps in quickly">
                                         <TextBlock Text="Zoom speed" Style="{StaticResource Label}" />
                                         <Grid HorizontalAlignment="Right" Width="230">
@@ -1021,6 +1070,7 @@
                                             <TextBlock x:Name="VidHoldText" Grid.Column="1" Style="{StaticResource Value}" />
                                         </Grid>
                                     </Grid>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -1191,11 +1241,12 @@
                 </Grid>
 
                 <!-- ============ images ============ -->
-                <Grid x:Name="PageImage" Grid.Row="1" Margin="14,10,14,6">
+                <Grid x:Name="PageImage" Grid.Row="1" Margin="14,10,14,6" SizeChanged="PageImage_SizeChanged">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
                     <Border Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
@@ -1213,7 +1264,8 @@
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="Pin an image" Style="{StaticResource Heading}" />
-                                <TextBlock Text="Drop a file, paste, or snip the screen" Style="{StaticResource Dim}" Margin="0,2,10,0" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="Drop, paste or snip" Style="{StaticResource Dim}" Margin="0,2,10,0" TextTrimming="CharacterEllipsis"
+                                           ToolTip="Drop a picture file here, paste one, or snip part of the screen" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="PinClipboard_Click" ToolTip="Pin the picture on the clipboard (Ctrl+Alt+V from anywhere)">
@@ -1252,14 +1304,14 @@
                         </Grid>
                         <ListBox x:Name="ImageList" Grid.Row="1" Style="{StaticResource List}"
                                  ItemContainerStyle="{StaticResource Row}" ItemTemplate="{StaticResource ImageRow}" />
-                        <StackPanel x:Name="ImagesEmpty" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,24">
+                        <StackPanel x:Name="ImagesEmpty" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,28,0,32">
                             <local:Icon Data="{StaticResource IcImages}" Width="30" Height="30" StrokeWidth="1.5" Foreground="{DynamicResource TextFaint}" />
                             <TextBlock Text="Nothing pinned yet" Style="{StaticResource Dim}" HorizontalAlignment="Center" Margin="0,11,0,0" />
                         </StackPanel>
                     </Grid>
 
                     <!-- cheat sheet for the image windows themselves -->
-                    <Border Grid.Row="2" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="1,10,1,5">
+                    <Border x:Name="PinsCheatSheet" Grid.Row="2" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="1,10,1,5">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -1777,6 +1829,7 @@
                                     
                                 </Grid>
                                 <Border Style="{StaticResource Rule}" />
+                                <TextBlock Text="Capture" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" Margin="0,6,0,2" />
                                 <Grid Height="31">
                                     <TextBlock Text="Capture a region" Style="{StaticResource Label}" />
                                     <Button x:Name="HkRegionButton" Style="{StaticResource Btn}" Tag="HotkeyRegion" MinWidth="124" Height="25"
@@ -1798,6 +1851,11 @@
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
                                 <Grid Height="31">
+                                    <TextBlock Text="Record a video (press again to stop)" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkVideoButton" Style="{StaticResource Btn}" Tag="HotkeyVideo" MinWidth="124" Height="25"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="31">
                                     <TextBlock Text="Text from screen" Style="{StaticResource Label}" />
                                     <Button x:Name="HkTextButton" Style="{StaticResource Btn}" Tag="HotkeyText" MinWidth="124" Height="25"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
@@ -1812,12 +1870,13 @@
                                     <Button x:Name="HkRecentButton" Style="{StaticResource Btn}" Tag="HotkeyRecent" MinWidth="124" Height="25"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
+                                <Border Style="{StaticResource Rule}" Margin="0,4,0,4" />
+                                <TextBlock Text="Pins and windows" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" Margin="0,6,0,2" />
                                 <Grid Height="31">
                                     <TextBlock Text="Pin the clipboard picture" Style="{StaticResource Label}" />
                                     <Button x:Name="HkPinClipboardButton" Style="{StaticResource Btn}" Tag="HotkeyPinClipboard" MinWidth="124" Height="25"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Border Style="{StaticResource Rule}" Margin="0,4,0,4" />
                                 <Grid Height="31">
                                     <TextBlock Text="Pin the window under the mouse" Style="{StaticResource Label}" />
                                     <Button x:Name="HkPinButton" Style="{StaticResource Btn}" Tag="HotkeyPin" MinWidth="124" Height="25"
@@ -1843,6 +1902,8 @@
                                     <Button x:Name="HkSnipButton" Style="{StaticResource Btn}" Tag="HotkeySnip" MinWidth="124" Height="25"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
+                                <Border Style="{StaticResource Rule}" Margin="0,4,0,4" />
+                                <TextBlock Text="Drawing (Trace)" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" Margin="0,6,0,2" />
                                 <Grid Height="31">
                                     <TextBlock Text="Start drawing in the chosen area" Style="{StaticResource Label}" />
                                     <Button x:Name="HkDrawButton" Style="{StaticResource Btn}" Tag="HotkeyDraw" MinWidth="124" Height="25"

@@ -12,6 +12,7 @@ public sealed record AfterSteps
     public bool CopyText { get; init; }
     public bool Pin { get; init; }
     public bool Editor { get; init; }
+    public bool Viewer { get; init; }
     public bool Preview { get; init; }
 }
 

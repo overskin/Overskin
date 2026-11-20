@@ -7,7 +7,7 @@ using System.Windows.Shapes;
 
 namespace Overskin;
 
-public enum AnnotationKind { Pen, Highlighter, Line, Arrow, Rectangle, Ellipse, Text, Step, Pixelate }
+public enum AnnotationKind { Pen, Highlighter, Line, Arrow, Rectangle, Ellipse, Text, Pixelate, Piece }
 
 /// <summary>
 /// One mark on a screenshot, in image pixels. Kept as plain data so undo is just a copy of the
@@ -21,7 +21,8 @@ public sealed class Annotation
     public Color Color { get; set; } = Colors.Red;
     public double Size { get; set; } = 3;
     public string Text { get; set; } = "";
-    public int Number { get; set; }
+    /// <summary>Text: "Normal", "Bold" or "Italic".</summary>
+    public string TextStyle { get; set; } = "Bold";
     /// <summary>Pixelate: the blocky picture of what was underneath.</summary>
     public BitmapSource? Pixels { get; set; }
     /// <summary>Boxes and ellipses: solid instead of outlined.</summary>
@@ -38,7 +39,7 @@ public sealed class Annotation
         Color = Color,
         Size = Size,
         Text = Text,
-        Number = Number,
+        TextStyle = TextStyle,
         Pixels = Pixels,
         Filled = Filled,
         Mode = Mode,
@@ -51,7 +52,8 @@ public sealed class Annotation
     }
 
     public double FontSize => 12 + Size * 3.5;
-    public double StepDiameter => 22 + Size * 2.5;
+    public FontWeight TextWeight => TextStyle == "Bold" ? FontWeights.Bold : FontWeights.Normal;
+    public FontStyle TextSlant => TextStyle == "Italic" ? FontStyles.Italic : FontStyles.Normal;
 
     /// <summary>Rough area the mark covers, for clicking on it and for the selection box.</summary>
     public Rect Bounds()
@@ -64,11 +66,6 @@ public sealed class Annotation
                 var formatted = Measure();
                 return new Rect(Points[0], new Size(formatted.Width, formatted.Height));
             }
-            case AnnotationKind.Step:
-            {
-                double r = StepDiameter / 2;
-                return new Rect(Points[0].X - r, Points[0].Y - r, r * 2, r * 2);
-            }
         }
         double minX = Points.Min(p => p.X), minY = Points.Min(p => p.Y);
         double maxX = Points.Max(p => p.X), maxY = Points.Max(p => p.Y);
@@ -80,7 +77,7 @@ public sealed class Annotation
 
     private Size Measure()
     {
-        var tb = new TextBlock { Text = Text.Length == 0 ? " " : Text, FontSize = FontSize, FontWeight = FontWeights.SemiBold };
+        var tb = new TextBlock { Text = Text.Length == 0 ? " " : Text, FontSize = FontSize, FontWeight = TextWeight, FontStyle = TextSlant };
         tb.FontFamily = (FontFamily)Application.Current.Resources["UiFont"];
         tb.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         return tb.DesiredSize;
@@ -159,32 +156,15 @@ public sealed class Annotation
             {
                 var tb = new TextBlock
                 {
-                    Text = Text, Foreground = brush, FontSize = FontSize, FontWeight = FontWeights.SemiBold,
+                    Text = Text, Foreground = brush, FontSize = FontSize, FontWeight = TextWeight, FontStyle = TextSlant,
                     FontFamily = (FontFamily)Application.Current.Resources["UiFont"], Effect = Halo(Color),
                 };
                 Canvas.SetLeft(tb, Points[0].X);
                 Canvas.SetTop(tb, Points[0].Y);
                 return tb;
             }
-            case AnnotationKind.Step:
-            {
-                double d = StepDiameter;
-                var grid = new Grid { Width = d, Height = d };
-                grid.Children.Add(new Ellipse { Fill = brush, Stroke = new SolidColorBrush(Color.FromArgb(0x60, 0, 0, 0)), StrokeThickness = 1 });
-                grid.Children.Add(new TextBlock
-                {
-                    Text = Number.ToString(),
-                    Foreground = TraceEngine.Luma(Color) > 160 ? Brushes.Black : Brushes.White,
-                    FontSize = d * 0.52, FontWeight = FontWeights.Bold,
-                    FontFamily = (FontFamily)Application.Current.Resources["UiFont"],
-                    HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 0, d * 0.04),
-                });
-                Canvas.SetLeft(grid, Points[0].X - d / 2);
-                Canvas.SetTop(grid, Points[0].Y - d / 2);
-                return grid;
-            }
             case AnnotationKind.Pixelate:
+            case AnnotationKind.Piece:
             {
                 var r = Span(Points[0], Points[^1]);
                 var img = new Image { Source = Pixels, Width = r.Width, Height = r.Height, Stretch = Stretch.Fill };

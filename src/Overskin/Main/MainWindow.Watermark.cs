@@ -25,13 +25,17 @@ public partial class MainWindow
         WmOpacity.Value = w.Opacity;
         WmWhite.IsChecked = w.Color == "White";
         WmBlack.IsChecked = w.Color == "Black";
+        WmAngle.Value = w.TileAngle;
+        WmSpacing.Value = w.TileSpacing;
+        WmStaggerSwitch.IsChecked = w.TileStagger;
+        WmOutlineSwitch.IsChecked = w.Outline;
         _syncingWatermark = false;
         UpdateWatermarkView();
     }
 
     private void ReadWatermarkControls()
     {
-        if (_syncingWatermark || WmPreview == null || _settings == null) return;
+        if (_syncingWatermark || WmPreview == null || WmOutlineSwitch == null || _settings == null) return;
         var w = _settings.Watermark;
         w.OnScreenshots = WmShotsSwitch.IsChecked == true;
         w.OnVideos = WmVideosSwitch.IsChecked == true;
@@ -40,6 +44,10 @@ public partial class MainWindow
         w.Size = (int)WmSize.Value;
         w.Opacity = (int)WmOpacity.Value;
         w.Color = WmBlack.IsChecked == true ? "Black" : "White";
+        w.TileAngle = (int)WmAngle.Value;
+        w.TileSpacing = (int)WmSpacing.Value;
+        w.TileStagger = WmStaggerSwitch.IsChecked == true;
+        w.Outline = WmOutlineSwitch.IsChecked == true;
         UpdateWatermarkView();
         if (_ready) SaveSettings();
     }
@@ -77,6 +85,10 @@ public partial class MainWindow
         WmTextRow.Visibility = image ? Visibility.Collapsed : Visibility.Visible;
         WmColourRow.Visibility = image ? Visibility.Collapsed : Visibility.Visible;
         WmImageRow.Visibility = image ? Visibility.Visible : Visibility.Collapsed;
+        WmOutlineRow.Visibility = image ? Visibility.Collapsed : Visibility.Visible;
+        WmTileRows.Visibility = w.Position == "Tiled" ? Visibility.Visible : Visibility.Collapsed;
+        WmAngleText.Text = $"{w.TileAngle}\u00b0";
+        WmSpacingText.Text = $"{w.TileSpacing}%";
         WmImageName.Text = w.ImagePath.Length == 0 ? "None chosen" : File.Exists(w.ImagePath) ? Path.GetFileName(w.ImagePath) : "Missing: " + Path.GetFileName(w.ImagePath);
         WmPositionName.Text = WatermarkOptions.PositionName(w.Position);
         WmSizeText.Text = $"{w.Size}%";

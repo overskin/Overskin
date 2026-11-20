@@ -126,14 +126,14 @@
                         <RadioButton x:Name="ToolText" Style="{StaticResource Tool}" Tag="Text" ToolTip="Text  (T)" Checked="Tool_Checked">
                             <local:Icon Data="{StaticResource IcType}" Width="16" Height="16" />
                         </RadioButton>
-                        <RadioButton x:Name="ToolStep" Style="{StaticResource Tool}" Tag="Step" ToolTip="Numbered step  (N)" Checked="Tool_Checked">
-                            <local:Icon Data="{StaticResource IcListOrdered}" Width="16" Height="16" />
-                        </RadioButton>
                         <RadioButton x:Name="ToolPixelate" Style="{StaticResource Tool}" Tag="Pixelate" ToolTip="Hide: blur, pixelate or mosaic  (B)" Checked="Tool_Checked">
                             <local:Icon Data="{StaticResource IcGrid2x2}" Width="16" Height="16" />
                         </RadioButton>
                         <RadioButton x:Name="ToolErase" Style="{StaticResource Tool}" Tag="Erase" ToolTip="Smart erase: paint over something to remove it  (X)" Checked="Tool_Checked">
                             <local:Icon Data="{StaticResource IcEraser}" Width="16" Height="16" />
+                        </RadioButton>
+                        <RadioButton x:Name="ToolMove" Style="{StaticResource Tool}" Tag="Move" ToolTip="Move: lift a word, an icon or a picture off and drag it; the gap fills in  (M)" Checked="Tool_Checked">
+                            <local:Icon Data="{StaticResource IcMove}" Width="16" Height="16" />
                         </RadioButton>
                         <RadioButton x:Name="ToolCrop" Style="{StaticResource Tool}" Tag="Crop" ToolTip="Crop  (C)" Checked="Tool_Checked">
                             <local:Icon Data="{StaticResource IcCrop}" Width="16" Height="16" />
@@ -168,6 +168,16 @@
                             <TextBlock x:Name="OpacityText" Text="100%" Width="34" Margin="6,0,0,0" VerticalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextDim}" />
                         </StackPanel>
 
+                        <StackPanel x:Name="TextStyleOptions" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                            <Border Style="{StaticResource ToolSep}" />
+                            <RadioButton x:Name="TextNormal" Style="{StaticResource Seg}" GroupName="TextStyle" Tag="Normal" Content="Normal" Margin="0" Checked="TextStyle_Checked" ToolTip="Plain text" />
+                            <RadioButton x:Name="TextBold" Style="{StaticResource Seg}" GroupName="TextStyle" Tag="Bold" Checked="TextStyle_Checked" ToolTip="Bold">
+                                <TextBlock Text="Bold" FontWeight="Bold" />
+                            </RadioButton>
+                            <RadioButton x:Name="TextItalic" Style="{StaticResource Seg}" GroupName="TextStyle" Tag="Italic" Checked="TextStyle_Checked" ToolTip="Italic">
+                                <TextBlock Text="Italic" FontStyle="Italic" />
+                            </RadioButton>
+                        </StackPanel>
                         <StackPanel x:Name="HideOptions" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                             <Border Style="{StaticResource ToolSep}" />
                             <RadioButton x:Name="HideBlur" Style="{StaticResource Seg}" GroupName="HideMode" Tag="Blur" Content="Blur" Margin="0" Checked="HideMode_Checked" />

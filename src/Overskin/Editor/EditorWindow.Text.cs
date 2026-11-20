@@ -885,6 +885,7 @@ public partial class EditorWindow
             menu.Items.Add(mi);
         }
         Item("Copy the text", CopySelectedText);
+        Item("Move it (lift it off and drag it)", LiftSelectedText);
         Item("Erase it (fill in from around it)", () => _ = EraseSelectedTextAsync());
         Item("Hide it (blur, pixelate or mosaic)", HideSelectedText);
         Item("Select all the text", SelectAllText);

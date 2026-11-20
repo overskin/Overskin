@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <!--
     The setup app. It targets .NET Framework 4.7.2, which every supported Windows 10/11 already
@@ -18,7 +18,7 @@
 
     <AssemblyName>OverskinSetup</AssemblyName>
     <RootNamespace>OverskinSetup</RootNamespace>
-    <Version>2.6.1</Version>
+    <Version>2.7.0</Version>
     <Product>Overskin Setup</Product>
     <Description>Installs Overskin.</Description>
 

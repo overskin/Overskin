@@ -117,6 +117,12 @@ public partial class VideoEditorWindow : Window
             Seek(start);
             now = start;
         }
+        // cut parts are skipped while playing
+        if (CutAt(now) is { } cut)
+        {
+            Seek(cut.End);
+            now = cut.End;
+        }
         ShowTime(now);
     }
 
@@ -126,10 +132,10 @@ public partial class VideoEditorWindow : Window
         Scrubber.Value = Math.Clamp(seconds, 0, Scrubber.Maximum);
         _syncing = false;
         TimeText.Text = $"{Clock(seconds)} / {Clock(_length)}";
+        DrawOverlays();
     }
 
     private void Play_Click(object sender, RoutedEventArgs e) => Play(!_playing);
-    private void Player_Click(object sender, MouseButtonEventArgs e) => Play(!_playing);
 
     private void Scrubber_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
@@ -185,6 +191,7 @@ public partial class VideoEditorWindow : Window
         StartText.Text = Clock(start, tenths: true);
         EndText.Text = Clock(end, tenths: true);
         TrimText.Text = $"{Clock(end - start, tenths: true)} kept";
+        UpdateCuts();
     }
 
     private static string Clock(double seconds, bool tenths = false)
@@ -196,11 +203,14 @@ public partial class VideoEditorWindow : Window
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
+        // typing a label isn't a shortcut
+        if (Keyboard.FocusedElement is TextBox) { base.OnPreviewKeyDown(e); return; }
         switch (e.Key)
         {
             case Key.Space: Play(!_playing); e.Handled = true; break;
             case Key.I: StartHere_Click(this, e); e.Handled = true; break;
             case Key.O: EndHere_Click(this, e); e.Handled = true; break;
+            case Key.X: Cut_Click(this, e); e.Handled = true; break;
             case Key.Left: BeginAdjust(false); Seek(Player.Position.TotalSeconds - 1); e.Handled = true; break;
             case Key.Right: BeginAdjust(false); Seek(Player.Position.TotalSeconds + 1); e.Handled = true; break;
         }
@@ -213,9 +223,9 @@ public partial class VideoEditorWindow : Window
     {
         if (_busy) return false;
         var (start, end) = Range;
-        if (start <= 0.05 && end >= _length - 0.05)
+        if (start <= 0.05 && end >= _length - 0.05 && _cuts.Count == 0 && _overlays.Count == 0)
         {
-            Toast.Show("Move Start or End first: that's the whole video.");
+            Toast.Show("Trim, cut or add something first: this is the whole video as it is.");
             return false;
         }
         _busy = true;
@@ -227,8 +237,12 @@ public partial class VideoEditorWindow : Window
         {
             // writing over the file that's open in the player would fail, so render beside it first
             string temp = output + ".part.mp4";
-            await VideoTrim.TrimAsync(_path, temp, TimeSpan.FromSeconds(start), TimeSpan.FromSeconds(end),
-                new Progress<double>(p => SaveProgress.Value = p));
+            var progress = new Progress<double>(p => SaveProgress.Value = p);
+            if (_cuts.Count == 0 && _overlays.Count == 0)
+                await VideoTrim.TrimAsync(_path, temp, TimeSpan.FromSeconds(start), TimeSpan.FromSeconds(end), progress);
+            else
+                await VideoEdit.RenderAsync(_path, temp, VideoEdit.Keep(start, end, _cuts), _overlays.Select(o => o.Clone()).ToList(),
+                    Math.Max(2, Player.NaturalVideoHeight), progress);
             File.Move(temp, output, overwrite: true);
             StatusText.Text = Path.GetFileName(output);
             _saved(output);

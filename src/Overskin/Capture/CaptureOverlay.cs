@@ -39,6 +39,11 @@ public sealed class CaptureOverlay : Window
     private double _scale = 1;
 
     private readonly Canvas _canvas = new();
+    /// <summary>The window's own content: the canvas (the whole virtual screen), shifted so this window's monitor shows.</summary>
+    private readonly Canvas _host = new();
+    /// <summary>The monitor this window covers: the one the pointer was on. Every other monitor gets a <see cref="Mirror"/>.</summary>
+    private RECT _home;
+    private readonly List<Mirror> _mirrors = new();
     private readonly Image _backdrop = new();
     private readonly Path _dim = new() { Fill = new SolidColorBrush(Color.FromArgb(0x70, 0, 0, 0)), IsHitTestVisible = false };
     private readonly Rectangle _frame = new() { StrokeThickness = 1, IsHitTestVisible = false, SnapsToDevicePixels = true };
@@ -183,7 +188,14 @@ public sealed class CaptureOverlay : Window
             _toolbar.PickFromScreenRequested += BeginPickColour;
             _canvas.Children.Add(_toolbar);
         }
-        Content = _canvas;
+        _home = MonitorBounds(CursorPos());
+        _host.Children.Add(_canvas);
+        Content = _host;
+        Closed += (_, _) =>
+        {
+            foreach (var m in _mirrors) m.Close();
+            _mirrors.Clear();
+        };
     }
 
 #if DEBUG
@@ -301,6 +313,7 @@ public sealed class CaptureOverlay : Window
     {
         base.OnContentRendered(e);
         Cover();
+        OpenMirrors();
         Activate();
         Focus();
         Update(CursorPos());
@@ -312,10 +325,85 @@ public sealed class CaptureOverlay : Window
         Layout();
     }
 
+    /// <summary>
+    /// Covers the pointer's monitor only. A single window stretched over monitors that refresh at
+    /// different rates (360, 144 and 60 Hz, say) is shown at the slowest pace and stutters; one
+    /// window per monitor keeps each one smooth.
+    /// </summary>
     private void Cover()
     {
-        Placement.MoveTo(new WindowInteropHelper(this).Handle, new Int32Rect(_virtual.Left, _virtual.Top, _virtual.Width, _virtual.Height), true);
+        var home = AllMonitors().Count > 1 ? _home : _virtual;
+        if (home.Width <= 0 || home.Height <= 0) home = _virtual;
+        Placement.MoveTo(new WindowInteropHelper(this).Handle, new Int32Rect(home.Left, home.Top, home.Width, home.Height), true);
         Layout();
+    }
+
+    /// <summary>Opens a mirror on every other monitor, showing its part of the same canvas.</summary>
+    private void OpenMirrors()
+    {
+        if (_mirrors.Count > 0 || !IsVisible) return;
+        var monitors = AllMonitors();
+        if (monitors.Count < 2) return;
+        foreach (var m in monitors)
+        {
+            if (m.Left == _home.Left && m.Top == _home.Top && m.Right == _home.Right && m.Bottom == _home.Bottom) continue;
+            var mirror = new Mirror(this, m);
+            _mirrors.Add(mirror);
+            mirror.Show();
+        }
+    }
+
+    /// <summary>
+    /// Another monitor's view of the capture screen: a picture of its part of the owner's canvas,
+    /// kept up to date by WPF. The mouse is handed to the owner, which does all the work.
+    /// </summary>
+    private sealed class Mirror : Window
+    {
+        private readonly CaptureOverlay _owner;
+        private readonly RECT _monitor;
+
+        public Mirror(CaptureOverlay owner, RECT monitor)
+        {
+            _owner = owner;
+            _monitor = monitor;
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            ShowInTaskbar = false;
+            ShowActivated = false;
+            Topmost = true;
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Background = Brushes.Black;
+            Cursor = Cursors.Cross;
+            Left = monitor.Left;
+            Top = monitor.Top;
+            Width = 100;
+            Height = 100;
+            var a = owner.Local(monitor.Left, monitor.Top);
+            var b = owner.Local(monitor.Right, monitor.Bottom);
+            var brush = new VisualBrush(owner._canvas)
+            {
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Viewbox = new Rect(a, b),
+                Stretch = Stretch.Fill,
+                AlignmentX = AlignmentX.Left,
+                AlignmentY = AlignmentY.Top,
+            };
+            RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.NearestNeighbor);
+            Content = new Rectangle { Fill = brush };
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            var handle = new WindowInteropHelper(this).Handle;
+            TrySetExStyle(handle, GetExStyle(handle) | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW, out _);
+            Placement.MoveTo(handle, new Int32Rect(_monitor.Left, _monitor.Top, _monitor.Width, _monitor.Height), true);
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e) => _owner.OnMouseMove(e);
+        protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e) => _owner.OnMouseLeftButtonDown(e);
+        protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e) => _owner.OnMouseLeftButtonUp(e);
+        protected override void OnMouseRightButtonDown(MouseButtonEventArgs e) => _owner.OnMouseRightButtonDown(e);
     }
 
     /// <summary>The whole window is drawn at one scale, so physical pixels map to it uniformly.</summary>
@@ -324,6 +412,12 @@ public sealed class CaptureOverlay : Window
         _scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
         _backdrop.Width = _virtual.Width / _scale;
         _backdrop.Height = _virtual.Height / _scale;
+        // the canvas is the whole virtual screen; this window shows its own monitor's part of it
+        _canvas.Width = _backdrop.Width;
+        _canvas.Height = _backdrop.Height;
+        var home = AllMonitors().Count > 1 ? _home : _virtual;
+        // moved as a whole (not the canvas inside it), so the mirrors' pictures of the canvas stay in its own coordinates
+        _host.RenderTransform = new TranslateTransform(-(home.Left - _virtual.Left) / _scale, -(home.Top - _virtual.Top) / _scale);
         _magnifier.LayoutTransform = new ScaleTransform(1 / _scale, 1 / _scale); // same physical size on every monitor
         _ink.Width = _backdrop.Width;
         _ink.Height = _backdrop.Height;
@@ -360,11 +454,24 @@ public sealed class CaptureOverlay : Window
             GetWindowThreadProcessId(h, out uint pid);
             if (pid == own) return true;
             if (ClassName(h) is "Progman" or "WorkerW") return true;
+            if (IsOverlay(h)) return true;
             var r = VisibleBounds(h);
             if (r.Width >= 24 && r.Height >= 24) list.Add((r, h));
             return true;
         }, IntPtr.Zero);
         return list;
+    }
+
+    /// <summary>
+    /// Windows no one means to capture: ones the mouse goes straight through (the screen-wide
+    /// layers that Medal, Discord, NVIDIA, Xbox Game Bar and the like keep over everything), and
+    /// see-through tool windows that don't take clicks. Picking those gave the whole screen.
+    /// </summary>
+    internal static bool IsOverlay(IntPtr h)
+    {
+        long ex = GetExStyle(h);
+        if ((ex & WS_EX_TRANSPARENT) != 0) return true;
+        return (ex & WS_EX_LAYERED) != 0 && (ex & (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)) != 0 && (ex & WS_EX_NOACTIVATE) != 0;
     }
 
     // ---- interaction ---------------------------------------------------------------------
@@ -418,6 +525,21 @@ public sealed class CaptureOverlay : Window
         var p = new POINT(x + _virtual.Left, y + _virtual.Top);
         var r = Target(p);
         return (_images?.Count ?? -1, new Int32Rect(r.Left - _virtual.Left, r.Top - _virtual.Top, r.Width, r.Height), PictureAt(p) != null);
+    }
+#endif
+
+#if DEBUG
+    /// <summary>For the self-test: how many visible windows are skipped as overlays, and the size of the first one that would be picked.</summary>
+    internal static (int Skipped, string First) WindowsForTest()
+    {
+        int skipped = 0;
+        EnumWindows((h, _) =>
+        {
+            if (IsWindowVisible(h) && !IsIconic(h) && !IsCloaked(h) && IsOverlay(h)) skipped++;
+            return true;
+        }, IntPtr.Zero);
+        var first = VisibleWindows().FirstOrDefault();
+        return (skipped, first.Item2 == IntPtr.Zero ? "none" : $"{first.Item1.Width}x{first.Item1.Height}");
     }
 #endif
 
@@ -551,6 +673,10 @@ public sealed class CaptureOverlay : Window
         Canvas.SetTop(_magnifier, my);
     }
 
+    private readonly RectangleGeometry _dimWhole = new(), _dimHole = new();
+    private GeometryGroup? _dimShapeCache;
+    private GeometryGroup _dimShape => _dimShapeCache ??= new GeometryGroup { FillRule = FillRule.EvenOdd, Children = { _dimWhole, _dimHole } };
+
     private void ShowRect(RECT r, bool solid)
     {
         _current = r;
@@ -568,8 +694,12 @@ public sealed class CaptureOverlay : Window
         double round = _snapped is { } picture ? picture.Radius / _scale : 0;
         _frame.RadiusX = _frame.RadiusY = round;
 
-        var full = new RectangleGeometry(new Rect(0, 0, _backdrop.Width, _backdrop.Height));
-        _dim.Data = new GeometryGroup { FillRule = FillRule.EvenOdd, Children = { full, new RectangleGeometry(rect, round, round) } };
+        // the dimming is the whole screen with a hole: the same two shapes, moved, not made anew each time
+        var whole = new Rect(0, 0, _backdrop.Width, _backdrop.Height);
+        if (_dimWhole.Rect != whole) _dimWhole.Rect = whole;
+        _dimHole.Rect = rect;
+        _dimHole.RadiusX = _dimHole.RadiusY = round;
+        if (_dim.Data != _dimShape) _dim.Data = _dimShape;
 
         _labelText.Text = _snapped != null ? $"Picture   {r.Width} × {r.Height}   ·   Ctrl for the window" : $"{r.Width} × {r.Height}";
         _label.Visibility = Visibility.Visible;
@@ -605,7 +735,22 @@ public sealed class CaptureOverlay : Window
         Canvas.SetTop(_label, lb.Y - 30);
     }
 
-    protected override void OnMouseMove(MouseEventArgs e) => Update(CursorPos());
+    private bool _movePending;
+
+    /// <summary>
+    /// A fast mouse sends many moves between two screen refreshes; only the newest is worth
+    /// drawing, so the rest are folded into one update just before the next frame.
+    /// </summary>
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (_movePending) return;
+        _movePending = true;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
+        {
+            _movePending = false;
+            Update(CursorPos());
+        });
+    }
 
     private bool _pickingColour;
     /// <summary>The press picked a colour, so its release mustn't also capture.</summary>

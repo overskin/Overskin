@@ -21,6 +21,7 @@ public partial class MainWindow
         ["the colour picker"] = _settings.HotkeyColour,
         ["recent captures"] = _settings.HotkeyRecent,
         ["pinning the clipboard"] = _settings.HotkeyPinClipboard,
+        ["recording a video"] = _settings.HotkeyVideo,
         ["pinning a window"] = _settings.HotkeyPin,
         ["raising opacity"] = _settings.HotkeyOpacityUp,
         ["lowering opacity"] = _settings.HotkeyOpacityDown,
