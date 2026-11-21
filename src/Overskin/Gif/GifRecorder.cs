@@ -201,6 +201,13 @@ internal sealed class RecordFrameWindow
         foreach (var s in _strips) s.Show();
     }
 
+    /// <summary>Amber while the recording is paused, red while it records.</summary>
+    public void SetPaused(bool paused)
+    {
+        var colour = paused ? Color.FromRgb(0xF5, 0x9E, 0x0B) : Color.FromRgb(0xEF, 0x44, 0x44);
+        foreach (var s in _strips) s.Background = new SolidColorBrush(colour);
+    }
+
     public void Close()
     {
         foreach (var s in _strips) s.Close();
@@ -215,6 +222,12 @@ internal sealed class RecordBarWindow : GuardedWindow
     private readonly Int32Rect _area;
     private readonly TextBlock _time = new();
     private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    private readonly Ellipse _dot;
+    private readonly DoubleAnimation _blink = new(1, 0.25, TimeSpan.FromMilliseconds(700)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
+    private Button? _pause, _pen, _colour;
+    private Icon? _pauseIcon;
+    private readonly List<(ScreenPen.Tool Tool, Button Button)> _tools = new();
+    private StackPanel? _toolRow;
 
     public RecordBarWindow(IRecorder recorder, Int32Rect area) : base(clickThrough: false)
     {
@@ -225,8 +238,8 @@ internal sealed class RecordBarWindow : GuardedWindow
         UseLayoutRounding = true;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
 
-        var dot = new Ellipse { Width = 9, Height = 9, Fill = new SolidColorBrush(Color.FromRgb(0xEF, 0x44, 0x44)), Margin = new Thickness(2, 0, 9, 0) };
-        dot.BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0.25, TimeSpan.FromMilliseconds(700)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever });
+        var dot = _dot = new Ellipse { Width = 9, Height = 9, Fill = new SolidColorBrush(Color.FromRgb(0xEF, 0x44, 0x44)), Margin = new Thickness(2, 0, 9, 0) };
+        dot.BeginAnimation(OpacityProperty, _blink);
         _time.Foreground = (Brush)FindResource("Text");
         _time.FontSize = 12.5;
         _time.FontWeight = FontWeights.SemiBold;
@@ -247,6 +260,7 @@ internal sealed class RecordBarWindow : GuardedWindow
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(dot);
         row.Children.Add(_time);
+        if (recorder is VideoRecorder video) AddVideoButtons(row, video);
         row.Children.Add(stop);
         row.Children.Add(cancel);
 
@@ -261,13 +275,109 @@ internal sealed class RecordBarWindow : GuardedWindow
         };
         Corners = (CornerRadius)FindResource("RadiusCard");
 
-        _tick.Tick += (_, _) => UpdateTime();
+        _tick.Tick += (_, _) =>
+        {
+            UpdateTime();
+            if (_recorder is VideoRecorder { Pen.On: true }) RaiseAbove();
+        };
         UpdateTime();
+    }
+
+    private Button IconButton(string icon, string tip, Action click)
+    {
+        var b = new Button { Style = (Style)FindResource("BtnIcon"), ToolTip = tip, Margin = new Thickness(1, 0, 1, 0) };
+        b.Content = new Icon { Data = (Geometry)FindResource(icon), Width = 14, Height = 14 };
+        b.Click += (_, _) => click();
+        return b;
+    }
+
+    /// <summary>Pause, and drawing on the screen with its tools and colour.</summary>
+    private void AddVideoButtons(StackPanel row, VideoRecorder video)
+    {
+        _pause = IconButton("IcPause", "Pause  (" + Hotkeys.Pause + ")", video.TogglePause);
+        _pauseIcon = (Icon)_pause.Content;
+        _pen = IconButton("IcPencil", "Draw on the screen  (" + Hotkeys.Pen + ")\nWhat you draw is recorded and fades after a few seconds; the pointer is hidden meanwhile. Right-click puts the pen away.", video.TogglePen);
+        row.Children.Add(_pause);
+        row.Children.Add(_pen);
+
+        _toolRow = new StackPanel { Orientation = Orientation.Horizontal, Visibility = Visibility.Collapsed, Margin = new Thickness(2, 0, 0, 0) };
+        foreach (var (tool, icon, tip) in new[]
+        {
+            (ScreenPen.Tool.Pen, "IcPencil", "Pen"), (ScreenPen.Tool.Arrow, "IcArrowUpRight", "Arrow"),
+            (ScreenPen.Tool.Box, "IcSquare", "Box"), (ScreenPen.Tool.Highlight, "IcHighlighter", "Highlighter"),
+        })
+        {
+            var t = tool;
+            var b = IconButton(icon, tip, () => { if (video.Pen is { } p) { p.Current = t; Refresh(); } });
+            ((Icon)b.Content).Width = ((Icon)b.Content).Height = 13;
+            _tools.Add((t, b));
+            _toolRow.Children.Add(b);
+        }
+        _colour = new Button { Style = (Style)FindResource("BtnIcon"), ToolTip = "Colour (click for the next one)", Margin = new Thickness(1, 0, 4, 0) };
+        _colour.Content = new Ellipse { Width = 13, Height = 13, Stroke = (Brush)FindResource("LineStrong"), StrokeThickness = 1 };
+        _colour.Click += (_, _) => { if (video.Pen is { } p) { p.ColourIndex = (p.ColourIndex + 1) % ScreenPen.Colours.Length; Refresh(); } };
+        _toolRow.Children.Add(_colour);
+        row.Children.Add(_toolRow);
+        Refresh();
+    }
+
+    /// <summary>
+    /// Puts the bar back on top of everything, the drawing sheet included, so Pause, Stop and the
+    /// pen stay clickable while drawing (a click on the sheet can lift it above the bar).
+    /// </summary>
+    public void RaiseAbove()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle != IntPtr.Zero) SetWindowPos(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+
+    /// <summary>Shows whether the recording is paused and which drawing tool is picked.</summary>
+    public void Refresh()
+    {
+        if (_recorder is not VideoRecorder video || _pause == null) return;
+        bool paused = video.IsPaused, drawing = video.Pen?.On == true;
+        _pauseIcon!.Data = (Geometry)FindResource(paused ? "IcPlay" : "IcPause");
+        _pause.ToolTip = (paused ? "Carry on recording" : "Pause") + "  (" + Hotkeys.Pause + ")";
+        _dot.Fill = new SolidColorBrush(paused ? Color.FromRgb(0xF5, 0x9E, 0x0B) : Color.FromRgb(0xEF, 0x44, 0x44));
+        if (paused) { _dot.BeginAnimation(OpacityProperty, null); _dot.Opacity = 1; }
+        else _dot.BeginAnimation(OpacityProperty, _blink);
+        _pen!.IsEnabled = !paused;
+        Mark(_pen, drawing);
+        _toolRow!.Visibility = drawing ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var (tool, button) in _tools) Mark(button, video.Pen?.Current == tool);
+        if (video.Pen != null) ((Ellipse)_colour!.Content).Fill = new SolidColorBrush(video.Pen.Colour);
+        UpdateTime();
+    }
+
+    private void Mark(Button b, bool on)
+    {
+        if (on)
+        {
+            b.SetResourceReference(BackgroundProperty, "AccentSoft");
+            if (b.Content is Icon i) i.SetResourceReference(Overskin.Icon.ForegroundProperty, "Accent");
+        }
+        else
+        {
+            b.ClearValue(BackgroundProperty);
+            if (b.Content is Icon i) i.ClearValue(Overskin.Icon.ForegroundProperty);
+        }
+    }
+
+    /// <summary>The keys shown in the bar's tooltips (set by the main window from the settings).</summary>
+    internal static class Hotkeys
+    {
+        public static string Pause = "Ctrl+Alt+P";
+        public static string Pen = "Ctrl+Alt+D";
     }
 
     private void UpdateTime()
     {
         var t = _recorder.Elapsed;
+        if (_recorder is VideoRecorder { IsPaused: true })
+        {
+            _time.Text = $"Paused  {(int)t.TotalMinutes}:{t.Seconds:00}";
+            return;
+        }
         _time.Text = _recorder.Limit is { } limit
             ? $"{(int)t.TotalMinutes}:{t.Seconds:00}  /  {(int)limit.TotalMinutes}:{limit.Seconds:00}"
             : $"{(int)t.TotalMinutes}:{t.Seconds:00}";

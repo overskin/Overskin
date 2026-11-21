@@ -103,6 +103,16 @@ public partial class VideoEditorWindow
         if (Bands == null) return;
         Bands.Children.Clear();
         double width = Bands.ActualWidth;
+        // zooms in the accent colour just above the cuts
+        if (_zooms != null && _length > 0 && width > 0)
+            foreach (var z in _zooms.Zooms)
+            {
+                var band = new Rectangle { Height = 4, Width = Math.Max(2, (z.End - z.Start) / _length * width), RadiusX = 2, RadiusY = 2, Opacity = 0.85 };
+                band.SetResourceReference(Shape.FillProperty, "Accent");
+                Canvas.SetLeft(band, z.Start / _length * width);
+                Canvas.SetTop(band, -6);
+                Bands.Children.Add(band);
+            }
         if (_length > 0 && width > 0)
             foreach (var (s, e) in _cuts)
             {
@@ -187,6 +197,7 @@ public partial class VideoEditorWindow
         OverlayCanvas.Children.Clear();
         var (s, ox, oy) = Fit();
         if (s <= 0) return;
+        DrawBlurs(s, ox, oy);
         double now = Player.Position.TotalSeconds;
         foreach (var o in _overlays)
         {
@@ -231,6 +242,7 @@ public partial class VideoEditorWindow
         _dragged = false;
         _grabFrom = p;
         OverlayCanvas.CaptureMouse();
+        if (!_arrowMode && BlurMouseDown(p)) return;
         if (_arrowMode)
         {
             double now = Player.Position.TotalSeconds;
@@ -245,6 +257,7 @@ public partial class VideoEditorWindow
 
     private void Overlay_MouseMove(object sender, MouseEventArgs e)
     {
+        if (_pressed && BlurMouseMove(ToVideo(e.GetPosition(OverlayCanvas)))) return;
         if (!_pressed || _grabbed == null) return;
         var p = ToVideo(e.GetPosition(OverlayCanvas));
         if (!_dragged && (p - _grabFrom).Length < 3) return;
@@ -265,6 +278,7 @@ public partial class VideoEditorWindow
         if (!_pressed) return;
         _pressed = false;
         OverlayCanvas.ReleaseMouseCapture();
+        if (BlurMouseUp()) return;
         if (_arrowMode)
         {
             if (_grabbed != null && (_grabbed.B - _grabbed.A).Length < 12) { _overlays.Remove(_grabbed); _chosen = null; }
@@ -327,6 +341,89 @@ public partial class VideoEditorWindow
             row.Children.Add(buttons);
             OverlayList.Children.Add(row);
         }
+    }
+
+    // ---- editable zooms -------------------------------------------------------------------
+
+    private ZoomTrack? _zooms;
+    private bool _zoomsChanged;
+
+    private void LoadZooms()
+    {
+        _zooms = ZoomTrack.Load(_path);
+        ZoomCard.Visibility = _zooms != null ? Visibility.Visible : Visibility.Collapsed;
+        RebuildZoomList();
+    }
+
+    private void ZoomsChanged()
+    {
+        _zoomsChanged = true;
+        _zooms!.Zooms.Sort((a, b) => a.Start.CompareTo(b.Start));
+        RebuildZoomList();
+        UpdateCuts();
+        ZoomNote.Text = "Save makes the video again with these zooms.";
+    }
+
+    private void AddZoom_Click(object sender, RoutedEventArgs e)
+    {
+        if (_zooms == null) return;
+        double now = Player.Position.TotalSeconds;
+        _zooms.Zooms.Add(new ZoomSegment { Start = now, End = Math.Min(_length, now + 3), Zoom = _zooms.Zooms.LastOrDefault()?.Zoom ?? 1.8 });
+        ZoomsChanged();
+    }
+
+    private void RebuildZoomList()
+    {
+        if (ZoomList == null) return;
+        ZoomList.Children.Clear();
+        if (_zooms == null) return;
+        if (_zooms.Zooms.Count == 0)
+            ZoomList.Children.Add(new TextBlock { Text = "No zooms. Add one where the video is now.", FontSize = 11, Foreground = (Brush)FindResource("TextDim") });
+        foreach (var z in _zooms.Zooms)
+        {
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+            row.ColumnDefinitions.Add(new ColumnDefinition());
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var text = new StackPanel { Cursor = Cursors.Hand };
+            text.Children.Add(new TextBlock { Text = $"{z.Zoom:0.0}× zoom" });
+            var when = new TextBlock { Text = $"{Clock(z.Start, tenths: true)} to {Clock(z.End, tenths: true)}", FontSize = 11 };
+            when.SetResourceReference(TextBlock.ForegroundProperty, "TextDim");
+            text.Children.Add(when);
+            var chosen = z;
+            text.MouseLeftButtonUp += (_, _) => Seek(chosen.Start);
+            row.Children.Add(text);
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            Button Small(string label, string tip, Action act)
+            {
+                var b = new Button { Content = label, ToolTip = tip, Height = 24, Margin = new Thickness(3, 0, 0, 0), Padding = new Thickness(6, 0, 6, 0) };
+                b.SetResourceReference(StyleProperty, "Btn");
+                b.Click += (_, _) => { act(); ZoomsChanged(); };
+                return b;
+            }
+            buttons.Children.Add(Small("−", "Zoom in less", () => chosen.Zoom = Math.Max(1.2, Math.Round(chosen.Zoom - 0.2, 1))));
+            buttons.Children.Add(Small("+", "Zoom in more", () => chosen.Zoom = Math.Min(3.5, Math.Round(chosen.Zoom + 0.2, 1))));
+            buttons.Children.Add(Small("From", "Starts where the video is now", () => chosen.Start = Math.Min(Player.Position.TotalSeconds, chosen.End - 0.2)));
+            buttons.Children.Add(Small("To", "Ends where the video is now", () => chosen.End = Math.Max(Player.Position.TotalSeconds, chosen.Start + 0.2)));
+            buttons.Children.Add(Small("✕", "Remove this zoom", () => _zooms.Zooms.Remove(chosen)));
+            Grid.SetColumn(buttons, 1);
+            row.Children.Add(buttons);
+            ZoomList.Children.Add(row);
+        }
+    }
+
+    // ---- small enough to share ---------------------------------------------------------------
+
+    private void ShareSize_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (ShareSizeText != null) ShareSizeText.Text = $"{ShareSize.Value:0} MB";
+    }
+
+    private async void SaveSmall_Click(object sender, RoutedEventArgs e)
+    {
+        string dir = System.IO.Path.GetDirectoryName(_path) ?? "", name = System.IO.Path.GetFileNameWithoutExtension(_path);
+        string output = System.IO.Path.Combine(dir, $"{name} {ShareSize.Value:0} MB.mp4");
+        for (int i = 2; System.IO.File.Exists(output); i++) output = System.IO.Path.Combine(dir, $"{name} {ShareSize.Value:0} MB {i}.mp4");
+        await SaveTo(output, (long)(ShareSize.Value * 1024 * 1024));
     }
 
 #if DEBUG

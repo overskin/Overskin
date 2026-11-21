@@ -10,7 +10,7 @@ namespace Overskin;
 /// <summary>Screen recording to MP4, plain or with auto-zoom.</summary>
 public partial class MainWindow
 {
-    private const int HkVideoEsc = 20;
+    private const int HkVideoEsc = 20, HkVideoPause = 21;
 
     private VideoRecorder? _video;
     private bool _videoWasShown;
@@ -96,6 +96,7 @@ public partial class MainWindow
         VidKeysSwitch.IsChecked = v.ShowKeys;
         VidRingsSwitch.IsChecked = v.ClickRings;
         VideoZoomSwitch.IsChecked = v.AutoZoom;
+        VidEditableZoomsSwitch.IsChecked = v.EditableZooms;
         VidZoom.Value = v.Zoom;
         VidZoomSpeed.Value = v.ZoomSpeed;
         VidFollow.Value = v.FollowSmoothing;
@@ -250,6 +251,7 @@ public partial class MainWindow
         v.ShowKeys = VidKeysSwitch.IsChecked == true;
         v.ClickRings = VidRingsSwitch.IsChecked == true;
         v.AutoZoom = VideoZoomSwitch.IsChecked == true;
+        v.EditableZooms = VidEditableZoomsSwitch.IsChecked == true;
         v.Zoom = Math.Round(VidZoom.Value, 1);
         v.ZoomSpeed = (int)VidZoomSpeed.Value;
         v.FollowSmoothing = (int)VidFollow.Value;
@@ -292,7 +294,12 @@ public partial class MainWindow
                 _video.Finished += OnVideoFinished;
             }
             _hotkeys?.Register(HkVideoEsc, new Hotkey(ModifierKeys.None, Key.Escape), () => _video.Stop());
-            string path = ImageFiles.NewPath(_settings.SaveFolder, ".mp4");
+            // the pause key pauses the recording; the start-drawing key draws on the screen
+            if (Hotkey.TryParse(_settings.HotkeyPause, out var pause)) _hotkeys?.Register(HkVideoPause, pause, () => _video.TogglePause());
+            RecordBarWindow.Hotkeys.Pause = _settings.HotkeyPause;
+            RecordBarWindow.Hotkeys.Pen = _settings.HotkeyDraw;
+            FileNames.Context = NameInfo.At(area.X + area.Width / 2, area.Y + area.Height / 2);
+            string path = NewCapturePath(".mp4");
             var mark = _settings.Watermark.OnVideos && _settings.Watermark.HasContent ? _settings.Watermark.Copy() : null;
             _video.Start(area, path, _settings.Video.With(autoZoom), mark);
         });
@@ -301,6 +308,7 @@ public partial class MainWindow
     private void OnVideoFinished(string? path, string? error)
     {
         _hotkeys?.Unregister(HkVideoEsc);
+        _hotkeys?.Unregister(HkVideoPause);
         Reappear(_videoWasShown);
         if (error != null)
         {
@@ -330,6 +338,7 @@ public partial class MainWindow
             Toast.Show("That file has been moved or deleted.");
             return;
         }
+        VideoEditorWindow.OpenPicture ??= (picture, name) => OpenEditor(picture, null, name);
         new VideoEditorWindow(path, AddToHistory).Show();
     }
 

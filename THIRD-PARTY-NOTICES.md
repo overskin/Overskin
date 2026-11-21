@@ -1,7 +1,7 @@
 # Third-party notices
 
-Overskin includes icon artwork from the following project. The icon outlines are stored in
-`Themes/Icons.xaml`.
+Overskin includes icon artwork from Lucide (the outlines are stored in `Themes/Icons.xaml`) and
+reads QR codes and barcodes with ZXing.Net.
 
 ## Lucide
 
@@ -52,3 +52,20 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+
+## ZXing.Net
+
+https://github.com/micjahn/ZXing.Net
+
+Copyright 2012-2026 ZXing.Net authors, a port of ZXing ("Zebra Crossing") by the ZXing authors.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+in compliance with the License. You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License
+is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+or implied. See the License for the specific language governing permissions and limitations under
+the License.

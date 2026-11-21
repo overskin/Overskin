@@ -163,9 +163,9 @@ public sealed class CaptureNotice : Window
 /// <summary>Shows text read from the screen, already copied, editable before copying again.</summary>
 public sealed class TextResultWindow : Window
 {
-    public TextResultWindow(string text)
+    public TextResultWindow(string text, bool qr = false)
     {
-        Title = "Text from screen";
+        Title = qr ? "QR code" : "Text from screen";
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -173,15 +173,15 @@ public sealed class TextResultWindow : Window
         Topmost = true;
         ShowInTaskbar = false;
         Width = 460;
-        Height = 330;
+        Height = qr ? 230 : 330;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         FontFamily = (FontFamily)FindResource("UiFont");
         UseLayoutRounding = true;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
 
         var heading = new StackPanel { Orientation = Orientation.Horizontal };
-        heading.Children.Add(new Icon { Data = (Geometry)FindResource("IcScanText"), Width = 15, Height = 15, Foreground = (Brush)FindResource("Accent"), Margin = new Thickness(0, 0, 8, 0) });
-        heading.Children.Add(new TextBlock { Text = "Text from screen", Style = (Style)FindResource("Heading") });
+        heading.Children.Add(new Icon { Data = (Geometry)FindResource(qr ? "IcScan" : "IcScanText"), Width = 15, Height = 15, Foreground = (Brush)FindResource("Accent"), Margin = new Thickness(0, 0, 8, 0) });
+        heading.Children.Add(new TextBlock { Text = qr ? "QR code" : "Text from screen", Style = (Style)FindResource("Heading") });
         heading.Children.Add(new TextBlock { Text = "Copied", Style = (Style)FindResource("Dim"), Margin = new Thickness(8, 1, 0, 0) });
         heading.MouseLeftButtonDown += (_, e) => { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); };
         heading.Background = Brushes.Transparent;
@@ -205,6 +205,17 @@ public sealed class TextResultWindow : Window
         var close = new Button { Style = (Style)FindResource("Btn"), Content = "Close", Margin = new Thickness(0, 0, 6, 0) };
         close.Click += (_, _) => Close();
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        // a code that's a web address can be opened straight away
+        if (qr && QrReader.LinkIn(text) is { } link)
+        {
+            var open = new Button { Style = (Style)FindResource("Btn"), Content = "Open link", Margin = new Thickness(0, 0, 6, 0), ToolTip = link.AbsoluteUri };
+            open.Click += (_, _) =>
+            {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(link.AbsoluteUri) { UseShellExecute = true }); } catch { }
+                Close();
+            };
+            buttons.Children.Add(open);
+        }
         buttons.Children.Add(close);
         buttons.Children.Add(copy);
 

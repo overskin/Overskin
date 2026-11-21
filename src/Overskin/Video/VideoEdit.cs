@@ -76,6 +76,9 @@ public sealed class VideoOverlay
 /// </summary>
 public static class VideoEdit
 {
+    /// <summary>For the self-test: the file size after each pass of the last size-limited save.</summary>
+    internal static List<long> LastPasses { get; } = new();
+
     /// <summary>Where a moment of the original lands in the edited video (cuts close up the time).</summary>
     public static double ToOutput(double t, IReadOnlyList<(double Start, double End)> keep)
     {
@@ -107,9 +110,11 @@ public static class VideoEdit
         return keep.Where(k => k.Item2 - k.Item1 >= 0.05).ToList();
     }
 
+    /// <param name="maxBytes">When set, the file is made to fit: the picture quality (and if need be its size) is chosen so it comes in under this.</param>
     public static async Task RenderAsync(string input, string output, IReadOnlyList<(double Start, double End)> keep,
-        IReadOnlyList<VideoOverlay> overlays, int videoHeight, IProgress<double>? progress = null)
+        IReadOnlyList<VideoOverlay> overlays, int videoHeight, IProgress<double>? progress = null, long? maxBytes = null)
     {
+        LastPasses.Clear();
         if (keep.Count == 0 || keep.Sum(k => k.End - k.Start) < 0.1) throw new InvalidOperationException("That leaves nothing to save.");
         var source = await StorageFile.GetFileFromPathAsync(Path.GetFullPath(input));
         var composition = new MediaComposition();
@@ -153,6 +158,25 @@ public static class VideoEdit
 
             var profile = await MediaEncodingProfile.CreateFromFileAsync(source);
             if (profile.Video != null) profile.Video.Bitrate = Math.Max(profile.Video.Bitrate, 4_000_000);
+            double seconds = keep.Sum(k => k.End - k.Start);
+            if (maxBytes is { } limit && profile.Video != null)
+            {
+                // what the size allows per second, less the sound and a margin for the container
+                uint audio = profile.Audio != null ? Math.Min(profile.Audio.Bitrate, 96_000u) : 0;
+                if (profile.Audio != null) profile.Audio.Bitrate = audio;
+                double allowed = limit * 8 * 0.9 / Math.Max(0.5, seconds) - audio;
+                uint bitrate = (uint)Math.Clamp(allowed, 150_000, profile.Video.Bitrate);
+                profile.Video.Bitrate = bitrate;
+                // too few bits for this many pixels looks blocky: make the picture smaller to suit
+                double pixels = profile.Video.Width * (double)profile.Video.Height;
+                double needed = pixels * 30 * 0.07; // roughly what H.264 needs for clean screen video
+                if (bitrate < needed)
+                {
+                    double k = Math.Max(0.3, Math.Sqrt(bitrate / needed));
+                    profile.Video.Width = (uint)Math.Max(320, (int)(profile.Video.Width * k) & ~1);
+                    profile.Video.Height = (uint)Math.Max(180, (int)(profile.Video.Height * k) & ~1);
+                }
+            }
             string folder = Path.GetDirectoryName(Path.GetFullPath(output))!;
             Directory.CreateDirectory(folder);
             var storageFolder = await StorageFolder.GetFolderFromPathAsync(folder);
@@ -164,6 +188,29 @@ public static class VideoEdit
             {
                 try { await target.DeleteAsync(); } catch { }
                 throw new InvalidOperationException("Windows couldn't save the video (" + result + ").");
+            }
+            // the encoder can overshoot (very busy pictures especially): again with fewer bits and,
+            // if it's well over, fewer pixels, until it fits
+            for (int pass = 0; pass < 4 && maxBytes is { } cap && profile.Video != null; pass++)
+            {
+                long size = new FileInfo(Path.GetFullPath(output)).Length;
+                LastPasses.Add(size);
+                if (size <= cap) break;
+                double over = size / (double)cap;
+                profile.Video.Bitrate = (uint)Math.Max(100_000, profile.Video.Bitrate / over * 0.85);
+                if (over > 1.15)
+                {
+                    double k = Math.Max(0.5, Math.Sqrt(1 / over) * 0.95);
+                    profile.Video.Width = (uint)Math.Max(320, (int)(profile.Video.Width * k) & ~1);
+                    profile.Video.Height = (uint)Math.Max(180, (int)(profile.Video.Height * k) & ~1);
+                }
+                // a new file each time: rendering again over the same one leaves it as it was
+                await target.DeleteAsync();
+                target = await storageFolder.CreateFileAsync(Path.GetFileName(output), CreationCollisionOption.ReplaceExisting);
+                var again = composition.RenderToFileAsync(target, MediaTrimmingPreference.Precise, profile);
+                if (progress != null) again.Progress = (_, p) => progress.Report(p / 100.0);
+                var reason = await again;
+                if (reason != TranscodeFailureReason.None) throw new InvalidOperationException("Windows couldn't save the video (" + reason + ").");
             }
         }
         finally

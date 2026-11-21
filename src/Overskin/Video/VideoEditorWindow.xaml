@@ -72,6 +72,7 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <Button x:Name="PlayButton" Style="{StaticResource BtnIcon}" Width="32" Height="30" Click="Play_Click" ToolTip="Play / pause  (Space)">
                                 <local:Icon x:Name="PlayIcon" Data="{StaticResource IcPlay}" Width="16" Height="16" />
@@ -80,7 +81,11 @@
                                     ValueChanged="Scrubber_Changed" />
                             <!-- the parts that will be cut, in red under the scrubber -->
                             <Canvas x:Name="Bands" Grid.Column="1" Margin="15,0,15,0" Height="4" VerticalAlignment="Bottom" IsHitTestVisible="False" />
-                            <TextBlock x:Name="TimeText" Grid.Column="2" Style="{StaticResource Dim}" MinWidth="96" TextAlignment="Right" />
+                            <TextBlock x:Name="TimeText" Grid.Column="2" Style="{StaticResource Dim}" MinWidth="96" TextAlignment="Right" VerticalAlignment="Center" />
+                            <Button Grid.Column="3" Style="{StaticResource BtnIcon}" Width="32" Height="30" Margin="8,0,0,0" Click="GrabStill_Click"
+                                    ToolTip="Grab this frame: copies it as a picture and opens it in the editor">
+                                <local:Icon Data="{StaticResource IcCamera}" Width="16" Height="16" />
+                            </Button>
                         </Grid>
                     </Border>
                 </Grid>
@@ -125,6 +130,20 @@
                                                Text="Playing loops the part you keep. The original file isn't changed: Save makes an edited copy." />
                                 </StackPanel>
                             </Border>
+                            <Border x:Name="ZoomCard" Style="{StaticResource Card}" Visibility="Collapsed">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcZoomIn}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Zooms" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <StackPanel x:Name="ZoomList" />
+                                    <Button Style="{StaticResource Btn}" Height="26" HorizontalAlignment="Left" Margin="0,4,0,0" Click="AddZoom_Click"
+                                            ToolTip="Zooms in from where the video is now for 3 seconds, following the pointer" Content="Add a zoom here" />
+                                    <TextBlock x:Name="ZoomNote" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,8,0,0"
+                                               Text="Zooms show in your accent colour under the video. Change them here, then Save." />
+                                </StackPanel>
+                            </Border>
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
@@ -160,6 +179,49 @@
                                     <Button x:Name="ArrowButton" Style="{StaticResource Btn}" Height="26" HorizontalAlignment="Left" Click="AddArrow_Click" Content="Add an arrow"
                                             ToolTip="Then drag on the video from the tail to the point" />
                                     <StackPanel x:Name="OverlayList" Margin="0,8,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcEyeOff}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Blur" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <WrapPanel>
+                                        <Button x:Name="BlurButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,6" Click="AddBlur_Click" Content="Add a blur box"
+                                                ToolTip="Then drag over what to hide. It's blurred from here to the end; drag it to move it" />
+                                        <Button x:Name="FindPrivateButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,6" Click="FindPrivate_Click" Content="Find private details"
+                                                ToolTip="Reads the frame showing now and blurs every email, phone number, card number, address, IP and key on it, from here to the end" />
+                                    </WrapPanel>
+                                    <StackPanel x:Name="BlurList" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcDownload}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Small enough to share" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Style="{StaticResource Row}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="64" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="52" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Under" Style="{StaticResource Label}" />
+                                        <Slider x:Name="ShareSize" Grid.Column="1" Minimum="1" Maximum="100" SmallChange="1" LargeChange="5" TickFrequency="1"
+                                                IsSnapToTickEnabled="True" Value="10" ValueChanged="ShareSize_Changed" />
+                                        <TextBlock x:Name="ShareSizeText" Grid.Column="2" Style="{StaticResource Value}" Text="10 MB" />
+                                    </Grid>
+                                    <Button Style="{StaticResource Btn}" Height="26" HorizontalAlignment="Left" Margin="0,6,0,0" Click="SaveSmall_Click"
+                                            ToolTip="Saves a copy with your edits that fits in this size (Discord's free limit is 10 MB): the quality and, if need be, the size are chosen to suit">
+                                        <StackPanel Orientation="Horizontal">
+                                            <local:Icon Data="{StaticResource IcDownload}" Width="13" Height="13" Margin="0,0,6,0" />
+                                            <TextBlock Text="Save a small copy" />
+                                        </StackPanel>
+                                    </Button>
                                 </StackPanel>
                             </Border>
                             <Border Style="{StaticResource Card}">

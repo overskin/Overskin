@@ -76,6 +76,13 @@ public sealed class AppSettings
     public string SaveFolder { get; set; } = DefaultSaveFolder();
     /// <summary>"png" or "jpg".</summary>
     public string ImageFormat { get; set; } = "png";
+    /// <summary>JPEG quality, 10 to 100.</summary>
+    public int JpegQuality { get; set; } = 90;
+    /// <summary>Keep every saved screenshot under <see cref="SizeLimitMb"/>.</summary>
+    public bool SizeLimit { get; set; }
+    public double SizeLimitMb { get; set; } = 8;
+    /// <summary>How saved captures are named, such as "{app} {date} {time}" (see <see cref="FileNames"/>).</summary>
+    public string FileNamePattern { get; set; } = FileNames.Default;
     public int CaptureDelay { get; set; }
     public bool FullScreenAllMonitors { get; set; }
     public int[]? LastRegion { get; set; }
@@ -243,6 +250,9 @@ public sealed class AppSettings
         History.RemoveAll(h => h == null || string.IsNullOrEmpty(h.Path));
         if (string.IsNullOrWhiteSpace(SaveFolder)) SaveFolder = DefaultSaveFolder();
         if (ImageFormat is not ("png" or "jpg")) ImageFormat = "png";
+        JpegQuality = Math.Clamp(JpegQuality == 0 ? 90 : JpegQuality, 10, 100);
+        if (string.IsNullOrWhiteSpace(FileNamePattern)) FileNamePattern = FileNames.Default;
+        SizeLimitMb = Math.Clamp(SizeLimitMb <= 0 ? 8 : SizeLimitMb, 0.5, 50);
         if (CaptureDelay is not (0 or 3 or 5 or 10)) CaptureDelay = 0;
         if (LastRegion is { Length: not 4 }) LastRegion = null;
         // Ctrl+Alt+S used to be "snip and pin"; it now captures a region

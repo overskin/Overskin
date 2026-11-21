@@ -15,7 +15,7 @@ $app = Join-Path $root "build\app"
 New-Item -ItemType Directory -Force $dist, $app | Out-Null
 
 dotnet publish (Join-Path $root "src/Overskin/Overskin.csproj") -c Release -r win-x64 --self-contained true `
-    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $app --nologo -v quiet
+    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=true -o $app --nologo -v quiet
 if ($LASTEXITCODE -ne 0) { throw "Overskin build failed" }
 Remove-Item (Join-Path $app "*.pdb") -ErrorAction SilentlyContinue
 

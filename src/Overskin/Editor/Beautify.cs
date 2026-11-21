@@ -18,6 +18,10 @@ public sealed record BeautifyOptions
     public double Shadow { get; init; } = 50;
     /// <summary>Width / height, or 0 to fit the picture.</summary>
     public double Aspect { get; init; }
+    /// <summary>A device or window round the picture: see <see cref="Mockup.Frames"/>.</summary>
+    public string Frame { get; init; } = "None";
+    /// <summary>The frame picture for "Custom".</summary>
+    public string? FramePath { get; init; }
 }
 
 /// <summary>
@@ -47,6 +51,12 @@ public static class Beautify
 
     public static BitmapSource Render(BitmapSource image, BeautifyOptions o)
     {
+        if (o.Frame != "None")
+        {
+            // the frame gives the shape, so the card itself gets no rounding of its own
+            var framed = Mockup.Apply(image, o.Frame, o.FramePath);
+            if (!ReferenceEquals(framed, image)) { image = framed; o = o with { Corners = 0 }; }
+        }
         double iw = image.PixelWidth, ih = image.PixelHeight;
         double w = iw + 2 * o.Padding, h = ih + 2 * o.Padding;
         if (o.Aspect > 0)
@@ -94,6 +104,8 @@ public sealed class BeautifyWindow : Window
     private readonly Slider _corners = new() { Minimum = 0, Maximum = 40, Value = _last.Corners, Width = 170 };
     private readonly Slider _shadow = new() { Minimum = 0, Maximum = 100, Value = _last.Shadow, Width = 170 };
     private string _background = _last.Background;
+    private string _frame = _last.Frame;
+    private string? _framePath = _last.FramePath;
     private double _aspect = _last.Aspect;
     private readonly WrapPanel _swatches = new() { Width = 236 };
 
@@ -104,7 +116,7 @@ public sealed class BeautifyWindow : Window
         _image = image;
         Title = "Beautify";
         Width = 980;
-        Height = 620;
+        Height = 700;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false;
         SetResourceReference(BackgroundProperty, "Bg");
@@ -150,6 +162,36 @@ public sealed class BeautifyWindow : Window
             aspects.Children.Add(b);
         }
 
+        var frames = new WrapPanel { Width = 236 };
+        foreach (var name in Mockup.Frames)
+        {
+            var b = new RadioButton
+            {
+                Style = (Style)FindResource("Seg"), GroupName = "BeautifyFrame", Content = name == "Custom" ? "Your own…" : name,
+                Margin = new Thickness(0, 0, 5, 5), IsChecked = name == _frame,
+                ToolTip = name == "Custom" ? "Any frame picture with a see-through screen (a PNG), such as the device bezels makers publish for designers" : null,
+            };
+            var chosen = name;
+            b.Checked += (_, _) =>
+            {
+                if (chosen == "Custom")
+                {
+                    var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Choose a frame picture (PNG with a see-through screen)", Filter = "PNG pictures|*.png|All pictures|*.png;*.webp;*.tif;*.tiff" };
+                    if (dialog.ShowDialog(this) == true) _framePath = dialog.FileName;
+                    if (_framePath == null || Mockup.Custom(new WriteableBitmap(4, 4, 96, 96, PixelFormats.Bgra32, null), _framePath) == null)
+                    {
+                        Toast.Show("That picture has no see-through screen to put the screenshot in.", true);
+                        _frame = "None";
+                        Refresh();
+                        return;
+                    }
+                }
+                _frame = chosen;
+                Refresh();
+            };
+            frames.Children.Add(b);
+        }
+
         foreach (var s in new[] { _padding, _corners, _shadow }) s.ValueChanged += (_, _) => Refresh();
 
         TextBlock Label(string text) => new() { Text = text, Style = (Style)FindResource("Label"), Margin = new Thickness(0, 14, 0, 6) };
@@ -159,6 +201,8 @@ public sealed class BeautifyWindow : Window
 
         var side = new StackPanel { Margin = new Thickness(0, 18, 18, 18), Width = 236 };
         side.Children.Add(new TextBlock { Text = "Beautify", Style = (Style)FindResource("Heading"), FontSize = 15 });
+        side.Children.Add(Label("Frame"));
+        side.Children.Add(frames);
         side.Children.Add(Label("Background"));
         side.Children.Add(_swatches);
         side.Children.Add(Label("Shape"));
@@ -195,6 +239,7 @@ public sealed class BeautifyWindow : Window
     private BeautifyOptions Options() => new()
     {
         Background = _background, Padding = _padding.Value, Corners = _corners.Value, Shadow = _shadow.Value, Aspect = _aspect,
+        Frame = _frame, FramePath = _framePath,
     };
 
     private void Refresh()

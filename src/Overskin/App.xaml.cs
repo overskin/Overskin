@@ -97,7 +97,9 @@ public partial class App : Application
         {
             // just the newest tests, for quick checks while working on them
             var quick = new List<string>();
-            if (e.Args.Contains("--pass")) { try { PassTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
+            if (e.Args.Contains("--round")) { try { RoundTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
+            else if (e.Args.Contains("--speed")) { try { SpeedTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
+            else if (e.Args.Contains("--pass")) { try { PassTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else try { MoreFeatureTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); }
             System.IO.File.WriteAllLines(e.Args[1], quick);
             Shutdown();
@@ -1150,6 +1152,7 @@ public partial class App : Application
             NewFeatureTests(log);
             MoreFeatureTests(log);
             PassTests(log);
+            RoundTests(log);
         }
         catch (Exception ex)
         {

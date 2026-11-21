@@ -1,5 +1,66 @@
 # Changelog
 
+## 3.0.0
+
+Recording grows up: pause, draw on the screen as you record, edit the auto-zooms afterwards,
+blur private details in videos and grab stills. Plus QR codes, file names you choose, effects in
+the editor, and screenshots that reach the clipboard much sooner.
+
+### New
+
+- **Pause a recording** with the pause button on the recording bar or Ctrl+Alt+P. The video and
+  its sound carry on from where they stopped, with no gap; the red frame turns amber while paused.
+- **Draw on the screen while recording**: the pencil on the recording bar, or Ctrl+Alt+D. Pen,
+  arrow, box or highlighter in five colours; what you draw is recorded and fades after a few
+  seconds. The pointer is hidden from the video while you draw, and those clicks don't zoom or ring.
+  Right-click puts the pen away; the recording bar always stays on top, so Pause and Stop work.
+- **QR codes**: *Text from screen* now reads QR codes and barcodes too. Drag over one and what it
+  says is copied, with *Open link* when it's a web address. Offline.
+- **Blur in videos**: the video editor has a Blur card. *Add a blur box* and drag over a name or
+  an address; *Find private details* reads the frame showing now and blurs every email, phone
+  number, card number, address and key on it. Each box has From and To, and can be dragged.
+- **Grab a still**: the camera button next to the video's time copies the frame showing and opens
+  it in the editor, at the video's full size.
+- **File names you choose**: a pattern on the Capture page, such as `{app} {date} {time}`, with
+  buttons for the date, time, app, window title, type and a counter, and an example underneath.
+  A `\` makes folders (`{app}\{date} {time}` keeps each app's captures together).
+- **Videos in the viewer play like on a video site**: a bar along the bottom with play and
+  pause, the time, a scrubber and the volume (it tucks away while the video plays and the mouse
+  rests), a play or pause sign that pops up in the middle on each click, and zoom like a picture,
+  with the percentage shown. Space or K plays and pauses, J and L skip 5 seconds, Up and Down
+  change the volume, M mutes, and a double-click fills the screen.
+- **Effects** in the editor: a border in any of six colours, rounded corners, torn edges (top,
+  bottom, sides or all round), a shadow that follows the shape, and grayscale, sepia or invert.
+- **Auto-zoom you can edit afterwards**: recordings with auto-zoom keep an unzoomed copy and
+  where the pointer went, and the zooms show as bands under the video in the video editor. Make
+  one zoom in more or less, move its start and end, remove it, or add a new one, then Save.
+  (*Editable afterwards* on the Recording page; not with a webcam, backdrop, shortcut keys or
+  watermark, which still zoom as they record.)
+- **Keep files under a size**: every saved screenshot fits in the size you set (say 8 MB).
+  A JPG loses a little quality first, then any picture gets a little smaller.
+- **JPG quality** slider on the Capture page.
+- **Video: save a small copy** under a size you set (Discord's free limit is 10 MB), with your
+  cuts, labels and zooms.
+- **Viewer**: a film strip of thumbnails along the bottom, and a search box that finds captures
+  by the words in them (Ctrl+F). It looks like the editor now (tool strip, stage) and keeps the
+  picture centred when the window changes size.
+- **Mockup frames** in Beautify: a browser window, a laptop or a phone, or *your own* frame
+  picture (a PNG with a see-through screen, such as the device bezels makers publish for
+  designers); the screenshot is fitted into the screen.
+
+### Faster
+
+- **After a capture**: the clipboard gets the picture about ten times quicker (straight
+  through Windows rather than WPF's clipboard), the file is written off the main thread, the
+  Library catches up a moment later instead of holding things up, and the app is compiled ahead
+  of time so the first capture of a session isn't slow either.
+
+### Changed and fixed
+
+- Recent captures (Ctrl+Alt+H) open in the viewer, like the Library.
+- Fixed: a pale halo round the rounded corners of the notifications and the recording bar.
+- Fixed: in the viewer, a paused video stayed "paused" on the next video, so the first click did nothing.
+
 ## 2.7.0
 
 ### New

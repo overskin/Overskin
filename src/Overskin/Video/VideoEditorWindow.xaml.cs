@@ -23,6 +23,7 @@ public partial class VideoEditorWindow : Window
         InitializeComponent();
         _path = path;
         _saved = saved;
+        LoadZooms();
         TitleText.Text = Path.GetFileName(path);
         _tick.Tick += (_, _) => Follow();
         _settle.Tick += Settle_Tick;
@@ -219,11 +220,11 @@ public partial class VideoEditorWindow : Window
 
     // ---- saving --------------------------------------------------------------------------
 
-    private async Task<bool> SaveTo(string output)
+    private async Task<bool> SaveTo(string output, long? maxBytes = null)
     {
         if (_busy) return false;
         var (start, end) = Range;
-        if (start <= 0.05 && end >= _length - 0.05 && _cuts.Count == 0 && _overlays.Count == 0)
+        if (maxBytes == null && start <= 0.05 && end >= _length - 0.05 && _cuts.Count == 0 && _overlays.Count == 0 && !_zoomsChanged && _blurs.Count == 0)
         {
             Toast.Show("Trim, cut or add something first: this is the whole video as it is.");
             return false;
@@ -237,13 +238,35 @@ public partial class VideoEditorWindow : Window
         {
             // writing over the file that's open in the player would fail, so render beside it first
             string temp = output + ".part.mp4";
+            // edited zooms: the zoomed video is made afresh from the unzoomed recording first
+            string input = _path, zoomedTemp = output + ".zoom.mp4";
+            if (_zooms != null && _zoomsChanged)
+            {
+                StatusText.Text = "Making the zooms…";
+                await ZoomTrack.RenderAsync(ZoomTrack.RawPath(_path), zoomedTemp, _zooms, true, new Progress<double>(p => SaveProgress.Value = p * 0.5));
+                input = zoomedTemp;
+                StatusText.Text = "Saving…";
+            }
+            // blur boxes: the frames are blurred first, on the whole video (their times are the original's)
+            string blurredTemp = output + ".blur.mp4";
+            if (_blurs.Count > 0)
+            {
+                StatusText.Text = "Blurring…";
+                double from = _zooms != null && _zoomsChanged ? 0.5 : 0;
+                var blurs = _blurs.Select(b => b.Clone()).ToList();
+                await VideoBlur.RenderAsync(input, blurredTemp, blurs, _length, new Progress<double>(p => SaveProgress.Value = from + (1 - from) * p * 0.6));
+                if (input != _path) try { File.Delete(input); } catch { }
+                input = blurredTemp;
+                StatusText.Text = "Saving…";
+            }
             var progress = new Progress<double>(p => SaveProgress.Value = p);
-            if (_cuts.Count == 0 && _overlays.Count == 0)
-                await VideoTrim.TrimAsync(_path, temp, TimeSpan.FromSeconds(start), TimeSpan.FromSeconds(end), progress);
+            if (_cuts.Count == 0 && _overlays.Count == 0 && maxBytes == null && !_zoomsChanged && _blurs.Count == 0)
+                await VideoTrim.TrimAsync(input, temp, TimeSpan.FromSeconds(start), TimeSpan.FromSeconds(end), progress);
             else
-                await VideoEdit.RenderAsync(_path, temp, VideoEdit.Keep(start, end, _cuts), _overlays.Select(o => o.Clone()).ToList(),
-                    Math.Max(2, Player.NaturalVideoHeight), progress);
+                await VideoEdit.RenderAsync(input, temp, VideoEdit.Keep(start, end, _cuts), _overlays.Select(o => o.Clone()).ToList(),
+                    Math.Max(2, Player.NaturalVideoHeight), progress, maxBytes);
             File.Move(temp, output, overwrite: true);
+            if (input != _path) try { File.Delete(input); } catch { }
             StatusText.Text = Path.GetFileName(output);
             _saved(output);
             Toast.Show("Saved " + Path.GetFileName(output));

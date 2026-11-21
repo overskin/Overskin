@@ -46,6 +46,8 @@ public partial class MainWindow
                 _recorder.Finished += OnRecordingFinished;
             }
             _hotkeys?.Register(HkGifEsc, new Hotkey(ModifierKeys.None, Key.Escape), () => _recorder.Stop());
+            FileNames.Context = NameInfo.At(area.X + area.Width / 2, area.Y + area.Height / 2);
+            FileNames.Pattern = _settings.FileNamePattern;
             _recorder.Start(area, _settings.AfterCursor);
         });
     }

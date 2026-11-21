@@ -1223,6 +1223,20 @@ public partial class EditorWindow : Window
         ShowSelection();
     }
 
+    private void Effects_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new EffectsWindow(Export()) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Result is not { } result) return;
+        // like Beautify: the marks become part of the picture; Undo brings them back
+        PushUndo();
+        _base = ImageLoader.Normalize(result);
+        _items = new List<Annotation>();
+        _selected = null;
+        ApplyBase();
+        Render();
+        ShowSelection();
+    }
+
     // ---- window --------------------------------------------------------------------------
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;

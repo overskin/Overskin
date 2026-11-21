@@ -248,6 +248,13 @@
                         <TextBlock x:Name="HintText" Style="{StaticResource Dim}" Foreground="{DynamicResource TextFaint}" Margin="16,0,0,0" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="Effects_Click"
+                                ToolTip="A border, rounded corners, torn edges, a shadow, or grayscale, sepia or inverted colours">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcSquare}" Width="13" Height="13" Margin="0,0,6,0" />
+                                <TextBlock Text="Effects" />
+                            </StackPanel>
+                        </Button>
                         <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="Beautify_Click"
                                 ToolTip="Put it on a gradient with padding, rounded corners and a shadow">
                             <StackPanel Orientation="Horizontal">

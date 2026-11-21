@@ -21,6 +21,8 @@ public sealed class ViewerHost
     public required Action<string> ShowInFolder { get; init; }
     /// <summary>A file was rotated or deleted: the Library should look again.</summary>
     public required Action Changed { get; init; }
+    /// <summary>Whether a capture's name, date or text has every word of the search in it.</summary>
+    public Func<string, string, bool>? Matches { get; init; }
 }
 
 /// <summary>
@@ -29,9 +31,14 @@ public sealed class ViewerHost
 /// GIFs play and videos play too. From here: copy, rotate, pin, open in the editor, show in the
 /// folder, or move to the Recycle Bin.
 /// </summary>
-public sealed class ViewerWindow : Window
+public sealed partial class ViewerWindow : Window
 {
-    private readonly List<string?> _paths;
+    private List<string?> _paths;
+    /// <summary>Every capture the viewer was opened with; <see cref="_paths"/> is those the search finds.</summary>
+    private readonly List<string?> _all;
+    private readonly TextBox _searchBox = new() { Width = 220, Height = 26, VerticalContentAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _searchHint = new() { Text = "Search the text in your captures", IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(9, 0, 0, 0), FontSize = 12 };
+    private readonly DispatcherTimer _searchDelay = new() { Interval = TimeSpan.FromMilliseconds(220) };
     private readonly BitmapSource? _single;
     private readonly ViewerHost _host;
     private int _index;
@@ -42,7 +49,9 @@ public sealed class ViewerWindow : Window
     private readonly Canvas _canvas = new();
     private readonly ScaleTransform _zoom = new();
     private readonly TranslateTransform _pan = new();
-    private readonly MediaElement _video = new() { LoadedBehavior = MediaState.Manual, UnloadedBehavior = MediaState.Close, Stretch = Stretch.Uniform, Visibility = Visibility.Collapsed, Margin = new Thickness(16, 16, 16, 90) };
+    private readonly MediaElement _video = new() { LoadedBehavior = MediaState.Manual, UnloadedBehavior = MediaState.Close, Stretch = Stretch.Fill, Visibility = Visibility.Collapsed };
+    /// <summary>Holds the picture or the video; zoomed and moved as one.</summary>
+    private readonly Grid _content = new() { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
     private readonly TextBlock _title = new() { FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly TextBlock _details = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
     private readonly TextBlock _position = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, MinWidth = 64, TextAlignment = TextAlignment.Center };
@@ -51,6 +60,11 @@ public sealed class ViewerWindow : Window
     private readonly Button _rotateLeft, _rotateRight, _edit, _pin, _copy;
     private readonly DispatcherTimer _gifTimer = new();
     private readonly Dictionary<string, BitmapSource> _cache = new();
+    private readonly StackPanel _film = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 6, 8, 6) };
+    private readonly ScrollViewer _filmScroll = new()
+    {
+        HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false,
+    };
 
     private BitmapSource? _shown;
     private GifClip? _gif;
@@ -64,6 +78,7 @@ public sealed class ViewerWindow : Window
     public ViewerWindow(IReadOnlyList<string?> paths, int index, ViewerHost host, BitmapSource? single = null)
     {
         _paths = paths.ToList();
+        _all = _paths.ToList();
         _index = Math.Clamp(index, 0, Math.Max(0, _paths.Count - 1));
         _single = single;
         _host = host;
@@ -85,18 +100,26 @@ public sealed class ViewerWindow : Window
         WindowChrome.SetWindowChrome(this, new WindowChrome { CaptionHeight = 44, ResizeBorderThickness = new Thickness(6), GlassFrameThickness = new Thickness(0), UseAeroCaptionButtons = false });
 
         // the picture: moved and scaled as one, so zooming is a smooth transform, not a re-layout
-        _image.RenderTransform = new TransformGroup { Children = { _zoom, _pan } };
-        _canvas.Children.Add(_image);
+        _content.RenderTransform = new TransformGroup { Children = { _zoom, _pan } };
+        _content.Children.Add(_image);
+        _content.Children.Add(_video);
+        _canvas.Children.Add(_content);
         _stage.Children.Add(_canvas);
-        _stage.Children.Add(_video);
         _message.SetResourceReference(TextBlock.ForegroundProperty, "TextDim");
         _stage.Children.Add(_message);
-        _stage.Background = Brushes.Transparent;
+        BuildVideoControls();
         _stage.MouseWheel += Stage_Wheel;
         _stage.MouseLeftButtonDown += Stage_Down;
         _stage.MouseMove += Stage_Move;
         _stage.MouseLeftButtonUp += Stage_Up;
-        _stage.SizeChanged += (_, _) => { if (_fit) FitNow(animate: false); else Apply(animate: false); };
+        _stage.SizeChanged += (_, e) =>
+        {
+            if (_fit) { FitNow(animate: false); return; }
+            // zoomed in: keep what was in the middle in the middle, rather than cutting it off at one side
+            _x += (e.NewSize.Width - e.PreviousSize.Width) / 2;
+            _y += (e.NewSize.Height - e.PreviousSize.Height) / 2;
+            Apply(animate: false);
+        };
 
         // title bar
         var bar = new Grid { Height = 44 };
@@ -109,6 +132,25 @@ public sealed class ViewerWindow : Window
         left.Children.Add(_details);
         bar.Children.Add(left);
         var caption = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
+        if (host.Matches != null && _all.Count(p => p != null) > 1)
+        {
+            // search: type to keep only the captures with those words in them (Ctrl+F)
+            _searchBox.SetResourceReference(StyleProperty, "TextField");
+            _searchBox.ToolTip = "Finds captures by the words in them, their name or date  (Ctrl+F)";
+            _searchHint.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
+            var search = new Grid { Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+            search.Children.Add(_searchBox);
+            search.Children.Add(_searchHint);
+            WindowChrome.SetIsHitTestVisibleInChrome(search, true);
+            caption.Children.Add(search);
+            _searchBox.TextChanged += (_, _) =>
+            {
+                _searchHint.Visibility = _searchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+                _searchDelay.Stop();
+                _searchDelay.Start();
+            };
+            _searchDelay.Tick += (_, _) => { _searchDelay.Stop(); ApplySearch(); };
+        }
         caption.Children.Add(CaptionButton("IcMinus", "Minimize", () => WindowState = WindowState.Minimized));
         caption.Children.Add(CaptionButton("IcSquare", "Maximize", () => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized));
         caption.Children.Add(CaptionButton("IcX", "Close  (Esc)", Close, close: true));
@@ -146,24 +188,31 @@ public sealed class ViewerWindow : Window
         _edit.Content = editLabel;
         _edit.Click += (_, _) => Edit();
         tools.Children.Add(_edit);
-        var pill = new Border
-        {
-            Child = tools, Padding = new Thickness(8, 6, 8, 6), BorderThickness = new Thickness(1),
-            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 18),
-            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 18, ShadowDepth = 3, Direction = 270, Opacity = 0.4 },
-        };
-        pill.SetResourceReference(Border.BackgroundProperty, "Panel");
-        pill.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
-        pill.SetResourceReference(Border.CornerRadiusProperty, "RadiusCard");
+        // laid out like the editor: title bar, a tool strip on the panel colour, then the stage
+        tools.HorizontalAlignment = HorizontalAlignment.Center;
+        var strip = new Border { Child = tools, Padding = new Thickness(12, 6, 12, 6), BorderThickness = new Thickness(0, 1, 0, 1) };
+        strip.SetResourceReference(Border.BackgroundProperty, "Panel");
+        strip.SetResourceReference(Border.BorderBrushProperty, "Line");
+        _stage.SetResourceReference(Grid.BackgroundProperty, "Stage");
 
         var body = new Grid();
         body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(44) });
+        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         body.RowDefinitions.Add(new RowDefinition());
+        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         body.Children.Add(bar);
-        Grid.SetRow(_stage, 1);
+        Grid.SetRow(strip, 1);
+        body.Children.Add(strip);
+        Grid.SetRow(_stage, 2);
         body.Children.Add(_stage);
-        Grid.SetRow(pill, 1);
-        body.Children.Add(pill);
+        // the film strip: every capture as a thumbnail, the one shown picked out
+        var stripBorder = new Border { Child = _filmScroll, BorderThickness = new Thickness(0, 1, 0, 0), Visibility = _paths.Count > 1 ? Visibility.Visible : Visibility.Collapsed };
+        stripBorder.SetResourceReference(Border.BackgroundProperty, "Panel");
+        stripBorder.SetResourceReference(Border.BorderBrushProperty, "Line");
+        Grid.SetRow(stripBorder, 3);
+        body.Children.Add(stripBorder);
+        _filmScroll.Content = _film;
+        BuildFilm();
         // the same background and rounded corners as Overskin's other windows
         var frame = new Border { Child = body, BorderThickness = new Thickness(1) };
         frame.SetResourceReference(Border.BorderBrushProperty, "Line");
@@ -173,9 +222,9 @@ public sealed class ViewerWindow : Window
         Content = frame;
 
         _gifTimer.Tick += (_, _) => NextGifFrame();
-        _video.MediaEnded += (_, _) => { _video.Position = TimeSpan.Zero; _video.Play(); };
+        _video.MediaEnded += (_, _) => { _video.Position = TimeSpan.Zero; if (_playing) _video.Play(); };
         Loaded += (_, _) => Show(_index);
-        Closed += (_, _) => { _gifTimer.Stop(); _video.Close(); };
+        Closed += (_, _) => { _gifTimer.Stop(); _videoTick.Stop(); _idle.Stop(); _video.Close(); };
     }
 
     protected override void OnStateChanged(EventArgs e)
@@ -237,15 +286,17 @@ public sealed class ViewerWindow : Window
 
     private async void Show(int index)
     {
-        if (_paths.Count == 0) { Close(); return; }
+        if (_paths.Count == 0) { if (_all.Count == 0) Close(); return; }
         _index = (index % _paths.Count + _paths.Count) % _paths.Count;
         int token = ++_loadToken;
         _gifTimer.Stop();
         _gif = null;
         _video.Stop();
         _video.Visibility = Visibility.Collapsed;
+        StopVideoControls();
         _message.Text = "";
         _position.Text = _paths.Count > 1 ? $"{_index + 1} / {_paths.Count}" : "";
+        MarkFilm();
         string? path = CurrentPath;
         _title.Text = path == null ? "New capture" : Path.GetFileName(path);
 
@@ -253,14 +304,20 @@ public sealed class ViewerWindow : Window
         {
             _image.Source = null;
             _shown = null;
+            _image.Visibility = Visibility.Collapsed;
+            _content.Width = _content.Height = 0; // sized when the video says how big it is
+            _fit = true;
             _video.Source = new Uri(Path.GetFullPath(path));
             _video.Visibility = Visibility.Visible;
+            _playing = true;
+            StartVideo();
             _video.Play();
             _details.Text = Describe(path, null);
             SetTools(video: true);
             _zoomText.Text = "";
             return;
         }
+        _image.Visibility = Visibility.Visible;
 
         BitmapSource? picture = null;
         if (path == null) picture = _single;
@@ -300,14 +357,104 @@ public sealed class ViewerWindow : Window
         bool same = _shown != null && _shown.PixelWidth == picture.PixelWidth && _shown.PixelHeight == picture.PixelHeight;
         _shown = picture;
         _image.Source = picture;
-        _image.Width = picture.PixelWidth;
-        _image.Height = picture.PixelHeight;
+        _image.Width = _content.Width = picture.PixelWidth;
+        _image.Height = _content.Height = picture.PixelHeight;
         _details.Text = Describe(path, picture);
         SetTools(video: false);
         if (!same || _fit) FitNow(animate: false);
         // a quick fade, so going through them feels smooth rather than flickery
         _image.BeginAnimation(OpacityProperty, new DoubleAnimation(0.35, 1, TimeSpan.FromMilliseconds(140)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
         Preload();
+    }
+
+    /// <summary>Keeps only the captures the search finds, staying on the one shown if it's among them.</summary>
+    private void ApplySearch()
+    {
+        string query = _searchBox.Text.Trim();
+        string? current = CurrentPath;
+        _paths = query.Length == 0 ? _all.ToList() : _all.Where(p => p != null && _host.Matches!(p, query)).ToList();
+        BuildFilm();
+        if (_paths.Count == 0)
+        {
+            _loadToken++;
+            _gifTimer.Stop();
+            _video.Stop();
+            _video.Visibility = Visibility.Collapsed;
+            StopVideoControls();
+            _image.Source = null;
+            _shown = null;
+            _position.Text = "";
+            _message.Text = $"No captures with “{query}” in them.";
+            return;
+        }
+        int keep = current != null ? _paths.IndexOf(current) : -1;
+        _fit = true;
+        Show(keep >= 0 ? keep : 0);
+        if (query.Length > 0) _position.Text = $"{_index + 1} / {_paths.Count} found";
+    }
+
+    // ---- film strip -----------------------------------------------------------------------
+
+    private const double FilmHeight = 58;
+
+    /// <summary>A thumbnail per capture, loaded as it scrolls into view.</summary>
+    private void BuildFilm()
+    {
+        _film.Children.Clear();
+        if (_paths.Count < 2) return;
+        for (int i = 0; i < _paths.Count; i++)
+        {
+            int at = i;
+            string? path = _paths[i];
+            var thumb = new Image { Height = FilmHeight, Stretch = Stretch.Uniform, MaxWidth = FilmHeight * 2.2 };
+            RenderOptions.SetBitmapScalingMode(thumb, BitmapScalingMode.HighQuality);
+            var tile = new Border
+            {
+                Child = new Grid { Children = { thumb } }, Height = FilmHeight + 6, MinWidth = FilmHeight, Margin = new Thickness(0, 0, 6, 0),
+                Padding = new Thickness(2), BorderThickness = new Thickness(2), Cursor = Cursors.Hand, Tag = path,
+                ToolTip = path != null ? Path.GetFileName(path) : "New capture",
+            };
+            tile.SetResourceReference(Border.CornerRadiusProperty, "RadiusSmall");
+            tile.SetResourceReference(Border.BackgroundProperty, "Field");
+            tile.MouseLeftButtonUp += (_, _) => { _fit = true; Show(at); };
+            if (path != null && (Thumbs.IsVideo(path) || IsVideoFile(path)))
+                ((Grid)tile.Child).Children.Add(new Border
+                {
+                    Background = new SolidColorBrush(Color.FromArgb(170, 0, 0, 0)), CornerRadius = new CornerRadius(3), Padding = new Thickness(4, 1, 4, 1),
+                    HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(3),
+                    Child = new TextBlock { Text = "Video", FontSize = 10, Foreground = Brushes.White },
+                });
+            _film.Children.Add(tile);
+            tile.Loaded += async (_, _) =>
+            {
+                if (thumb.Source != null) return;
+                if (path == null) { thumb.Source = _single; return; }
+                try { thumb.Source = await Thumbs.LoadAsync(path, (int)(FilmHeight * 2.2 * 1.5)); } catch { }
+            };
+        }
+    }
+
+    /// <summary>Picks out the shown capture in the strip and scrolls it into view.</summary>
+    private void MarkFilm()
+    {
+        for (int i = 0; i < _film.Children.Count; i++)
+        {
+            var tile = (Border)_film.Children[i];
+            if (i == _index) tile.SetResourceReference(Border.BorderBrushProperty, "Accent");
+            else tile.BorderBrush = Brushes.Transparent;
+            tile.Opacity = i == _index ? 1 : 0.7;
+        }
+        if (_index < _film.Children.Count)
+        {
+            var tile = (FrameworkElement)_film.Children[_index];
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+            {
+                if (!tile.IsLoaded) return;
+                var at = tile.TransformToAncestor(_film).Transform(new Point(0, 0));
+                double target = at.X + tile.ActualWidth / 2 - _filmScroll.ViewportWidth / 2;
+                _filmScroll.ScrollToHorizontalOffset(Math.Max(0, target));
+            });
+        }
     }
 
     private void SetTools(bool video)
@@ -387,12 +534,12 @@ public sealed class ViewerWindow : Window
     /// <summary>The whole picture in view, never blown up past its real size.</summary>
     private void FitNow(bool animate)
     {
-        if (_shown == null || _stage.ActualWidth <= 0) return;
-        double room = Math.Max(1, _stage.ActualHeight - 90);
-        double s = Math.Min(1, Math.Min((_stage.ActualWidth - 32) / _shown.PixelWidth, (room - 16) / _shown.PixelHeight));
+        if (ContentSize is not { } size || _stage.ActualWidth <= 0) return;
+        double room = Math.Max(1, _stage.ActualHeight);
+        double s = Math.Min(1, Math.Min((_stage.ActualWidth - 40) / size.Width, (room - 40) / size.Height));
         _scale = Math.Max(0.02, s);
-        _x = (_stage.ActualWidth - _shown.PixelWidth * _scale) / 2;
-        _y = (room - _shown.PixelHeight * _scale) / 2 + 8;
+        _x = (_stage.ActualWidth - size.Width * _scale) / 2;
+        _y = (room - size.Height * _scale) / 2;
         _fit = true;
         Apply(animate);
     }
@@ -403,7 +550,7 @@ public sealed class ViewerWindow : Window
 
     private void ZoomTo(double scale, Point around)
     {
-        if (_shown == null) return;
+        if (ContentSize == null) return;
         scale = Math.Clamp(scale, 0.05, 32);
         // keep the point under the mouse where it is
         double ix = (around.X - _x) / _scale, iy = (around.Y - _y) / _scale;
@@ -418,7 +565,7 @@ public sealed class ViewerWindow : Window
     {
         // sharp pixels when looking closely, smooth when shrunk
         RenderOptions.SetBitmapScalingMode(_image, _scale >= 2 ? BitmapScalingMode.NearestNeighbor : BitmapScalingMode.HighQuality);
-        _zoomText.Text = _shown == null ? "" : $"{_scale * 100:0}%";
+        _zoomText.Text = ContentSize == null ? "" : $"{_scale * 100:0}%";
         var time = TimeSpan.FromMilliseconds(animate ? 160 : 0);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
         void To(Animatable target, DependencyProperty p, double value)
@@ -434,7 +581,7 @@ public sealed class ViewerWindow : Window
 
     private void Stage_Wheel(object sender, MouseWheelEventArgs e)
     {
-        if (_shown == null) return;
+        if (ContentSize == null) return;
         // the wheel zooms; Ctrl isn't needed
         ZoomBy(e.Delta > 0 ? 1.25 : 1 / 1.25, e.GetPosition(_stage));
         e.Handled = true;
@@ -442,12 +589,21 @@ public sealed class ViewerWindow : Window
 
     private void Stage_Down(object sender, MouseButtonEventArgs e)
     {
-        if (_video.Visibility == Visibility.Visible)
+        if (_controls.IsVisible && _controls.IsMouseOver) return; // the play bar has its own buttons
+        bool video = _video.Visibility == Visibility.Visible;
+        if (video && e.ClickCount == 2)
         {
-            if (_video.CanPause) { if (_playing) _video.Pause(); else _video.Play(); _playing = !_playing; }
+            // like a video site: a double-click fills the screen (and undoes the first click's pause)
+            TogglePlay();
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
             return;
         }
-        if (e.ClickCount == 2)
+        if (video)
+        {
+            _videoPress = e.GetPosition(_stage);
+            if (_fit) { _stage.CaptureMouse(); return; } // fitted: a click plays or pauses, nothing to drag
+        }
+        else if (e.ClickCount == 2)
         {
             if (_fit) ActualSize(e.GetPosition(_stage));
             else FitNow(animate: true);
@@ -472,8 +628,17 @@ public sealed class ViewerWindow : Window
         Apply(animate: false);
     }
 
+    private Point? _videoPress;
+
     private void Stage_Up(object sender, MouseButtonEventArgs e)
     {
+        if (_videoPress is { } pressed)
+        {
+            _videoPress = null;
+            if (!_panning) _stage.ReleaseMouseCapture();
+            // a click (not a drag to look around) plays or pauses
+            if ((e.GetPosition(_stage) - pressed).Length < 4) TogglePlay();
+        }
         if (!_panning) return;
         _panning = false;
         _stage.ReleaseMouseCapture();
@@ -546,8 +711,8 @@ public sealed class ViewerWindow : Window
         }
         _shown = result;
         _image.Source = result;
-        _image.Width = result.PixelWidth;
-        _image.Height = result.PixelHeight;
+        _image.Width = _content.Width = result.PixelWidth;
+        _image.Height = _content.Height = result.PixelHeight;
         _details.Text = Describe(path, result);
         FitNow(animate: true);
     }
@@ -570,10 +735,14 @@ public sealed class ViewerWindow : Window
             return;
         }
         Toast.Show("Moved to the Recycle Bin.");
+        if (IsVideoFile(path)) ZoomTrack.DeleteFor(path);
         _cache.Remove(path);
+        _all.Remove(path);
         _paths.RemoveAt(_index);
+        BuildFilm();
         _host.Changed();
-        if (_paths.Count == 0) { Close(); return; }
+        if (_all.Count == 0) { Close(); return; }
+        if (_paths.Count == 0) { ApplySearch(); return; }
         Show(Math.Min(_index, _paths.Count - 1));
     }
 
@@ -581,6 +750,15 @@ public sealed class ViewerWindow : Window
     {
         bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        if (e.Key == Key.F && ctrl && _searchBox.IsVisible) { _searchBox.Focus(); _searchBox.SelectAll(); e.Handled = true; return; }
+        if (_searchBox.IsKeyboardFocused)
+        {
+            // typing a search: only Esc, Enter and the up and down arrows are the viewer's
+            if (e.Key == Key.Escape) { _searchBox.Clear(); _stage.Focus(); Keyboard.Focus(this); e.Handled = true; }
+            else if (e.Key is Key.Enter or Key.Down) { Keyboard.Focus(this); e.Handled = true; }
+            else base.OnPreviewKeyDown(e);
+            return;
+        }
         Action? act = e.Key switch
         {
             Key.Escape => Close,
@@ -597,7 +775,12 @@ public sealed class ViewerWindow : Window
             Key.E => Edit,
             Key.P => Pin,
             Key.Delete => Delete,
-            Key.Space when _video.Visibility == Visibility.Visible => () => { if (_playing) _video.Pause(); else _video.Play(); _playing = !_playing; },
+            Key.Space or Key.K when _video.Visibility == Visibility.Visible => TogglePlay,
+            Key.J when _video.Visibility == Visibility.Visible => () => Skip(-5),
+            Key.L when _video.Visibility == Visibility.Visible => () => Skip(5),
+            Key.M when _video.Visibility == Visibility.Visible => ToggleMute,
+            Key.Up when _video.Visibility == Visibility.Visible => () => ChangeVolume(0.1),
+            Key.Down when _video.Visibility == Visibility.Visible => () => ChangeVolume(-0.1),
             _ => null,
         };
         if (act == null) { base.OnPreviewKeyDown(e); return; }

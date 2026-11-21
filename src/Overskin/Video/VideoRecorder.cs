@@ -24,8 +24,16 @@ public sealed class VideoRecorder : IRecorder
     private volatile bool _stop, _cancel;
     private RecordFrameWindow? _frame;
     private RecordBarWindow? _bar;
+    private ScreenPen? _pen;
+    private AudioMixer? _mixer;
+    private volatile bool _paused;
 
     public bool IsRecording { get; private set; }
+    public bool IsPaused => _paused;
+    /// <summary>Drawing on the screen while recording; null when not recording.</summary>
+    internal ScreenPen? Pen => _pen;
+    /// <summary>Raised on the UI thread when the recording pauses or carries on.</summary>
+    public event Action? PauseChanged;
     public TimeSpan Elapsed => _clock.Elapsed;
     public TimeSpan? Limit => null;
 
@@ -37,16 +45,48 @@ public sealed class VideoRecorder : IRecorder
     public void Stop() => _stop = true;
     public void Cancel() => _cancel = true;
 
+    /// <summary>
+    /// Pauses the recording or carries on. The clock stops while paused, so the video and its sound
+    /// simply continue from where they stopped, with no gap.
+    /// </summary>
+    public void TogglePause()
+    {
+        if (!IsRecording) return;
+        lock (_clock)
+        {
+            _paused = !_paused;
+            if (_mixer != null) _mixer.Paused = _paused;
+            if (_paused) _clock.Stop(); else if (_clock.Elapsed > TimeSpan.Zero) _clock.Start();
+        }
+        _frame?.SetPaused(_paused);
+        _pen?.SetOn(false);
+        _bar?.Refresh();
+        PauseChanged?.Invoke();
+    }
+
+    /// <summary>Turns drawing on the screen on or off.</summary>
+    public void TogglePen()
+    {
+        if (_pen == null || _paused) return;
+        _pen.Toggle();
+        _bar?.Refresh();
+        _bar?.RaiseAbove();
+    }
+
     public void Start(Int32Rect area, string path, VideoOptions options, WatermarkOptions? watermark = null)
     {
         if (IsRecording) return;
         IsRecording = true;
         _stop = _cancel = false;
+        _paused = false;
 
         _frame = new RecordFrameWindow(area);
         _frame.Show();
+        // the drawing sheet sits over the area (and is recorded); the bar stays above it
+        _pen = new ScreenPen(area); // shown when it's first turned on
         _bar = new RecordBarWindow(this, area);
         _bar.Show();
+        _pen.Touched += () => { _bar?.RaiseAbove(); _bar?.Refresh(); };
 
         _clock.Reset(); // started by the recording thread once the camera and sound are ready
         // the watermark is drawn here, on the UI thread, once: each frame only blends it in
@@ -126,10 +166,23 @@ public sealed class VideoRecorder : IRecorder
             catch (Exception ex) { _problems.Add(ex.Message); }
         }
         var (mixer, sound) = OpenSound(o);
+        _mixer = mixer;
         if (_problems.Count > 0) Notice = string.Join(" ", _problems);
-        _clock.Restart();
+        lock (_clock)
+        {
+            _clock.Restart();
+            if (_paused) _clock.Stop(); // paused before the camera and sound were even ready
+            if (mixer != null) mixer.Paused = _paused;
+        }
         var keys = o.ShowKeys ? new KeyCaps(_ui, () => _clock.Elapsed.TotalSeconds, h) : null;
-        var encoding = Task.Run(() => VideoEncoder.EncodeAsync(path, w, h, fps, queue, o.HighQuality, sound));
+        // editable zooms: record the whole area unzoomed, with where the pointer went and the clicks;
+        // the zoomed video is made from those afterwards (and again whenever the zooms are edited).
+        // Not with a webcam, backdrop, shortcut keys or watermark, which would be zoomed along.
+        bool editable = o.AutoZoom && o.EditableZooms && look == null && cam == null && !o.ShowKeys && mark == null;
+        var zooms = editable ? new ZoomTrack { Width = w, Height = h, Fps = fps, ZoomRate = o.ZoomRate, PanRate = o.PanRate } : null;
+        string recordTo = editable ? ZoomTrack.RawPath(path) : path;
+        double toVideo = w / (double)area.Width;
+        var encoding = Task.Run(() => VideoEncoder.EncodeAsync(recordTo, w, h, fps, queue, o.HighQuality, sound));
         string? error = null;
         bool highRes = timeBeginPeriod(1) == 0;
         int frames = 0;
@@ -184,7 +237,7 @@ public sealed class VideoRecorder : IRecorder
             GrabberKind = grabber.Kind;
             var camera = new SmartCamera(area.Width, area.Height)
             {
-                ZoomIn = o.AutoZoom ? o.Zoom : 1,
+                ZoomIn = o.AutoZoom && !editable ? o.Zoom : 1,
                 Linger = o.ZoomHold,
                 ZoomRate = o.ZoomRate,
                 PanRate = o.PanRate,
@@ -196,6 +249,11 @@ public sealed class VideoRecorder : IRecorder
             int n = 0;
             while (!_stop && !_cancel && !encoding.IsCompleted)
             {
+                if (_paused)
+                {
+                    Thread.Sleep(10);
+                    continue;
+                }
                 long due = n * 1000L / fps;
                 long now = _clock.ElapsedMilliseconds;
                 if (now < due)
@@ -208,11 +266,18 @@ public sealed class VideoRecorder : IRecorder
 
                 GetCursorPos(out var p);
                 var pointer = new Point(p.X - area.X, p.Y - area.Y);
-                bool down = (GetAsyncKeyState(0x01) & 0x8000) != 0;
+                // while drawing on the screen the pointer is hidden, and the pen's clicks don't zoom or ring
+                bool drawing = ScreenPen.Drawing;
+                bool down = !drawing && (GetAsyncKeyState(0x01) & 0x8000) != 0;
                 bool clicked = down && !wasDown;
                 wasDown = down;
 
                 camera.Update(dt, pointer, clicked);
+                if (zooms != null)
+                {
+                    zooms.Pointer.Add(new[] { (float)t, (float)(pointer.X * toVideo), (float)(pointer.Y * toVideo) });
+                    if (clicked) zooms.Clicks.Add(new[] { (float)t, (float)(pointer.X * toVideo), (float)(pointer.Y * toVideo) });
+                }
                 if (clicked && o.ClickRings) rings.Add((pointer, 0));
                 for (int i = rings.Count - 1; i >= 0; i--)
                 {
@@ -225,7 +290,7 @@ public sealed class VideoRecorder : IRecorder
                 var c = camera.Cursor;
                 double px = (c.X - view.X) * k, py = (c.Y - view.Y) * k;
                 int size = (int)Math.Round(pointerBase * Math.Sqrt(camera.Zoom));
-                var kind = o.Pointer ? SystemPointers.Current() : SystemPointers.Kind.None;
+                var kind = o.Pointer && !drawing ? SystemPointers.Current() : SystemPointers.Kind.None;
                 PointerSprite? sprite = null;
                 if (sprites != null && kind is SystemPointers.Kind.Arrow or SystemPointers.Kind.Text)
                 {
@@ -310,16 +375,41 @@ public sealed class VideoRecorder : IRecorder
 
         if (_cancel || frames == 0 || error != null)
         {
-            try { File.Delete(path); } catch { }
+            try { File.Delete(recordTo); } catch { }
         }
+        else if (zooms != null)
+        {
+            // the zooms from the clicks, kept so they can be edited; then the zoomed video itself
+            zooms.Zooms = ZoomTrack.FromClicks(zooms.Clicks, o.ZoomHold, o.Zoom);
+            try
+            {
+                zooms.Save(path);
+                _ui.BeginInvoke(() => Toast.ShowSticky("Adding the zooms…"));
+                ZoomTrack.RenderAsync(recordTo, path, zooms, o.HighQuality,
+                    new Progress<double>(p => _ui.BeginInvoke(() => Toast.ShowSticky($"Adding the zooms…  {p * 100:0}%")))).GetAwaiter().GetResult();
+                _ui.BeginInvoke(Toast.HideNow);
+            }
+            catch (Exception ex)
+            {
+                // keep the recording at least, unzoomed
+                try { File.Copy(recordTo, path, overwrite: true); } catch { }
+                _problems.Add("The zooms couldn't be added: " + ex.Message);
+                Notice = string.Join(" ", _problems);
+                _ui.BeginInvoke(Toast.HideNow);
+            }
+        }
+        _mixer = null;
         string? saved = _cancel || frames == 0 || error != null ? null : path;
         _ui.BeginInvoke(() =>
         {
             IsRecording = false;
+            _paused = false;
             _frame?.Close();
             _bar?.Close();
+            _pen?.Close();
             _frame = null;
             _bar = null;
+            _pen = null;
             Finished?.Invoke(saved, _cancel ? null : error);
         });
     }

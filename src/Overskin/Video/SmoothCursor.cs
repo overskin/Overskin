@@ -38,9 +38,10 @@ internal sealed class CursorTrack : IDisposable
         while (!_stop)
         {
             GetCursorPos(out var p);
-            bool down = (GetAsyncKeyState(0x01) & 0x8000) != 0;
+            bool drawing = ScreenPen.Drawing; // drawing on the screen: no pointer, and the pen's clicks aren't clicks
+            bool down = !drawing && (GetAsyncKeyState(0x01) & 0x8000) != 0;
             var info = new CURSORINFO { cbSize = Marshal.SizeOf<CURSORINFO>() };
-            bool showing = GetCursorInfo(ref info) && (info.flags & CURSOR_SHOWING) != 0 && info.hCursor != IntPtr.Zero;
+            bool showing = !drawing && GetCursorInfo(ref info) && (info.flags & CURSOR_SHOWING) != 0 && info.hCursor != IntPtr.Zero;
             Add(new Sample(_now(), p.X - _area.X, p.Y - _area.Y, down, showing ? info.hCursor : IntPtr.Zero, showing));
             Thread.Sleep(1000 / Rate);
         }

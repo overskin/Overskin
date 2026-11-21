@@ -372,6 +372,8 @@ public sealed class AudioMixer : IDisposable
     private readonly Thread _thread;
     private volatile bool _stop;
     private long _emitted; // frames
+    /// <summary>While paused nothing is written and whatever the devices send is thrown away.</summary>
+    public volatile bool Paused;
 
     public AudioMixer(Stopwatch clock, IEnumerable<(AudioSource, float)> sources, BlockingCollection<AudioChunk> output)
     {
@@ -401,7 +403,7 @@ public sealed class AudioMixer : IDisposable
                 _emitted += Chunk;
             }
             // a source that has piled up more than the delay is ahead of the clock: drop the excess
-            foreach (var (source, _) in _sources) source.TrimTo(Chunk * 12);
+            foreach (var (source, _) in _sources) source.TrimTo(Paused ? 0 : Chunk * 12);
             if (stopping) break;
             Thread.Sleep(5);
         }

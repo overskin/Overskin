@@ -57,6 +57,10 @@ public class GuardedWindow : Window
         ShowActivated = false;
         Topmost = true;
         UseLayoutRounding = true;
+        // The window is cut to its rounded shape, and the softened pixels along the card's curved
+        // edge are blended with the window's own background. Windows' default is white, which
+        // showed as a pale halo round the corners; the outline colour blends in invisibly.
+        SetResourceReference(BackgroundProperty, "LineStrong");
     }
 
     protected override void OnSourceInitialized(EventArgs e)

@@ -35,6 +35,11 @@ public sealed class VideoOptions
     public int FollowSmoothing { get; set; } = 50;
     /// <summary>Seconds without a click before zooming back out.</summary>
     public double ZoomHold { get; set; } = 2.5;
+    /// <summary>
+    /// Keep the recording unzoomed alongside the zoomed video, so the zooms can be moved, removed
+    /// or added in the video editor afterwards.
+    /// </summary>
+    public bool EditableZooms { get; set; } = true;
 
     /// <summary>Record what the speakers play.</summary>
     public bool SystemSound { get; set; } = true;

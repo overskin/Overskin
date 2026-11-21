@@ -97,6 +97,7 @@ public partial class MainWindow : Window
 
         _loading = false;
         _ready = true;
+        VideoEditorWindow.OpenPicture = (picture, name) => OpenEditor(picture, null, name);
         SelectTab(_settings.LastTab);
         UpdateTraceLabels();
         UpdateStatus();
@@ -1933,6 +1934,12 @@ public partial class MainWindow : Window
     /// <summary>The start hotkey: works from inside the game, without switching back to Overskin.</summary>
     private void HotkeyStartDrawing()
     {
+        // while a video records, the same keys draw on the screen
+        if (_video?.IsRecording == true)
+        {
+            _video.TogglePen();
+            return;
+        }
         if (_drawer.IsRunning)
         {
             _drawer.TogglePause();
@@ -2355,10 +2362,16 @@ public partial class MainWindow : Window
             ApplyScale();
 
             // second pass in other colours, to check that theming reaches everything
+            string accent = _settings.AccentColor, tone = _settings.BackgroundTone;
             _settings.AccentColor = "#48C288";
             _settings.BackgroundTone = "Black";
             ApplyTheme();
             await SnapshotTabsAsync(folder, null, "alt-");
+            // put the colours back, so the next snapshots (the README's) are in the usual blue
+            _settings.AccentColor = accent;
+            _settings.BackgroundTone = tone;
+            ApplyTheme();
+            SaveSettings();
         }
     }
 #endif

@@ -283,11 +283,13 @@ public partial class MainWindow
     private void ShowRecent()
     {
         var paths = _settings.History.AsEnumerable().Reverse().Select(h => h.Path).Where(File.Exists).Take(10).ToList();
+        // a click opens the viewer, with the other recent captures either side, as the Library does
         RecentStrip.Toggle(paths, path =>
         {
-            if (IsVideo(path)) OpenVideo(path);
-            else if (IsGif(path)) OpenClipFile(path);
-            else if (TryLoadFile(path, out var image)) OpenEditor(image!, path, Path.GetFileName(path));
+            var list = paths.Select(p => (string?)p).ToList();
+            var viewer = new ViewerWindow(list, Math.Max(0, list.IndexOf(path)), ViewerHostFor());
+            viewer.Show();
+            viewer.Activate();
         });
     }
 
@@ -298,6 +300,8 @@ public partial class MainWindow
     private async void Finish(BitmapSource image, Int32Rect where, AfterSteps? steps = null)
     {
         var s = steps ?? SettingsSteps;
+        // what was captured, for the file name: the window in the middle of it
+        FileNames.Context = NameInfo.At(where.X + where.Width / 2, where.Y + where.Height / 2);
         if (s.AutoHide)
         {
             try
@@ -318,8 +322,12 @@ public partial class MainWindow
             image = ImageLoader.Normalize(Beautify.Render(image, new BeautifyOptions()));
         if (s.Watermark && _settings.Watermark.HasContent)
             image = Watermark.Apply(image, _settings.Watermark);
-        string? path = s.Save ? SaveCapture(image) : null;
+        // the file is written off the main thread, then the clipboard gets the picture and the file
+        var timing = System.Diagnostics.Stopwatch.StartNew();
+        string? path = s.Save ? await SaveCaptureAsync(image) : null;
+        long saved = timing.ElapsedMilliseconds;
         if (s.Copy) CopyImage(image, quiet: true, path);
+        CrashLog.Note($"after capture: saved in {saved} ms, copied by {timing.ElapsedMilliseconds} ms");
         bool textCopied = false;
         if (s.CopyText)
         {
@@ -360,11 +368,95 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// <see cref="SaveCapture"/> on a thread of its own, so the screen doesn't wait for the
+    /// picture to be compressed. (WPF's encoders need a thread of the right kind: STA.)
+    /// </summary>
+    private async Task<string?> SaveCaptureAsync(BitmapSource image)
+    {
+        if (!image.IsFrozen)
+        {
+            if (!image.CanFreeze) return SaveCapture(image);
+            image.Freeze();
+        }
+        string path = NewCapturePath(_settings.ImageFormat == "jpg" ? ".jpg" : ".png");
+        long? limit = _settings.SizeLimit ? (long)(_settings.SizeLimitMb * 1024 * 1024) : null;
+        int quality = _settings.JpegQuality;
+        var done = new TaskCompletionSource<string?>();
+        var thread = new Thread(() =>
+        {
+            try { done.SetResult(ImageFiles.TrySave(image, path, out string? error, quality, limit) ? null : error ?? "unknown error"); }
+            catch (Exception ex) { done.SetResult(ex.Message); }
+        }) { IsBackground = true, Name = "Overskin save" };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        if (await done.Task is { } failed)
+        {
+            Toast.Show("Couldn't save the capture: " + failed, true);
+            return null;
+        }
+        AddToHistory(path);
+        return path;
+    }
+
+    // ---- file names ---------------------------------------------------------------------
+
+    /// <summary>One small button per word that can go in a file name; a click puts it where the cursor is.</summary>
+    private void BuildFileNameTokens()
+    {
+        if (FileNameTokens.Children.Count > 0) { UpdateFileNameExample(); return; }
+        foreach (var (token, label, meaning) in FileNames.Tokens.Take(6))
+        {
+            var b = new Button { Content = label, ToolTip = $"{token}: {meaning}", Height = 22, Padding = new Thickness(8, 0, 8, 0), Margin = new Thickness(0, 0, 4, 4), FontSize = 11.5 };
+            b.SetResourceReference(StyleProperty, "Btn");
+            string t = token;
+            b.Click += (_, _) =>
+            {
+                int at = FileNameBox.CaretIndex;
+                string text = FileNameBox.Text;
+                // a space either side when it's next to other words
+                string add = (at > 0 && text[at - 1] != ' ' && text[at - 1] != '\\' ? " " : "") + t;
+                FileNameBox.Text = text.Insert(at, add);
+                FileNameBox.CaretIndex = at + add.Length;
+                FileNameBox.Focus();
+            };
+            FileNameTokens.Children.Add(b);
+        }
+        UpdateFileNameExample();
+    }
+
+    private void FileName_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (!_ready) return;
+        string pattern = FileNameBox.Text;
+        _settings.FileNamePattern = string.IsNullOrWhiteSpace(pattern) ? FileNames.Default : pattern;
+        FileNames.Pattern = _settings.FileNamePattern;
+        UpdateFileNameExample();
+        SaveSettings();
+    }
+
+    private void FileNameReset_Click(object sender, RoutedEventArgs e) => FileNameBox.Text = FileNames.Default;
+
+    private void UpdateFileNameExample()
+    {
+        string ext = _settings.ImageFormat == "jpg" ? ".jpg" : ".png";
+        FileNameExample.Text = "For example: " + FileNames.Example(_settings.FileNamePattern, ext);
+        FileNameExample.ToolTip = FileNameExample.Text;
+    }
+
+    /// <summary>A new file in the screenshots folder, named by the pattern from the settings.</summary>
+    private string NewCapturePath(string extension)
+    {
+        FileNames.Pattern = _settings.FileNamePattern;
+        return FileNames.NewPath(_settings.SaveFolder, extension);
+    }
+
     /// <summary>Writes a capture into the screenshots folder and adds it to the library.</summary>
     private string? SaveCapture(BitmapSource image)
     {
-        string path = ImageFiles.NewPath(_settings.SaveFolder, _settings.ImageFormat == "jpg" ? ".jpg" : ".png");
-        if (!ImageFiles.TrySave(image, path, out string? error))
+        string path = NewCapturePath(_settings.ImageFormat == "jpg" ? ".jpg" : ".png");
+        long? limit = _settings.SizeLimit ? (long)(_settings.SizeLimitMb * 1024 * 1024) : null;
+        if (!ImageFiles.TrySave(image, path, out string? error, _settings.JpegQuality, limit))
         {
             Toast.Show("Couldn't save the capture: " + error, true);
             return null;
@@ -377,11 +469,17 @@ public partial class MainWindow
     private static void CopyImage(BitmapSource image, bool quiet, string? path = null)
     {
         bool ok;
-        if (path != null && File.Exists(path)) ok = ClipboardFiles.Copy(new[] { path }, image);
-        else
+        try { ok = FastClipboard.Copy(image, path); }
+        catch { ok = false; }
+        if (!ok)
         {
-            try { Clipboard.SetImage(image); ok = true; }
-            catch { ok = false; }
+            // the slower way, which copes with anything
+            if (path != null && File.Exists(path)) ok = ClipboardFiles.Copy(new[] { path }, image);
+            else
+            {
+                try { Clipboard.SetImage(image); ok = true; }
+                catch { ok = false; }
+            }
         }
         if (!ok) Toast.Show("The clipboard is busy. Try again.", true);
         else if (!quiet) Toast.Show("Copied to the clipboard.");
@@ -436,13 +534,22 @@ public partial class MainWindow
 
     private void TextFromScreen() => Guarded(async () =>
     {
-        var chosen = await Choose(OverlayMode.Region, "Drag over the text you want to copy.  Esc cancels.", useDelay: false);
+        var chosen = await Choose(OverlayMode.Region, "Drag over the text or QR code you want to copy.  Esc cancels.", useDelay: false);
         if (chosen is not { } c) return;
         Reappear(c.WasShown);
         if (c.Overlay.Selection is not { } r) return;
 
+        // a QR code or barcode there: copy what it says
+        var crop = c.Overlay.Crop(r);
+        if (QrReader.Read(crop) is { } code)
+        {
+            try { Clipboard.SetText(code); } catch { }
+            new TextResultWindow(code, qr: true).Show();
+            return;
+        }
+
         Toast.ShowSticky("Reading text…");
-        string? text = await TextRecognizer.RecognizeAsync(c.Overlay.Crop(r));
+        string? text = await TextRecognizer.RecognizeAsync(crop);
         Toast.Hide();
         if (text == null)
         {
@@ -516,10 +623,17 @@ public partial class MainWindow
         AfterCursorSwitch.IsChecked = _settings.AfterCursor;
         FormatPng.IsChecked = _settings.ImageFormat != "jpg";
         FormatJpg.IsChecked = _settings.ImageFormat == "jpg";
+        JpegQualitySlider.Value = _settings.JpegQuality;
+        SizeLimitSwitch.IsChecked = _settings.SizeLimit;
+        SizeLimitSlider.Value = _settings.SizeLimitMb;
+        UpdateCompressionRows();
         foreach (var chip in new[] { Delay0, Delay3, Delay5, Delay10 })
             chip.IsChecked = (string)chip.Tag == _settings.CaptureDelay.ToString();
         SaveFolderText.Text = _settings.SaveFolder;
         SaveFolderText.ToolTip = _settings.SaveFolder;
+        FileNames.Pattern = _settings.FileNamePattern;
+        if (FileNameBox.Text != _settings.FileNamePattern) FileNameBox.Text = _settings.FileNamePattern;
+        BuildFileNameTokens();
         AfterPreviewSwitch.IsEnabled = !_settings.AfterEditor && !_settings.AfterViewer;
     }
 
@@ -552,7 +666,29 @@ public partial class MainWindow
     {
         if (!_ready || sender is not RadioButton { Tag: string tag }) return;
         _settings.ImageFormat = tag;
+        UpdateCompressionRows();
         SaveSettings();
+    }
+
+    private void Compression_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready || JpegQualitySlider == null || SizeLimitSlider == null) return;
+        _settings.JpegQuality = (int)JpegQualitySlider.Value;
+        _settings.SizeLimit = SizeLimitSwitch.IsChecked == true;
+        _settings.SizeLimitMb = SizeLimitSlider.Value;
+        UpdateCompressionRows();
+        SaveSettings();
+    }
+
+    private void CompressionSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) => Compression_Changed(sender, e);
+
+    private void UpdateCompressionRows()
+    {
+        if (JpegQualityRow == null || SizeLimitText == null) return;
+        JpegQualityRow.Visibility = _settings.ImageFormat == "jpg" ? Visibility.Visible : Visibility.Collapsed;
+        JpegQualityText.Text = $"{_settings.JpegQuality}%";
+        SizeLimitText.Text = $"{_settings.SizeLimitMb:0.#} MB";
+        SizeLimitSlider.IsEnabled = _settings.SizeLimit;
     }
 
     private void ChangeFolder_Click(object sender, RoutedEventArgs e)
@@ -572,12 +708,19 @@ public partial class MainWindow
     //  library
     // ===================================================================================
 
+    private bool _libraryRefreshQueued;
+
     private void AddToHistory(string path)
     {
         _settings.History.RemoveAll(h => string.Equals(h.Path, path, StringComparison.OrdinalIgnoreCase));
         _settings.History.Add(new HistoryEntry { Path = path, Time = DateTime.Now });
         if (_settings.History.Count > 500) _settings.History.RemoveRange(0, _settings.History.Count - 500);
-        RefreshLibrary();
+        // the library is rebuilt once things are quiet, so a capture's copy and preview never wait for it
+        if (!_libraryRefreshQueued)
+        {
+            _libraryRefreshQueued = true;
+            Dispatcher.BeginInvoke(() => { _libraryRefreshQueued = false; RefreshLibrary(); }, System.Windows.Threading.DispatcherPriority.Background);
+        }
     }
 
     private static string Friendly(DateTime t)
@@ -743,6 +886,7 @@ public partial class MainWindow
         Pin = (image, name, path) => PinImage(image, name, path),
         ShowInFolder = ShowInFolder,
         Changed = RefreshLibrary,
+        Matches = (path, query) => _search.Matches(path, Friendly(File.Exists(path) ? File.GetLastWriteTime(path) : DateTime.MinValue), query),
     };
 
     /// <summary>
@@ -825,6 +969,7 @@ public partial class MainWindow
             Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(item.Path,
                 Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
                 Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+            if (IsVideo(item.Path)) ZoomTrack.DeleteFor(item.Path);
             Toast.Show("Moved to the Recycle Bin.");
         }
         catch (OperationCanceledException)

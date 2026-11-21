@@ -516,6 +516,134 @@ public partial class App
         }
         catch (Exception ex) { log.Add("viewer: FAILED " + ex); }
 
+        // ---- size limit: a big, noisy screenshot always fits, as PNG and as JPG ----
+        try
+        {
+            int w = 2400, h = 1600;
+            var rnd = new Random(1);
+            var px = new byte[w * h * 4];
+            for (int i = 0; i < px.Length; i += 4) { px[i] = (byte)rnd.Next(256); px[i + 1] = (byte)(i / 4 % w / 10); px[i + 2] = (byte)rnd.Next(256); px[i + 3] = 255; }
+            var big = System.Windows.Media.Imaging.BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgra32, null, px, w * 4);
+            long limit = 2 * 1024 * 1024;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var png = ImageFiles.Fit(big, false, 90, limit);
+            long pngMs = sw.ElapsedMilliseconds;
+            var jpg = ImageFiles.Fit(big, true, 90, limit);
+            log.Add($"size limit 2 MB: png {png.Length / 1024} KB in {pngMs} ms, jpg {jpg.Length / 1024} KB in {sw.ElapsedMilliseconds - pngMs} ms (expect both at most 2048 KB)");
+        }
+        catch (Exception ex) { log.Add("size limit: FAILED " + ex); }
+
+        // ---- mockup frames: browser, laptop, phone, and your own frame picture ----
+        try
+        {
+            var dv = new DrawingVisual();
+            using (var dc = dv.RenderOpen())
+            {
+                dc.DrawRectangle(new LinearGradientBrush(Color.FromRgb(70, 120, 230), Color.FromRgb(160, 90, 220), 30), null, new Rect(0, 0, 800, 500));
+                dc.DrawText(new FormattedText("Screenshot", System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 60, Brushes.White, 1.0), new Point(40, 40));
+            }
+            var shotRtb = new System.Windows.Media.Imaging.RenderTargetBitmap(800, 500, 96, 96, PixelFormats.Pbgra32);
+            shotRtb.Render(dv);
+            // a home-made frame: a grey slab with a see-through rounded screen
+            var fv = new DrawingVisual();
+            using (var dc = fv.RenderOpen())
+            {
+                var outer = new RectangleGeometry(new Rect(20, 20, 560, 360), 30, 30);
+                var hole = new RectangleGeometry(new Rect(60, 60, 480, 280), 12, 12);
+                dc.DrawGeometry(Brushes.DimGray, null, new CombinedGeometry(GeometryCombineMode.Exclude, outer, hole));
+            }
+            var frameRtb = new System.Windows.Media.Imaging.RenderTargetBitmap(600, 400, 96, 96, PixelFormats.Pbgra32);
+            frameRtb.Render(fv);
+            string framePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Overskin-test-frame.png");
+            var fe = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            fe.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(frameRtb));
+            using (var f = System.IO.File.Create(framePath)) fe.Save(f);
+            var screen = Mockup.FindScreen(frameRtb);
+            var sizes = new List<string>();
+            foreach (var name in Mockup.Frames.Skip(1))
+            {
+                var made = Beautify.Render(shotRtb, new BeautifyOptions { Background = "Ocean", Padding = 60, Frame = name, FramePath = framePath });
+                sizes.Add($"{name} {made.PixelWidth}x{made.PixelHeight}");
+                if (Environment.GetEnvironmentVariable("OVERSKIN_TEST_OUT") is { Length: > 0 } dir)
+                {
+                    var px = new byte[made.PixelWidth * made.PixelHeight * 4];
+                    new System.Windows.Media.Imaging.FormatConvertedBitmap(made, PixelFormats.Bgra32, null, 0).CopyPixels(px, made.PixelWidth * 4, 0);
+                    SaveBgra(px, made.PixelWidth, made.PixelHeight, System.IO.Path.Combine(dir, $"mockup-{name}.png"));
+                }
+            }
+            log.Add($"mockups: [{string.Join(" | ", sizes)}] custom frame's screen found at {screen} (expect about 60,60,480,280)");
+        }
+        catch (Exception ex) { log.Add("mockups: FAILED " + ex); }
+
+        // ---- a small copy of a video: under the size asked for ----
+        try
+        {
+            string src = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Overskin-noisy.mp4");
+            string dst = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Overskin-noisy-small.mp4");
+            int w = 960, h = 540, fps = 30;
+            var queue = new System.Collections.Concurrent.BlockingCollection<VideoFrame>(8);
+            var encode = Task.Run(() => VideoEncoder.EncodeAsync(src, w, h, fps, queue));
+            var rnd = new Random(2);
+            for (int i = 0; i < fps * 5; i++)
+            {
+                var f = new byte[w * h * 4];
+                rnd.NextBytes(f);
+                queue.Add(new VideoFrame(f, TimeSpan.FromSeconds(i / (double)fps)));
+            }
+            queue.CompleteAdding();
+            encode.GetAwaiter().GetResult();
+            long before = new System.IO.FileInfo(src).Length, limit = 1024 * 1024;
+            Task.Run(() => VideoEdit.RenderAsync(src, dst, new[] { (0.0, 5.0) }, Array.Empty<VideoOverlay>(), h, null, limit)).GetAwaiter().GetResult();
+            long after = new System.IO.FileInfo(dst).Length;
+            log.Add($"small video copy: {before / 1024} KB -> {after / 1024} KB (expect at most 1024 KB) passes: {string.Join(", ", VideoEdit.LastPasses.Select(b => b / 1024 + " KB"))}");
+        }
+        catch (Exception ex) { log.Add("small video copy: FAILED " + ex); }
+
+        // ---- editable zooms: the zoomed video made from an unzoomed recording and its zoom track ----
+        try
+        {
+            string raw = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Overskin-raw.mp4");
+            string zoomed = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Overskin-zoomed.mp4");
+            int w = 640, h = 360, fps = 30;
+            var queue = new System.Collections.Concurrent.BlockingCollection<VideoFrame>(8);
+            var encode = Task.Run(() => VideoEncoder.EncodeAsync(raw, w, h, fps, queue));
+            for (int i = 0; i < fps * 5; i++)
+            {
+                var f = new byte[w * h * 4];
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                    {
+                        int o = (y * w + x) * 4;
+                        bool right = x >= w / 2, bottom = y >= h / 2;
+                        (byte r, byte g, byte b) c = !right && !bottom ? ((byte)230, (byte)30, (byte)30) : right && !bottom ? ((byte)30, (byte)230, (byte)30) : !right ? ((byte)30, (byte)30, (byte)230) : ((byte)240, (byte)240, (byte)240);
+                        f[o] = c.b; f[o + 1] = c.g; f[o + 2] = c.r; f[o + 3] = 255;
+                    }
+                queue.Add(new VideoFrame(f, TimeSpan.FromSeconds(i / (double)fps)));
+            }
+            queue.CompleteAdding();
+            encode.GetAwaiter().GetResult();
+            var track = new ZoomTrack { Width = w, Height = h, Fps = fps, PanRate = 30 };
+            for (int i = 0; i <= 50; i++) track.Pointer.Add(new[] { i * 0.1f, 480f, 90f });
+            track.Zooms.Add(new ZoomSegment { Start = 1, End = 3.5, Zoom = 2.5 });
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            Task.Run(() => ZoomTrack.RenderAsync(raw, zoomed, track, true)).GetAwaiter().GetResult();
+            double length = Task.Run(() => VideoTrim.DurationAsync(zoomed)).GetAwaiter().GetResult().TotalSeconds;
+            // the editor finds the zoom track of a video recorded with editable zooms
+            string video = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Overskin-zoomable.mp4");
+            System.IO.File.Copy(zoomed, video, true);
+            System.IO.File.Copy(raw, ZoomTrack.RawPath(video), true);
+            track.Save(video);
+            var ed = new VideoEditorWindow(video, _ => { }) { Left = -10000, Top = -10000, ShowActivated = false, ShowInTaskbar = false };
+            ed.Show();
+            Pump(800);
+            SaveWindow(ed, "video-editor-zooms.png");
+            ed.Close();
+            ZoomTrack.DeleteFor(video);
+            log.Add($"editable zooms in the editor: track found={ZoomTrack.Load(video) == null} after removing (expect True)");
+            log.Add($"editable zooms: made {length:0.0} s in {sw.ElapsedMilliseconds} ms (expect about 5.0) middle before={VideoPixel(zoomed, 0.3)} while zoomed={VideoPixel(zoomed, 2.5)} (expect a mix, then green)");
+        }
+        catch (Exception ex) { log.Add("editable zooms: FAILED " + ex); }
+
         // ---- tray menu: labels, and every submenu placed the same way ----
         try
         {

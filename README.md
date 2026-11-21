@@ -100,12 +100,18 @@ for private details), smart erase, crop, rotate, and Beautify.
   wheel and joins every new strip into one tall picture, stopping at the end of the page
   (or when you press Esc). Fixed headers and footers appear once.
 - **Delay timer**: 3, 5 or 10 seconds.
-- **After capturing**, any mix of copy to the clipboard, save to a folder (PNG or JPG),
+- **File names**: a pattern of your own, such as `{app} {date} {time}` or `{app}\{type} {n}`,
+  using the date, time, app, window title, type (Screenshot, Video, GIF) and a counter. A `\`
+  makes folders.
+- **After capturing**, any mix of copy to the clipboard, save to a folder (PNG or JPG, with a
+  quality slider and an optional size limit such as 8 MB),
   open in the viewer or the editor, pin it where it was, and a preview card with Edit, Pin,
   Copy, Trace and Show in folder. Optionally with the mouse pointer drawn in.
 - **Viewer**: a quick, smooth look at what you captured. The arrow keys go through all your
   captures, the wheel zooms towards the mouse, drag to look around, double-click for actual
-  size. GIFs and videos play. Copy, rotate, pin, show in the folder, move to the Recycle Bin,
+  size. A film strip shows them all, and the search box finds captures by the words in them.
+  GIFs play, and videos have a proper player: play and pause (with the sign in the middle, like
+  on a video site), a scrubber, the volume and zoom. Space or K, J and L to skip, M to mute. Copy, rotate, pin, show in the folder, move to the Recycle Bin,
   or press E for the editor. Clicking anything in the Library opens it here too.
 - **Watermark**: your name, handle or logo on every screenshot and video, in a corner, the
   middle or tiled across (at any angle and spacing). Text, outlined text or a picture, with
@@ -120,7 +126,11 @@ for private details), smart erase, crop, rotate, and Beautify.
 Capture → **Recording** has the Video and GIF buttons and every video setting.
 
 - **Record** any area, a window or the whole screen as an MP4 (30 or 60 fps, H.264, using
-  Windows' own encoder, with no length limit). Click Video again or press Esc to stop. The
+  Windows' own encoder, with no length limit). Click Video again or press Esc to stop. **Pause**
+  and carry on with the button on the recording bar or Ctrl+Alt+P.
+- **Draw on the screen** while it records (the pencil on the recording bar, or Ctrl+Alt+D): pen,
+  arrow, box or highlighter, in five colours. It's in the video and fades after a few seconds;
+  the pointer is hidden while you draw. The
   screen is read straight from the graphics card, about three times faster than before.
 - **Sound**: what your speakers play, your microphone (pick which one), or both.
 - **Webcam**: you in a circle or rounded square in any corner, sized to suit.
@@ -133,11 +143,15 @@ Capture → **Recording** has the Video and GIF buttons and every video setting.
 - **Backdrop**: put the recording on a gradient with rounded corners and a shadow.
 - **Keyboard shortcuts**: show shortcuts like Ctrl + C in the video. Ordinary typing is never shown.
 - **Auto-zoom**: the video glides in towards each click, follows the pointer while you work
-  and eases back out after a few quiet seconds. Zoom amount, zoom speed, how loosely the view
+  and eases back out after a few quiet seconds. The zooms stay editable: in the video editor
+  they show as bands under the video, to change, remove or add. Zoom amount, zoom speed, how loosely the view
   follows, and how long it waits before zooming out are all adjustable.
 - **Edit**: click a video in the Library to play it. Trim the start and end (I and O), cut
   idle parts automatically or any part by hand (X), and add text labels and arrows that show
-  at the times you choose. Save makes an edited copy; sound is kept.
+  at the times you choose. Save makes an edited copy; sound is kept. *Save a small copy* fits
+  it under a size you choose, such as Discord's 10 MB. **Blur** hides part of the video for as
+  long as you like: drag a box, or let *Find private details* find the emails, numbers and
+  addresses on the frame showing. The camera button **grabs a still** of the frame showing.
 - **Steps**: click through anything and get a numbered how-to guide: one screenshot per
   click, the click circled, and a sentence such as *Click the "Save" button in Notepad*.
   Reword or drop steps, then save it as one picture, an HTML page, Markdown or a PDF.
@@ -181,8 +195,11 @@ for every tool (A, R, E, L, P, H, T, B, X, M, C, V). Copy, save, pin or trace th
   piece you can drag anywhere or resize; the gap it leaves fills in. Right-click a picture
   inside the screenshot to swap it for a picture file or the clipboard picture, keeping its
   place, size and rounded corners.
+- **Effects**: a border, rounded corners, torn edges, a shadow, or grayscale, sepia or invert.
 - **Beautify**: puts the picture on a gradient or plain backdrop with padding, rounded
-  corners and a shadow, optionally 16:9, 4:3, 1:1 or 9:16, ready to post.
+  corners and a shadow, optionally 16:9, 4:3, 1:1 or 9:16, ready to post. It can also put
+  the picture in a frame: a browser window, a laptop, a phone, or your own frame picture (a
+  PNG with a see-through screen, such as a device maker's design bezels).
 
 ## Library
 
@@ -210,7 +227,8 @@ arrows and text. The tray menu can also combine picture files.
 
 - **Snip and pin**: keep part of the screen floating on top.
 - **Text from screen**: drag over any text (in a video, a picture, a game) and it's copied.
-  Uses the OCR built into Windows, so it works offline.
+  Uses the OCR built into Windows, so it works offline. Drag over a **QR code** or barcode and
+  what it says is copied, with *Open link* for a web address.
 - **Colour picker**: copy the hex code of any pixel.
 - **Ruler**: measure distances, sizes and angles in pixels.
 - **Open an image** or **edit the clipboard** in the editor.
@@ -270,13 +288,13 @@ drawing time for accuracy.
 | Ctrl+Alt+O | Text from screen |
 | Ctrl+Alt+K | Colour picker |
 | Ctrl+Alt+R | Record a video (again to stop) |
+| Ctrl+Alt+P | Pause / carry on recording (and pause / resume drawing in Trace) |
+| Ctrl+Alt+D | Draw on the screen while recording (and start drawing in Trace) |
 | Ctrl+Alt+G | Record a GIF (again to stop) |
 | Ctrl+Alt+T | Pin / unpin the window under the mouse |
 | Ctrl+Alt+Up / Down | Opacity of the window or picture under the mouse |
 | Ctrl+Alt+C | Toggle click-through |
 | Hold Ctrl+Alt | Grab a click-through picture while held |
-| Ctrl+Alt+D | Start drawing (Trace) |
-| Ctrl+Alt+P | Pause / resume drawing |
 | Esc or Ctrl+Alt+X | Stop drawing |
 
 All of them can be changed in Settings, including to a bare Print Screen. The defaults avoid
@@ -360,6 +378,7 @@ Open an issue. For a crash, attach the newest file from Settings → About → C
 ## Credits
 
 - Icons by [Lucide](https://lucide.dev), ISC License.
+- QR codes and barcodes read with [ZXing.Net](https://github.com/micjahn/ZXing.Net), Apache License 2.0.
 
 Full texts are in `THIRD-PARTY-NOTICES.md`.
 

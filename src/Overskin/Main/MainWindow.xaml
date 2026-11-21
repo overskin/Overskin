@@ -570,7 +570,7 @@
                                                 </StackPanel>
                                             </Grid>
                                         </Button>
-                                        <Button x:Name="ToolTextButton" Style="{StaticResource ToolRow}" Click="TextFromScreen_Click">
+                                        <Button x:Name="ToolTextButton" Style="{StaticResource ToolRow}" Click="TextFromScreen_Click" ToolTip="Drag over text to copy it. Drag over a QR code or barcode to copy what it says.">
                                             <Grid>
                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                                 <local:Icon Data="{StaticResource IcScanText}" Width="16" Height="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,10,0" />
@@ -671,6 +671,38 @@
                                             <RadioButton x:Name="FormatJpg" Style="{StaticResource Seg}" Margin="0,0,8,0" MinWidth="0" GroupName="Format" Content="JPG" Tag="jpg" Checked="Format_Checked" ToolTip="Smaller files, best for photos" />
                                         </StackPanel>
                                         <Button Grid.Column="2" Style="{StaticResource Btn}" Height="25" Content="Change" Click="ChangeFolder_Click" />
+                                    </Grid>
+                                    <Grid Margin="0,4,0,2" ToolTip="How saved captures are named. Click a word below to add it; {year}, {month} and {day} work too. A \ makes a folder, such as {app}\{date} {time}">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <TextBlock Text="File names" Style="{StaticResource Label}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                                        <TextBox x:Name="FileNameBox" Grid.Column="1" Style="{StaticResource TextField}" Height="26" TextChanged="FileName_Changed" />
+                                        <Button Grid.Column="2" Style="{StaticResource BtnIcon}" Width="26" Height="26" Margin="4,0,0,0" Click="FileNameReset_Click" ToolTip="Back to the usual names">
+                                            <local:Icon Data="{StaticResource IcRotateCcw}" Width="13" Height="13" />
+                                        </Button>
+                                    </Grid>
+                                    <WrapPanel x:Name="FileNameTokens" Margin="0,2,0,0" />
+                                    <TextBlock x:Name="FileNameExample" Style="{StaticResource Dim}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="1,3,0,6" />
+                                    <Grid x:Name="JpegQualityRow" Height="31" ToolTip="Higher looks better; lower makes smaller files">
+                                        <TextBlock Text="JPG quality" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="JpegQualitySlider" Minimum="10" Maximum="100" SmallChange="5" LargeChange="10" TickFrequency="5"
+                                                    IsSnapToTickEnabled="True" ValueChanged="CompressionSlider_Changed" />
+                                            <TextBlock x:Name="JpegQualityText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Every saved screenshot fits in this size: a JPG loses a little quality first, then any picture is made a little smaller (Discord's free limit is 10 MB)">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal">
+                                            <ToggleButton x:Name="SizeLimitSwitch" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="Compression_Changed" Margin="0,0,10,0" />
+                                            <TextBlock Text="Keep files under" Style="{StaticResource Label}" />
+                                        </StackPanel>
+                                        <Grid Grid.Column="1" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="54" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="SizeLimitSlider" Minimum="0.5" Maximum="25" SmallChange="0.5" LargeChange="1" TickFrequency="0.5"
+                                                    IsSnapToTickEnabled="True" ValueChanged="CompressionSlider_Changed" />
+                                            <TextBlock x:Name="SizeLimitText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
                                     </Grid>
                                     <Grid Height="31" ToolTip="A quick, smooth look at it: arrow keys go through your captures, the wheel zooms, E opens the editor">
                                         <TextBlock Text="Open in the viewer" Style="{StaticResource Label}" />
@@ -1036,6 +1068,10 @@
                                                     IsSnapToTickEnabled="True" ValueChanged="VideoSetting_Changed" />
                                             <TextBlock x:Name="VidZoomText" Grid.Column="1" Style="{StaticResource Value}" />
                                         </Grid>
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Keeps the recording unzoomed alongside, so the zooms can be moved, removed or added in the video editor afterwards (not with a webcam, backdrop, shortcut keys or watermark)">
+                                        <TextBlock Text="Editable afterwards" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="VidEditableZoomsSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
                                     </Grid>
                                     <Grid Height="31">
                                         <TextBlock Text="Fine-tuning" Style="{StaticResource Dim}" VerticalAlignment="Center" />

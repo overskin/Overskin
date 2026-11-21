@@ -32,7 +32,7 @@ public partial class MainWindow
         ("Tools", "IcZap", new Command[]
         {
             new("snip", "Snip and pin", "IcScissors", SnipAndPin, true),
-            new("text", "Text from screen", "IcScanText", TextFromScreen, true),
+            new("text", "Text or QR code from screen", "IcScanText", TextFromScreen, true),
             new("colour", "Colour picker", "IcPipette", PickScreenColour, true),
             new("ruler", "Ruler", "IcRuler", ShowRuler),
         }),

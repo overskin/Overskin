@@ -12,7 +12,7 @@
 
     <AssemblyName>Overskin</AssemblyName>
     <RootNamespace>Overskin</RootNamespace>
-    <Version>2.7.0</Version>
+    <Version>3.0.0</Version>
     <Product>Overskin</Product>
     <Description>Screenshots, annotations, pinning and tracing for Windows.</Description>
 
@@ -34,6 +34,10 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
   </ItemGroup>
 
 </Project>
