@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.1
+
+- Fixed: file names with {app} could say "Medal" (or another overlay app) instead of the app you captured. The window in front is used when the capture is over it, and the see-through layers Medal, Discord, NVIDIA, Steam and Game Bar keep over games are passed over.
+
 ## 3.0.0
 
 Recording grows up: pause, draw on the screen as you record, edit the auto-zooms afterwards,

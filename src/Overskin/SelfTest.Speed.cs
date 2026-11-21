@@ -35,6 +35,25 @@ public partial class App
         return copy;
     }
 
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetTopWindow")] private static extern IntPtr GetTopWindowForTest(IntPtr parent);
+
+    /// <summary>The top-level windows from the top down: whose they are and whether naming skips them (no pictures).</summary>
+    private static void WindowList(List<string> log)
+    {
+        for (var w = GetTopWindowForTest(IntPtr.Zero); w != IntPtr.Zero; w = NativeMethods.GetWindow(w, 2))
+        {
+            if (!NativeMethods.IsWindowVisible(w)) continue;
+            NativeMethods.GetWindowRect(w, out var r);
+            NativeMethods.GetWindowThreadProcessId(w, out uint pid);
+            string name = "";
+            try { name = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+            long ex = NativeMethods.GetExStyle(w);
+            log.Add($"{name,-24} {NativeMethods.ClassName(w),-40} ex={ex:X8} overlay={CaptureOverlay.IsOverlay(w)} layer={NameInfo.IsOverlayLayer(w, r, pid)} rect={r.Left},{r.Top} {r.Right - r.Left}x{r.Bottom - r.Top}");
+        }
+        foreach (var (x, y) in new[] { (1280, 720), (-960, 540), (-1500, 2600) })
+            log.Add($"named at {x},{y}: {NameInfo.At(x, y)}");
+    }
+
     private static void SpeedTests(List<string> log)
     {
         var shot = FakeScreenshot(2560, 1440);

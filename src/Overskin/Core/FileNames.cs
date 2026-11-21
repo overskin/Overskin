@@ -20,21 +20,27 @@ public sealed record NameInfo(string App, string Title)
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder name, int max);
     [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
 
-    /// <summary>The top window (not Overskin's own) at a screen point.</summary>
+    /// <summary>Apps whose screen-wide layers float over games and are never what was captured.</summary>
+    private static readonly string[] OverlayApps =
+    {
+        "Medal", "Discord", "DiscordCanary", "DiscordPTB", "NVIDIA Share", "NVIDIA Overlay", "GameOverlayUI", "steamwebhelper",
+        "GameBar", "XboxGameBarWidgets", "GameBarFTServer", "obs64", "Overwolf", "OverwolfBrowser", "RTSS", "MSIAfterburner",
+    };
+
+    /// <summary>
+    /// The window that was captured at a screen point: the window in front when the point is on it,
+    /// otherwise the top window there, passing over Overskin's own and every overlay layer.
+    /// </summary>
     public static NameInfo At(int x, int y)
     {
         try
         {
             uint own = (uint)Environment.ProcessId;
+            var front = GetForegroundWindow();
+            if (front != IntPtr.Zero && Fits(front, x, y, own)) return Of(front);
             for (var w = GetTopWindow(IntPtr.Zero); w != IntPtr.Zero; w = GetWindow(w, 2 /* GW_HWNDNEXT */))
             {
-                if (!IsWindowVisible(w) || !GetWindowRect(w, out var r)) continue;
-                if (x < r.Left || x >= r.Right || y < r.Top || y >= r.Bottom) continue;
-                if (DwmGetWindowAttribute(w, 14 /* DWMWA_CLOAKED */, out int cloaked, 4) == 0 && cloaked != 0) continue;
-                // the see-through layers Medal, Discord, NVIDIA and Game Bar keep over everything aren't what was captured
-                if (CaptureOverlay.IsOverlay(w)) continue;
-                GetWindowThreadProcessId(w, out uint pid);
-                if (pid == own) continue;
+                if (!Fits(w, x, y, own)) continue;
                 var info = Of(w);
                 if (info.App.Length == 0 && info.Title.Length == 0) continue;
                 return info;
@@ -42,6 +48,41 @@ public sealed record NameInfo(string App, string Title)
         }
         catch { }
         return None;
+    }
+
+    /// <summary>A real window at the point: shown, not Overskin's, and not an overlay layer.</summary>
+    private static bool Fits(IntPtr w, int x, int y, uint own)
+    {
+        if (!IsWindowVisible(w) || !GetWindowRect(w, out var r)) return false;
+        if (x < r.Left || x >= r.Right || y < r.Top || y >= r.Bottom) return false;
+        if (DwmGetWindowAttribute(w, 14 /* DWMWA_CLOAKED */, out int cloaked, 4) == 0 && cloaked != 0) return false;
+        GetWindowThreadProcessId(w, out uint pid);
+        if (pid == own) return false;
+        return !IsOverlayLayer(w, r, pid);
+    }
+
+    /// <summary>
+    /// Medal, Discord, NVIDIA, Steam and Game Bar keep see-through layers over the whole screen.
+    /// Most let the mouse through (and are easy to spot), but some stop doing so while they show a
+    /// notification or their menu, so an always-on-top layered window that covers a whole screen
+    /// also counts, and so does a screen-sized window of one of those apps that's always on top.
+    /// </summary>
+    internal static bool IsOverlayLayer(IntPtr w, NativeMethods.RECT r, uint pid)
+    {
+        if (CaptureOverlay.IsOverlay(w)) return true;
+        long ex = NativeMethods.GetExStyle(w);
+        bool topmost = (ex & 0x8) != 0, layered = (ex & NativeMethods.WS_EX_LAYERED) != 0;
+        if (!topmost) return false;
+        var mon = NativeMethods.MonitorBounds(new NativeMethods.POINT(r.Left + (r.Right - r.Left) / 2, r.Top + (r.Bottom - r.Top) / 2));
+        bool screenSized = (r.Right - r.Left) >= mon.Width - 4 && (r.Bottom - r.Top) >= mon.Height - 4;
+        if (!screenSized) return false;
+        if (layered) return true;
+        try
+        {
+            using var p = Process.GetProcessById((int)pid);
+            return OverlayApps.Any(a => p.ProcessName.Equals(a, StringComparison.OrdinalIgnoreCase));
+        }
+        catch { return false; }
     }
 
     /// <summary>The window in front.</summary>
