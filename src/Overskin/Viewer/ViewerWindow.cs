@@ -168,6 +168,7 @@ public sealed partial class ViewerWindow : Window
         tools.Children.Add(_zoomText);
         tools.Children.Add(ToolButton("IcZoomIn", "Zoom in  (+)", () => ZoomBy(1.4, Centre())));
         tools.Children.Add(ToolButton("IcMaximize", "Fit  (0)   ·   Actual size  (1)", () => { if (_fit) ActualSize(Centre()); else FitNow(animate: true); }));
+        tools.Children.Add(ToolButton("IcMaximize2", "Full screen  (F)", ToggleTheater));
         tools.Children.Add(Separator());
         _rotateLeft = ToolButton("IcRotateCcw", "Rotate left  (Shift+R)", () => _ = RotateAsync(-90));
         _rotateRight = ToolButton("IcRotateCw", "Rotate right  (R)", () => _ = RotateAsync(90));
@@ -213,6 +214,10 @@ public sealed partial class ViewerWindow : Window
         body.Children.Add(stripBorder);
         _filmScroll.Content = _film;
         BuildFilm();
+        _titleBar = bar;
+        _toolStrip = strip;
+        _filmBorder = stripBorder;
+        BuildTheater();
         // the same background and rounded corners as Overskin's other windows
         var frame = new Border { Child = body, BorderThickness = new Thickness(1) };
         frame.SetResourceReference(Border.BorderBrushProperty, "Line");
@@ -230,7 +235,7 @@ public sealed partial class ViewerWindow : Window
     protected override void OnStateChanged(EventArgs e)
     {
         base.OnStateChanged(e);
-        if (_frame == null) return;
+        if (_frame == null || _theater) return;
         // square and inset when it fills the screen, rounded otherwise
         _frame.Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
         if (WindowState == WindowState.Maximized) _frame.CornerRadius = new CornerRadius(0);
@@ -595,7 +600,7 @@ public sealed partial class ViewerWindow : Window
         {
             // like a video site: a double-click fills the screen (and undoes the first click's pause)
             TogglePlay();
-            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            ToggleTheater();
             return;
         }
         if (video)
@@ -761,7 +766,9 @@ public sealed partial class ViewerWindow : Window
         }
         Action? act = e.Key switch
         {
+            Key.Escape when _theater => ToggleTheater,
             Key.Escape => Close,
+            Key.F or Key.F11 when !ctrl => ToggleTheater,
             Key.Left or Key.PageUp => () => Go(-1),
             Key.Right or Key.PageDown => () => Go(1),
             Key.Home => () => { _fit = true; Show(0); },

@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.2.1
+
+### New
+
+- **Full screen in the viewer**: the new button next to Fit, or F or F11, fills the whole monitor
+  (taskbar too) with just the picture or video on black. A double-click on a video does the same.
+  Esc, or the button in the corner, comes back to where the viewer was. The button and the
+  pointer fade away when the mouse rests.
+- **The viewer opens beside Overskin** on the side with more room, instead of in the middle of
+  the screen on top of it. With no room either side it opens in the middle, above Overskin.
+
+### Fixed
+
+- The 3.2.0 download on GitHub was the 3.1.0 installer by mistake, so the fixes in 3.2.0 (like
+  the even gaps on the Capture page) weren't in it. This release has them all.
+
 ## 3.2.0
 
 Overskin updates itself, crops videos and GIFs, and snaps to round pictures.

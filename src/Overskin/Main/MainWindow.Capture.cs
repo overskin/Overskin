@@ -288,6 +288,7 @@ public partial class MainWindow
         {
             var list = paths.Select(p => (string?)p).ToList();
             var viewer = new ViewerWindow(list, Math.Max(0, list.IndexOf(path)), ViewerHostFor());
+            viewer.PlaceBeside(this);
             viewer.Show();
             viewer.Activate();
         });
@@ -872,6 +873,7 @@ public partial class MainWindow
         {
             var paths = _library.Select(i => (string?)i.Path).ToList();
             var viewer = new ViewerWindow(paths, Math.Max(0, paths.IndexOf(item.Path)), ViewerHostFor());
+            viewer.PlaceBeside(this);
             viewer.Show();
             viewer.Activate();
         }
@@ -905,6 +907,7 @@ public partial class MainWindow
         }
         else paths = new List<string?> { null };
         var viewer = new ViewerWindow(paths, index, ViewerHostFor(), path == null ? image : null);
+        viewer.PlaceBeside(this);
         viewer.Show();
         viewer.Activate();
     }

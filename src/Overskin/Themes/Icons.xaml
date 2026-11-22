@@ -52,6 +52,7 @@
     <Geometry x:Key="IcListOrdered">M 11 5 h 10 M 11 12 h 10 M 11 19 h 10 M 4 4 h 1 v 5 M 4 9 h 2 M 6.5 20 H 3.4 c 0 -1 2.6 -1.925 2.6 -3.5 a 1.5 1.5 0 0 0 -2.6 -1.02</Geometry>
     <Geometry x:Key="IcLock">M 5 11 H 19 A 2 2 0 0 1 21 13 V 20 A 2 2 0 0 1 19 22 H 5 A 2 2 0 0 1 3 20 V 13 A 2 2 0 0 1 5 11 Z M 7 11 V 7 a 5 5 0 0 1 10 0 v 4</Geometry>
     <Geometry x:Key="IcMaximize">M 8 3 H 5 a 2 2 0 0 0 -2 2 v 3 M 21 8 V 5 a 2 2 0 0 0 -2 -2 h -3 M 3 16 v 3 a 2 2 0 0 0 2 2 h 3 M 16 21 h 3 a 2 2 0 0 0 2 -2 v -3</Geometry>
+    <Geometry x:Key="IcMinimize2">M 4 14 h 6 v 6 M 20 10 h -6 V 4 M 14 10 l 7 -7 M 3 21 l 7 -7</Geometry>
     <Geometry x:Key="IcMaximize2">M 15 3 h 6 v 6 M 21 3 l -7 7 M 3 21 l 7 -7 M 9 21 H 3 v -6</Geometry>
     <Geometry x:Key="IcMinus">M 5 12 h 14</Geometry>
     <Geometry x:Key="IcMonitor">M 4 3 H 20 A 2 2 0 0 1 22 5 V 15 A 2 2 0 0 1 20 17 H 4 A 2 2 0 0 1 2 15 V 5 A 2 2 0 0 1 4 3 Z M 8 21 L 16 21 M 12 17 L 12 21</Geometry>

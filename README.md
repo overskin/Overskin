@@ -116,7 +116,9 @@ for private details), smart erase, crop, rotate, and Beautify.
   size. A film strip shows them all, and the search box finds captures by the words in them.
   GIFs play, and videos have a proper player: play and pause (with the sign in the middle, like
   on a video site), a scrubber, the volume and zoom. Space or K, J and L to skip, M to mute. Copy, rotate, pin, show in the folder, move to the Recycle Bin,
-  or press E for the editor. Clicking anything in the Library opens it here too.
+  or press E for the editor. Clicking anything in the Library opens it here too. It opens beside
+  Overskin's window rather than on top of it, and **full screen** (the button, F or F11) fills the
+  whole monitor with just the picture or video; Esc comes back.
 - **Watermark**: your name, handle or logo on every screenshot and video, in a corner, the
   middle or tiled across (at any angle and spacing). Text, outlined text or a picture, with
   size and opacity.
