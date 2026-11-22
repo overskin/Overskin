@@ -19,7 +19,9 @@ public sealed class CaptureNotice : Window
     private static CaptureNotice? _current;
 
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(7) };
-    private readonly TranslateTransform _slide = new(24, 0);
+    // the card (with its shadow) rises out of the corner, growing a little, and settles with a small bounce
+    private readonly TranslateTransform _slide = new(0, 36);
+    private readonly ScaleTransform _grow = new(0.86, 0.86);
     private bool _closing;
 
     public static void ShowFor(BitmapSource image, string? path, string caption,
@@ -31,6 +33,10 @@ public sealed class CaptureNotice : Window
     }
 
     public static void CloseAll() => _current?.Close();
+
+    /// <summary>For the self-test: how far through its pop-up the shown card is (scale, rise, opacity).</summary>
+    internal static (double Scale, double Rise, double Opacity)? StateForTest =>
+        _current is { } c ? (c._grow.ScaleX, c._slide.Y, c.Opacity) : null;
 
     private CaptureNotice(BitmapSource image, string? path, string caption,
         Action edit, Action pin, Action copy, Action? openFolder, Action trace)
@@ -92,7 +98,6 @@ public sealed class CaptureNotice : Window
             CornerRadius = (CornerRadius)FindResource("RadiusCard"),
             Padding = new Thickness(10, 10, 8, 8),
             Margin = new Thickness(14),
-            RenderTransform = _slide,
         };
         var shadow = new Border
         {
@@ -100,7 +105,11 @@ public sealed class CaptureNotice : Window
             CornerRadius = (CornerRadius)FindResource("RadiusCard"),
             Effect = new System.Windows.Media.Effects.BlurEffect { Radius = 14 },
         };
-        var root = new Grid();
+        var root = new Grid
+        {
+            RenderTransformOrigin = new Point(1, 1),
+            RenderTransform = new TransformGroup { Children = { _grow, _slide } },
+        };
         root.Children.Add(shadow);
         root.Children.Add(card);
         Content = root;
@@ -136,9 +145,12 @@ public sealed class CaptureNotice : Window
         Left = area.Right - ActualWidth - 4;
         Top = area.Bottom - ActualHeight - 4;
 
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(180)));
-        _slide.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(260)) { EasingFunction = ease });
+        var settle = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.35 };
+        var rise = TimeSpan.FromMilliseconds(340);
+        BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(170)));
+        _slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0, rise) { EasingFunction = settle });
+        _grow.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(1, rise) { EasingFunction = settle });
+        _grow.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(1, rise) { EasingFunction = settle });
         _timer.Start();
     }
 
@@ -150,7 +162,10 @@ public sealed class CaptureNotice : Window
         var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(160));
         fade.Completed += (_, _) => Close();
         BeginAnimation(OpacityProperty, fade);
-        _slide.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(16, TimeSpan.FromMilliseconds(160)));
+        var sink = new CubicEase { EasingMode = EasingMode.EaseIn };
+        _slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(20, TimeSpan.FromMilliseconds(160)) { EasingFunction = sink });
+        _grow.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.94, TimeSpan.FromMilliseconds(160)) { EasingFunction = sink });
+        _grow.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.94, TimeSpan.FromMilliseconds(160)) { EasingFunction = sink });
     }
 
     protected override void OnClosed(EventArgs e)

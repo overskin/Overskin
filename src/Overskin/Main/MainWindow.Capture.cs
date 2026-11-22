@@ -799,7 +799,7 @@ public partial class MainWindow
             _ = IsVideo(item.Path) ? LoadVideoThumbAsync(item) : LoadThumbAsync(item);
         }
 
-        LibraryCount.Text = _library.Count == 0 ? "" : _library.Count.ToString();
+        UpdateLibraryCount();
         LibraryEmpty.Visibility = _library.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         LibraryEmptyTitle.Text = query.Length > 0 ? "Nothing matches"
             : _libraryFilter switch { "GIFs" => "No GIFs", "Videos" => "No videos", "Pictures" => "No pictures", _ => "No captures yet" };

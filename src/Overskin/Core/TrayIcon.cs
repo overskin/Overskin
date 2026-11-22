@@ -151,6 +151,7 @@ public sealed class TrayIcon : IDisposable
 
     private void OpenMenu()
     {
+        Rebuild(); // so it shows what's happening now (a recording to stop) and the current hotkeys
         _menu.IsOpen = true;
         // A tray menu only closes on an outside click if its window is the foreground one.
         if (PresentationSource.FromVisual(_menu) is HwndSource popup)

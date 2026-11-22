@@ -93,6 +93,8 @@ public partial class MainWindow : Window
         PinsPictures.IsChecked = true;
         RefreshLibrary();
         RefreshCatalog();
+        SetUpFolds();
+        SetUpCleanUp();
         Loaded += (_, _) => FadeIn();
 
         _loading = false;
@@ -338,6 +340,10 @@ public partial class MainWindow : Window
         HkAbortButton.Content = _settings.HotkeyAbort;
         HkDrawButton.Content = _settings.HotkeyDraw;
         HkPauseButton.Content = _settings.HotkeyPause;
+        HkRecPenButton.Content = _settings.HotkeyDraw;
+        HkRecPauseButton.Content = _settings.HotkeyPause;
+        TileVideoKey.Text = _settings.HotkeyVideo;
+        RecordHint.Text = $"While recording: {_settings.HotkeyPause} pauses · {_settings.HotkeyDraw} draws";
         HkSnipButton.Content = _settings.HotkeySnip;
         HintSnipKey.Text = _settings.HotkeySnip;
         HkRegionButton.Content = _settings.HotkeyRegion;
@@ -2154,6 +2160,7 @@ public partial class MainWindow : Window
 
         if (prefix.Length == 0)
         {
+            await WriteTidyChecksAsync(folder);
             // the Recording half of the Capture page, top and scrolled down
             SelectTab(TabCaptureIndex);
             CaptureRecordTab.IsChecked = true;

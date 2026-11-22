@@ -1,5 +1,40 @@
 # Changelog
 
+## 3.1.0
+
+A tidier app: shorter pages, hotkeys grouped by what they do, smoother area picking and a
+livelier preview card.
+
+### New
+
+- **Tray menu quick actions**: right-click the tray icon and Capture a region, Capture a window,
+  Capture the full screen, Record a video and Library are right there, with their hotkeys.
+  While a video records, Stop and Pause (or Resume) are at the top instead; while a GIF records,
+  Stop. Everything else is still in the groups below.
+- **Clear out old captures** (Settings → General): captures older than 30 days, 90 days or a year
+  go to the Recycle Bin by themselves. Only captures in your screenshots folder, never ones
+  pinned on screen; turning it on asks first and says how many and how much space.
+- **The Library shows how much space it uses**: "12 captures · 48 MB" next to the filters, and
+  Settings shows the total for all your captures.
+
+### Changed
+
+- **The Capture page is much shorter**: After capturing, Watermark, Video, Sound, Webcam,
+  Pointer and Auto-zoom fold away to their headings, each with a short summary of what's set
+  ("Copy · Save PNG · Preview", "30 fps · Sharper"). Click a heading to open it; Overskin
+  remembers which you left open.
+- **Hotkeys are grouped**: Capture, Recording, Pins and Trace, each with its icon, in tighter
+  rows. Pause and Draw now have their own rows under Recording (they share their keys with
+  Trace, as before), so it's clear they work while recording.
+- **Smoother area picking**: the box, magnifier and size readout follow the pointer frame by
+  frame, read just before each screen refresh, instead of a frame or two behind it.
+- **The preview card pops up**: it rises out of the corner, grows into place with a small
+  bounce, and sinks away when it goes.
+- The Video card on the Recording page shows its hotkey (Ctrl+Alt+R) like the others, and a line
+  under the recording buttons says which keys pause and draw while recording.
+- **Caption a GIF** moved from Screen tools to beside the recording buttons.
+- Trace's seven styles fit on one row ("Gartic Phone" is now "Gartic", with the full name on hover).
+
 ## 3.0.1
 
 - Fixed: file names with {app} could say "Medal" (or another overlay app) instead of the app you captured. The window in front is used when the capture is over it, and the see-through layers Medal, Discord, NVIDIA, Steam and Game Bar keep over games are passed over.

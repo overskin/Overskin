@@ -166,7 +166,7 @@ Capture → **Recording** has the Video and GIF buttons and every video setting.
   looping, and output width.
 - **Copy** puts the GIF on the clipboard as a file, so Ctrl+V in Discord just works. Or save
   it.
-- **Caption a GIF** opens any existing GIF (or a still picture) in the same editor.
+- **Caption a GIF** (beside the recording buttons) opens any existing GIF (or a still picture) in the same editor.
 
 ## Edit
 
@@ -203,8 +203,13 @@ for every tool (A, R, E, L, P, H, T, B, X, M, C, V). Copy, save, pin or trace th
 
 ## Library
 
-Every saved capture with a thumbnail, filtered by pictures, GIFs or videos. Click to edit;
-right-click to copy, pin, trace, show in the folder, or move to the Recycle Bin.
+Every saved capture with a thumbnail, filtered by pictures, GIFs or videos, with how many
+are showing and the space they take up. Click to edit; right-click to copy, pin, trace, show in
+the folder, or move to the Recycle Bin.
+
+**Clear out old captures** (Settings → General): captures older than 30 days, 90 days or a
+year go to the Recycle Bin by themselves. Only captures in your screenshots folder, never ones
+pinned on screen, and it asks first when you turn it on.
 
 **Convert to** (right-click a capture) makes a copy in another format next to the original:
 PNG, JPG, BMP or TIFF; a GIF; or an MP4 video. A picture becomes a 5-second video or a
@@ -302,7 +307,9 @@ Ctrl+Alt combinations that type characters on European keyboards (AltGr+Q, E, M 
 
 ## Right-click menus
 
-Right-click the tray icon for every feature, grouped into Capture, Tools, Pin, Edit and Open.
+Right-click the tray icon for the everyday captures straight away (region, window, full screen,
+record a video, the Library, with their hotkeys; while a video records, Stop and Pause come
+first), then every feature, grouped into Capture, Tools, Pin, Edit and Open.
 Right-click Overskin on the taskbar or in Start for the main captures and recordings.
 
 ## Settings

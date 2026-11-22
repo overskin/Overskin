@@ -654,7 +654,8 @@ public sealed class CaptureOverlay : Window
         }
         bool magnify = Tool == CaptureTool.None && (_toolbar?.Magnifier ?? true) && !(_toolbar?.IsMouseOver ?? false);
         _magnifier.Visibility = magnify ? Visibility.Visible : Visibility.Collapsed;
-        Cursor = Tool != CaptureTool.None ? Cursors.Pen : Cursors.Cross;
+        var cursor = Tool != CaptureTool.None ? Cursors.Pen : Cursors.Cross;
+        if (Cursor != cursor) Cursor = cursor;
 
         // magnifier and readout
         int half = MagnifierPixels / 2;
@@ -677,6 +678,8 @@ public sealed class CaptureOverlay : Window
     private GeometryGroup? _dimShapeCache;
     private GeometryGroup _dimShape => _dimShapeCache ??= new GeometryGroup { FillRule = FillRule.EvenOdd, Children = { _dimWhole, _dimHole } };
 
+    private bool? _frameSolid;
+
     private void ShowRect(RECT r, bool solid)
     {
         _current = r;
@@ -689,7 +692,11 @@ public sealed class CaptureOverlay : Window
         Canvas.SetTop(_frame, rect.Y);
         _frame.Width = rect.Width;
         _frame.Height = rect.Height;
-        _frame.StrokeDashArray = solid ? null : new DoubleCollection { 4, 3 };
+        if (_frameSolid != solid)
+        {
+            _frameSolid = solid;
+            _frame.StrokeDashArray = solid ? null : new DoubleCollection { 4, 3 };
+        }
         // a picture with rounded corners gets a frame with the same corners
         double round = _snapped is { } picture ? picture.Radius / _scale : 0;
         _frame.RadiusX = _frame.RadiusY = round;
@@ -724,6 +731,7 @@ public sealed class CaptureOverlay : Window
         _frame.Width = rb.X - ra.X;
         _frame.Height = rb.Y - ra.Y;
         _frame.StrokeDashArray = new DoubleCollection { 4, 3 };
+        _frameSolid = false;
         _dim.Data = new RectangleGeometry(new Rect(0, 0, _backdrop.Width, _backdrop.Height));
 
         int dx = b.X - a.X, dy = b.Y - a.Y;
@@ -735,21 +743,30 @@ public sealed class CaptureOverlay : Window
         Canvas.SetTop(_label, lb.Y - 30);
     }
 
-    private bool _movePending;
+    private bool _framesHooked;
+    private POINT _lastDrawn = new(int.MinValue, int.MinValue);
 
     /// <summary>
-    /// A fast mouse sends many moves between two screen refreshes; only the newest is worth
-    /// drawing, so the rest are folded into one update just before the next frame.
+    /// The box, magnifier and readout follow the pointer frame by frame: just before each screen
+    /// refresh the pointer's position is read and drawn, so the box keeps up with the pointer the
+    /// way Windows' own snipping does. (Drawing on each mouse message instead lagged a frame or
+    /// two behind, as the message often landed just after a frame had been put together.)
     /// </summary>
     protected override void OnMouseMove(MouseEventArgs e)
     {
-        if (_movePending) return;
-        _movePending = true;
-        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () =>
-        {
-            _movePending = false;
-            Update(CursorPos());
-        });
+        if (_framesHooked) return;
+        _framesHooked = true;
+        CompositionTarget.Rendering += OnFrame;
+        Closed += (_, _) => CompositionTarget.Rendering -= OnFrame;
+        OnFrame(null, EventArgs.Empty);
+    }
+
+    private void OnFrame(object? sender, EventArgs e)
+    {
+        var p = CursorPos();
+        if (p.X == _lastDrawn.X && p.Y == _lastDrawn.Y) return;
+        _lastDrawn = p;
+        Update(p);
     }
 
     private bool _pickingColour;

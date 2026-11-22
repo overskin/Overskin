@@ -56,6 +56,10 @@ public sealed class AppSettings
     public string HotkeyVideo { get; set; } = "Ctrl+Alt+R";
     /// <summary>Library order: Newest, Oldest, Name or Largest.</summary>
     public string LibrarySort { get; set; } = "Newest";
+    /// <summary>Captures older than this many days go to the Recycle Bin; 0 keeps them.</summary>
+    public int CleanUpDays { get; set; }
+    /// <summary>Settings cards on the Capture tab left open; the rest show just their heading.</summary>
+    public List<string> OpenCards { get; set; } = new();
 
     // capture
     public bool AfterCopy { get; set; } = true;
@@ -247,6 +251,8 @@ public sealed class AppSettings
         Palette ??= new();
         PinnedImages ??= new();
         History ??= new();
+        OpenCards ??= new();
+        if (CleanUpDays is not (0 or 30 or 90 or 365)) CleanUpDays = 0;
         History.RemoveAll(h => h == null || string.IsNullOrEmpty(h.Path));
         if (string.IsNullOrWhiteSpace(SaveFolder)) SaveFolder = DefaultSaveFolder();
         if (ImageFormat is not ("png" or "jpg")) ImageFormat = "png";

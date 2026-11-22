@@ -615,15 +615,6 @@
                                                 </StackPanel>
                                             </Grid>
                                         </Button>
-                                        <Button Style="{StaticResource ToolRow}" Click="CaptionGif_Click">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                                <local:Icon Data="{StaticResource IcType}" Width="16" Height="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,10,0" />
-                                                <StackPanel Grid.Column="1">
-                                                    <TextBlock Text="Caption a GIF" Style="{StaticResource Label}" FontWeight="SemiBold" />
-                                                </StackPanel>
-                                            </Grid>
-                                        </Button>
                                         <Button Style="{StaticResource ToolRow}" Click="PinClipboard_Click" ToolTip="Pin the picture on the clipboard on top of everything (Ctrl+Alt+V)">
                                             <Grid>
                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
@@ -638,7 +629,7 @@
                             </Border>
 
                             <!-- after capture -->
-                            <Border Style="{StaticResource Card}">
+                            <Border x:Name="CardAfter" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <local:Icon Data="{StaticResource IcCamera}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
@@ -736,7 +727,7 @@
                             </Border>
 
                             <!-- watermark -->
-                            <Border Style="{StaticResource Card}">
+                            <Border x:Name="CardWatermark" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <local:Icon Data="{StaticResource IcStamp}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
@@ -845,7 +836,7 @@
                                             <local:Icon Data="{StaticResource IcCircleDot}" Width="17" Height="17" Foreground="{DynamicResource Accent}" />
                                         </Border>
                                         <TextBlock Text="Video" Style="{StaticResource Heading}" Margin="0,12,0,0" />
-                                        <TextBlock Text="MP4" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
+                                        <TextBlock x:Name="TileVideoKey" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
                                     </StackPanel>
                                 </Button>
                                 <Button Style="{StaticResource Tile}" Click="RecordGif_Click" ToolTip="Record an area as a GIF, then caption and trim it">
@@ -868,7 +859,20 @@
                                     </StackPanel>
                                 </Button>
                             </UniformGrid>
-                            <Border Style="{StaticResource Card}">
+                            <Grid Margin="1,2,0,14">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <local:Icon Data="{StaticResource IcKeyboard}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="RecordHint" Grid.Column="1" Style="{StaticResource Dim}" FontSize="11.5" TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="Keys that work while a video records (change them in Settings)" />
+                                <Button Grid.Column="2" Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="CaptionGif_Click"
+                                        ToolTip="Add a caption to a GIF you already have">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcType}" Width="13" Height="13" Margin="0,0,6,0" />
+                                        <TextBlock Text="Caption a GIF" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <Border x:Name="CardVideo" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <local:Icon Data="{StaticResource IcFilm}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
@@ -912,7 +916,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
-                            <Border Style="{StaticResource Card}">
+                            <Border x:Name="CardSound" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <local:Icon Data="{StaticResource IcVolume2}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
@@ -942,7 +946,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
-                            <Border Style="{StaticResource Card}">
+                            <Border x:Name="CardWebcam" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <local:Icon Data="{StaticResource IcVideo}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
@@ -993,7 +997,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
-                            <Border Style="{StaticResource Card}">
+                            <Border x:Name="CardPointer" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <local:Icon Data="{StaticResource IcMousePointer2}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
@@ -1049,7 +1053,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
-                            <Border Style="{StaticResource Card}">
+                            <Border x:Name="CardZoom" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <local:Icon Data="{StaticResource IcZoomIn}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
@@ -1125,7 +1129,7 @@
                             <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Content="Pictures" Tag="Pictures" Checked="LibraryFilter_Checked" />
                             <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Content="GIFs" Tag="GIFs" Checked="LibraryFilter_Checked" />
                             <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Content="Videos" Tag="Videos" Checked="LibraryFilter_Checked" />
-                            <TextBlock x:Name="LibraryCount" Style="{StaticResource Dim}" Margin="10,0,0,0" />
+                            <TextBlock x:Name="LibraryCount" Style="{StaticResource Dim}" FontSize="11.5" VerticalAlignment="Center" Margin="12,0,0,0" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button Style="{StaticResource Btn}" Height="25" Click="CombineMode_Click" Margin="0,0,6,0"
@@ -1460,15 +1464,16 @@
                                         <TextBlock Text="Style" Style="{StaticResource Heading}" />
                                     </StackPanel>
                                     <Border Style="{StaticResource Rule}" />
-                                    <WrapPanel x:Name="ModeChoices" Margin="0,0,0,2">
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Outline" Tag="Outline" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Lines" Tag="Lines" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Sketch" Tag="Sketch" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Hatch" Tag="Hatch" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Shade" Tag="Shade" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Colour" Tag="Colour" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" GroupName="Mode" Content="Gartic Phone" Tag="Gartic" Checked="Mode_Checked" />
-                                    </WrapPanel>
+                                    <UniformGrid x:Name="ModeChoices" Rows="1" Margin="0,0,-6,2">
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Outline" Tag="Outline" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Lines" Tag="Lines" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Sketch" Tag="Sketch" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Hatch" Tag="Hatch" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Shade" Tag="Shade" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Colour" Tag="Colour" Checked="Mode_Checked" />
+                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Gartic" Tag="Gartic" Checked="Mode_Checked"
+                                                     ToolTip="Gartic Phone: its pen, brush sizes and opacity buttons" />
+                                    </UniformGrid>
                                 </StackPanel>
                             </Border>
 
@@ -1865,97 +1870,121 @@
                                     
                                 </Grid>
                                 <Border Style="{StaticResource Rule}" />
-                                <TextBlock Text="Capture" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" Margin="0,6,0,2" />
-                                <Grid Height="31">
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,3">
+                                    <local:Icon Data="{StaticResource IcCamera}" Width="12" Height="12" Foreground="{DynamicResource Accent}" Margin="0,0,7,0" />
+                                    <TextBlock Text="Capture" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <Grid Height="28">
                                     <TextBlock Text="Capture a region" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkRegionButton" Style="{StaticResource Btn}" Tag="HotkeyRegion" MinWidth="124" Height="25"
+                                    <Button x:Name="HkRegionButton" Style="{StaticResource Btn}" Tag="HotkeyRegion" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="31">
+                                <Grid Height="28">
                                     <TextBlock Text="Capture the active window" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkWindowButton" Style="{StaticResource Btn}" Tag="HotkeyWindow" MinWidth="124" Height="25"
+                                    <Button x:Name="HkWindowButton" Style="{StaticResource Btn}" Tag="HotkeyWindow" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="31">
+                                <Grid Height="28">
                                     <TextBlock Text="Capture the full screen" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkScreenButton" Style="{StaticResource Btn}" Tag="HotkeyScreen" MinWidth="124" Height="25"
+                                    <Button x:Name="HkScreenButton" Style="{StaticResource Btn}" Tag="HotkeyScreen" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="31">
-                                    <TextBlock Text="Record a GIF (press again to stop)" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkGifButton" Style="{StaticResource Btn}" Tag="HotkeyGif" MinWidth="124" Height="25"
+                                <Grid Height="28">
+                                    <TextBlock Text="Text or QR code from screen" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkTextButton" Style="{StaticResource Btn}" Tag="HotkeyText" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="31">
-                                    <TextBlock Text="Record a video (press again to stop)" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkVideoButton" Style="{StaticResource Btn}" Tag="HotkeyVideo" MinWidth="124" Height="25"
-                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
-                                </Grid>
-                                <Grid Height="31">
-                                    <TextBlock Text="Text from screen" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkTextButton" Style="{StaticResource Btn}" Tag="HotkeyText" MinWidth="124" Height="25"
-                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
-                                </Grid>
-                                <Grid Height="31">
+                                <Grid Height="28">
                                     <TextBlock Text="Colour picker" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkColourButton" Style="{StaticResource Btn}" Tag="HotkeyColour" MinWidth="124" Height="25"
+                                    <Button x:Name="HkColourButton" Style="{StaticResource Btn}" Tag="HotkeyColour" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="31">
+                                <Grid Height="28">
                                     <TextBlock Text="Recent captures, to drag into other apps" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkRecentButton" Style="{StaticResource Btn}" Tag="HotkeyRecent" MinWidth="124" Height="25"
+                                    <Button x:Name="HkRecentButton" Style="{StaticResource Btn}" Tag="HotkeyRecent" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Border Style="{StaticResource Rule}" Margin="0,4,0,4" />
-                                <TextBlock Text="Pins and windows" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" Margin="0,6,0,2" />
-                                <Grid Height="31">
-                                    <TextBlock Text="Pin the clipboard picture" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkPinClipboardButton" Style="{StaticResource Btn}" Tag="HotkeyPinClipboard" MinWidth="124" Height="25"
+                                <Border Style="{StaticResource Rule}" Margin="0,6,0,2" />
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,3">
+                                    <local:Icon Data="{StaticResource IcCircleDot}" Width="12" Height="12" Foreground="{DynamicResource Accent}" Margin="0,0,7,0" />
+                                    <TextBlock Text="Recording" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <Grid Height="28">
+                                    <TextBlock Text="Record a video (again to stop)" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkVideoButton" Style="{StaticResource Btn}" Tag="HotkeyVideo" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="31">
-                                    <TextBlock Text="Pin the window under the mouse" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkPinButton" Style="{StaticResource Btn}" Tag="HotkeyPin" MinWidth="124" Height="25"
+                                <Grid Height="28">
+                                    <TextBlock Text="Record a GIF (again to stop)" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkGifButton" Style="{StaticResource Btn}" Tag="HotkeyGif" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="31">
-                                    <TextBlock Text="Raise opacity" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkUpButton" Style="{StaticResource Btn}" Tag="HotkeyOpacityUp" MinWidth="124" Height="25"
+                                <Grid Height="28" ToolTip="Shared with Trace: the same keys pause and draw there">
+                                    <TextBlock Text="Pause or resume the recording" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkRecPauseButton" Style="{StaticResource Btn}" Tag="HotkeyPause" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="31">
-                                    <TextBlock Text="Lower opacity" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkDownButton" Style="{StaticResource Btn}" Tag="HotkeyOpacityDown" MinWidth="124" Height="25"
+                                <Grid Height="28" ToolTip="Shared with Trace: the same keys pause and draw there">
+                                    <TextBlock Text="Draw on the screen while recording" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkRecPenButton" Style="{StaticResource Btn}" Tag="HotkeyDraw" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="31">
-                                    <TextBlock Text="Toggle click-through" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkClickButton" Style="{StaticResource Btn}" Tag="HotkeyClickThrough" MinWidth="124" Height="25"
-                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
-                                </Grid>
-                                <Grid Height="31">
+                                <Border Style="{StaticResource Rule}" Margin="0,6,0,2" />
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,3">
+                                    <local:Icon Data="{StaticResource IcPin}" Width="12" Height="12" Foreground="{DynamicResource Accent}" Margin="0,0,7,0" />
+                                    <TextBlock Text="Pins" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <Grid Height="28">
                                     <TextBlock Text="Snip part of the screen and pin it" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkSnipButton" Style="{StaticResource Btn}" Tag="HotkeySnip" MinWidth="124" Height="25"
+                                    <Button x:Name="HkSnipButton" Style="{StaticResource Btn}" Tag="HotkeySnip" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Border Style="{StaticResource Rule}" Margin="0,4,0,4" />
-                                <TextBlock Text="Drawing (Trace)" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" Margin="0,6,0,2" />
-                                <Grid Height="31">
+                                <Grid Height="28">
+                                    <TextBlock Text="Pin the clipboard picture" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkPinClipboardButton" Style="{StaticResource Btn}" Tag="HotkeyPinClipboard" MinWidth="124" Height="23"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="28">
+                                    <TextBlock Text="Pin the window under the mouse" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkPinButton" Style="{StaticResource Btn}" Tag="HotkeyPin" MinWidth="124" Height="23"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="28">
+                                    <TextBlock Text="Toggle click-through" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkClickButton" Style="{StaticResource Btn}" Tag="HotkeyClickThrough" MinWidth="124" Height="23"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="28">
+                                    <TextBlock Text="Raise opacity" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkUpButton" Style="{StaticResource Btn}" Tag="HotkeyOpacityUp" MinWidth="124" Height="23"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="28">
+                                    <TextBlock Text="Lower opacity" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkDownButton" Style="{StaticResource Btn}" Tag="HotkeyOpacityDown" MinWidth="124" Height="23"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Border Style="{StaticResource Rule}" Margin="0,6,0,2" />
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,3">
+                                    <local:Icon Data="{StaticResource IcPenTool}" Width="12" Height="12" Foreground="{DynamicResource Accent}" Margin="0,0,7,0" />
+                                    <TextBlock Text="Trace" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <Grid Height="28" ToolTip="Also turns the pen on and off while recording">
                                     <TextBlock Text="Start drawing in the chosen area" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkDrawButton" Style="{StaticResource Btn}" Tag="HotkeyDraw" MinWidth="124" Height="25"
+                                    <Button x:Name="HkDrawButton" Style="{StaticResource Btn}" Tag="HotkeyDraw" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="31">
+                                <Grid Height="28" ToolTip="Also pauses and resumes a recording">
                                     <TextBlock Text="Pause or resume drawing" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkPauseButton" Style="{StaticResource Btn}" Tag="HotkeyPause" MinWidth="124" Height="25"
+                                    <Button x:Name="HkPauseButton" Style="{StaticResource Btn}" Tag="HotkeyPause" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="31">
+                                <Grid Height="28">
                                     <TextBlock Text="Stop drawing" Style="{StaticResource Label}" />
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                         <Border Style="{StaticResource Key}"><TextBlock Text="Esc" Style="{StaticResource KeyText}" /></Border>
                                         <TextBlock Text="or" Style="{StaticResource Dim}" Margin="0,0,8,0" />
-                                        <Button x:Name="HkAbortButton" Style="{StaticResource Btn}" Tag="HotkeyAbort" MinWidth="124" Height="25"
+                                        <Button x:Name="HkAbortButton" Style="{StaticResource Btn}" Tag="HotkeyAbort" MinWidth="124" Height="23"
                                                 Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                     </StackPanel>
                                 </Grid>
@@ -2017,6 +2046,11 @@
                                     <ToggleButton x:Name="GrabSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right"
                                                   Click="GeneralSwitch_Click" />
                                 </Grid>
+                                <Grid Height="31" ToolTip="Only captures in your screenshots folder, never ones pinned on screen. They go to the Recycle Bin, so you can get them back.">
+                                    <TextBlock Text="Clear out captures older than" Style="{StaticResource Label}" />
+                                    <StackPanel x:Name="CleanUpChoicesPanel" Orientation="Horizontal" HorizontalAlignment="Right" />
+                                </Grid>
+                                <TextBlock x:Name="CleanUpUsage" Style="{StaticResource Dim}" FontSize="11" Margin="1,-3,0,5" />
                                 <Grid Height="31">
                                     <TextBlock Text="Put every changed window back" Style="{StaticResource Label}" />
                                     <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="RestoreAll_Click">

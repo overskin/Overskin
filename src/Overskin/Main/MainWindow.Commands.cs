@@ -87,8 +87,44 @@ public partial class MainWindow
 
     private Icon MenuIcon(string key) => new() { Data = (Geometry)FindResource(key), Width = 15, Height = 15 };
 
+    /// <summary>
+    /// The things reached for most, straight in the tray menu with their hotkeys; while a video
+    /// records, stopping and pausing it come first instead.
+    /// </summary>
+    private List<(string Header, string Icon, string Keys, Action Run)> QuickActions()
+    {
+        var list = new List<(string, string, string, Action)>();
+        if (_video?.IsRecording == true)
+        {
+            list.Add(("Stop the video", "IcSquare", _settings.HotkeyVideo, () => ToggleVideo(false)));
+            list.Add((_video.IsPaused ? "Resume the video" : "Pause the video", _video.IsPaused ? "IcPlay" : "IcPause",
+                      _settings.HotkeyPause, () => _video?.TogglePause()));
+        }
+        else if (_recorder?.IsRecording == true)
+            list.Add(("Stop the GIF", "IcSquare", _settings.HotkeyGif, ToggleGifRecording));
+        else
+        {
+            list.Add(("Capture a region", "IcSquareDashed", _settings.HotkeyRegion, () => CaptureRegion()));
+            list.Add(("Capture a window", "IcAppWindow", _settings.HotkeyWindow, () => CaptureWindowPick()));
+            list.Add(("Capture the full screen", "IcMonitor", _settings.HotkeyScreen, () => CaptureFullScreen()));
+            list.Add(("Record a video", "IcCircleDot", _settings.HotkeyVideo, () => ToggleVideo(_settings.Video.AutoZoom)));
+        }
+        list.Add(("Library", "IcImages", "", () => ShowTab(TabLibraryIndex)));
+        return list;
+    }
+
+    /// <summary>For the self-test: the tray menu's quick actions.</summary>
+    internal List<string> QuickActionsForTest() => QuickActions().Select(q => $"{q.Header} {q.Keys}".Trim()).ToList();
+
     private void FillTrayMenu(ItemCollection items)
     {
+        foreach (var (header, icon, keys, run) in QuickActions())
+        {
+            var item = new MenuItem { Header = header, Icon = MenuIcon(icon), InputGestureText = keys };
+            item.Click += (_, _) => run();
+            items.Add(item);
+        }
+        items.Add(new Separator());
         foreach (var (group, icon, commands) in Commands())
         {
             var header = new MenuItem { Header = group, Icon = MenuIcon(icon) };

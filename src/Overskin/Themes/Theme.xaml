@@ -70,7 +70,7 @@
 
     <ControlTemplate x:Key="SegTemplate" TargetType="RadioButton">
         <Border x:Name="B" Background="Transparent" BorderBrush="{DynamicResource Line}" BorderThickness="1"
-                CornerRadius="{DynamicResource RadiusSmall}" Padding="11,0" Height="23" MinWidth="50" SnapsToDevicePixels="True">
+                CornerRadius="{DynamicResource RadiusSmall}" Padding="{TemplateBinding Padding}" Height="23" MinWidth="{TemplateBinding MinWidth}" SnapsToDevicePixels="True">
             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
         <ControlTemplate.Triggers>
@@ -363,6 +363,8 @@
 
     <!-- choice chip: used for either/or groups (RadioButton) -->
     <Style x:Key="Seg" TargetType="RadioButton">
+        <Setter Property="Padding" Value="11,0" />
+        <Setter Property="MinWidth" Value="50" />
         <Setter Property="Foreground" Value="{DynamicResource TextDim}" />
         <Setter Property="FontSize" Value="11.5" />
         <Setter Property="FontWeight" Value="SemiBold" />
