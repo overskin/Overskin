@@ -32,6 +32,7 @@ public static class ImageFinder
     {
         var found = new List<FoundImage>();
         if (w < MinSide + 2 || h < MinSide + 2) return found;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
 
         // the four kinds of edge, each with the flat background on a different side
         var tops = new List<Seg>[h];
@@ -84,8 +85,156 @@ public static class ImageFinder
                 found.Add(new FoundImage(bounds, sides.Radius));
             }
         }
+        EdgeMs = sw.ElapsedMilliseconds;
+        FindRound(px, w, h, found, ct);
+        RoundMs = sw.ElapsedMilliseconds - EdgeMs;
         return found;
     }
+
+    // ---- round pictures: circles (profile pictures), pills and big round corners ----------------
+    //
+    // These have short straight edges or none, so they're found another way: everything that
+    // isn't flat is grouped into blobs (in 4-pixel blocks, so it's quick), and each blob's outline
+    // is checked against a rectangle with round corners of the size its corners show, all the way
+    // round, from a square corner to a full circle.
+
+    private const int Block = 4;
+
+    /// <summary>For the self-test: how long the last search's two halves took.</summary>
+    internal static long EdgeMs, RoundMs;
+
+    private static int Diff(byte[] px, int a, int b) =>
+        Math.Max(Math.Abs(px[a] - px[b]), Math.Max(Math.Abs(px[a + 1] - px[b + 1]), Math.Abs(px[a + 2] - px[b + 2])));
+
+    private static void FindRound(byte[] px, int w, int h, List<FoundImage> found, CancellationToken ct)
+    {
+        int bw = (w + Block - 1) / Block, bh = (h + Block - 1) / Block;
+        var busy = new bool[bw * bh];
+        Parallel.For(1, h - 1, new ParallelOptions { CancellationToken = ct }, y =>
+        {
+            int row = (y / Block) * bw, up = -w * 4;
+            for (int x = 1; x < w; x++)
+            {
+                int i = (y * w + x) * 4;
+                if (Diff(px, i, i - 4) > FlatTolerance || Diff(px, i, i + up) > FlatTolerance) busy[row + x / Block] = true;
+            }
+        });
+        ct.ThrowIfCancellationRequested();
+
+        var label = new int[bw * bh];
+        var queue = new int[bw * bh];
+        int next = 0;
+        for (int start = 0; start < busy.Length; start++)
+        {
+            if (!busy[start] || label[start] != 0) continue;
+            next++;
+            int head = 0, tail = 0, count = 0;
+            int bx0 = int.MaxValue, by0 = int.MaxValue, bx1 = -1, by1 = -1;
+            queue[tail++] = start;
+            label[start] = next;
+            while (head < tail)
+            {
+                int c = queue[head++], cx = c % bw, cy = c / bw;
+                count++;
+                bx0 = Math.Min(bx0, cx); bx1 = Math.Max(bx1, cx); by0 = Math.Min(by0, cy); by1 = Math.Max(by1, cy);
+                if (cx > 0 && busy[c - 1] && label[c - 1] == 0) { label[c - 1] = next; queue[tail++] = c - 1; }
+                if (cx < bw - 1 && busy[c + 1] && label[c + 1] == 0) { label[c + 1] = next; queue[tail++] = c + 1; }
+                if (cy > 0 && busy[c - bw] && label[c - bw] == 0) { label[c - bw] = next; queue[tail++] = c - bw; }
+                if (cy < bh - 1 && busy[c + bw] && label[c + bw] == 0) { label[c + bw] = next; queue[tail++] = c + bw; }
+            }
+            int bwide = bx1 - bx0 + 1, btall = by1 - by0 + 1;
+            if (bwide * Block < MinSide || btall * Block < MinSide) continue;
+            if (bx0 == 0 || by0 == 0 || bx1 >= bw - 1 || by1 >= bh - 1) continue; // needs background all round
+            if (count < bwide * btall * 0.6) continue; // a ring, a line of text, scattered bits
+            ct.ThrowIfCancellationRequested();
+            if (Outline(px, w, h, label, bw, next, bx0, by0, bx1, by1) is not { } picture) continue;
+            if (found.Any(f => Same(f.Bounds, picture.Bounds))) continue;
+            if (!LooksLikeAPicture(px, w, picture.Bounds, picture.Radius)) continue;
+            found.Add(picture);
+        }
+    }
+
+    /// <summary>The blob's exact edges, the size of its corners, and whether its outline really is that shape.</summary>
+    private static FoundImage? Outline(byte[] px, int w, int h, int[] label, int bw, int id, int bx0, int by0, int bx1, int by1)
+    {
+        // exact edges: the outermost pixels that differ from their outer neighbour, inside this blob's blocks
+        int x0 = int.MaxValue, y0 = int.MaxValue, x1 = -1, y1 = -1;
+        for (int y = Math.Max(1, by0 * Block); y < Math.Min(h - 1, (by1 + 1) * Block); y++)
+            for (int x = Math.Max(1, bx0 * Block); x < Math.Min(w - 1, (bx1 + 1) * Block); x++)
+            {
+                if (label[(y / Block) * bw + x / Block] != id) continue;
+                int i = (y * w + x) * 4;
+                if (x < x0 && Diff(px, i, i - 4) > 1) x0 = x;
+                if (x > x1 && Diff(px, i, i + 4) > 1) x1 = x;
+                if (y < y0 && Diff(px, i, i - w * 4) > 1) y0 = y;
+                if (y > y1 && Diff(px, i, i + w * 4) > 1) y1 = y;
+            }
+        if (x1 < x0 || y1 < y0) return null;
+        int width = x1 - x0 + 1, height = y1 - y0 + 1;
+        if (width < MinSide || height < MinSide || x0 < 5 || y0 < 5 || x1 > w - 6 || y1 > h - 6) return null;
+
+        // each corner's roundness, from how far in along the diagonal the picture starts
+        int limit = Math.Min(width, height) / 2;
+        int Corner(int cx, int cy, int dx, int dy)
+        {
+            int bg = ((cy - dy * 2) * w + (cx - dx * 2)) * 4;
+            for (int k = 0; k <= limit; k++)
+            {
+                int i = ((cy + dy * k) * w + (cx + dx * k)) * 4;
+                if (Diff(px, i, bg) >= 24) return (int)Math.Round(k / (1 - Math.Sqrt(0.5)));
+            }
+            return -1;
+        }
+        var radii = new[] { Corner(x0, y0, 1, 1), Corner(x1, y0, -1, 1), Corner(x0, y1, 1, -1), Corner(x1, y1, -1, -1) };
+        if (radii.Any(r => r < 0)) return null;
+        Array.Sort(radii);
+        if (radii[3] - radii[0] > 4 + radii[3] / 5) return null; // corners that don't match
+        double radius = Math.Min(limit, (radii[1] + radii[2]) / 2.0);
+        if (Math.Abs(width - height) <= 3 && radius >= limit * 0.85) radius = limit; // a circle
+
+        // all the way round: flat just outside, something else just inside
+        double left = x0, top = y0, right = x1 + 1, bottom = y1 + 1, rr = radius;
+        int samples = 0, good = 0;
+        void Probe(double ox, double oy, double nx, double ny)
+        {
+            int At(double d)
+            {
+                int x = (int)Math.Floor(ox + nx * d), y = (int)Math.Floor(oy + ny * d);
+                return x < 0 || y < 0 || x >= w || y >= h ? -1 : (y * w + x) * 4;
+            }
+            int o1 = At(2.5), o2 = At(4), inner = At(-3);
+            samples++;
+            if (o1 < 0 || o2 < 0 || inner < 0) return;
+            if (Diff(px, o1, o2) <= 6 && Diff(px, inner, o1) >= EdgeContrast) good++;
+        }
+        for (int i = 0; i < 24; i++)
+        {
+            double t = (i + 0.5) / 24;
+            if (right - left - 2 * rr > 8)
+            {
+                double x = left + rr + t * (right - left - 2 * rr);
+                Probe(x, top, 0, -1);
+                Probe(x, bottom, 0, 1);
+            }
+            if (bottom - top - 2 * rr > 8)
+            {
+                double y = top + rr + t * (bottom - top - 2 * rr);
+                Probe(left, y, -1, 0);
+                Probe(right, y, 1, 0);
+            }
+            if (rr >= 6)
+            {
+                double a = t * Math.PI / 2, ca = Math.Cos(a), sa = Math.Sin(a);
+                Probe(right - rr + rr * ca, bottom - rr + rr * sa, ca, sa);
+                Probe(left + rr - rr * ca, bottom - rr + rr * sa, -ca, sa);
+                Probe(left + rr - rr * ca, top + rr - rr * sa, -ca, -sa);
+                Probe(right - rr + rr * ca, top + rr - rr * sa, ca, -sa);
+            }
+        }
+        if (samples < 24 || good < samples * 0.8) return null;
+        return new FoundImage(new Int32Rect(x0, y0, width, height), (int)Math.Round(radius));
+    }
+
 
     /// <summary>
     /// The left and right edges that close a top and bottom into a rectangle: just outside their
@@ -177,6 +326,8 @@ public static class ImageFinder
             if (start >= 0 && (!flat || Math.Abs(px[o] - rb) > 8 || Math.Abs(px[o + 1] - rg) > 8 || Math.Abs(px[o + 2] - rr) > 8))
                 Close();
             if (!flat) continue;
+            // a gradient background drifts slowly along the edge: follow it, but a jump is another background
+            if (start >= 0) { rb = px[o]; rg = px[o + 1]; rr = px[o + 2]; }
             if (Diff(s, o) >= EdgeContrast)
             {
                 if (start < 0)

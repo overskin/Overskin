@@ -25,3 +25,6 @@ src/Overskin.Linux/
 packaging/linux/
 build-linux.sh
 docs/screenshots/linux-*.png
+
+# the website: kept on this PC until it goes live
+website/

@@ -171,6 +171,13 @@ public static class Setup
         report(1, "Done");
     }
 
+    /// <summary>True when that shortcut exists and opens Overskin in this folder.</summary>
+    public static bool HasShortcut(string lnk, string folder)
+    {
+        try { return PointsInto(Native.ShortcutTarget(lnk), Path.Combine(Normalize(folder), ExeName)); }
+        catch { return false; }
+    }
+
     private static void SetShortcut(string lnk, string exe, bool wanted)
     {
         if (wanted)

@@ -82,6 +82,10 @@ internal sealed unsafe class MediaReader : IDisposable
         finally { Release(current); }
     }
 
+    /// <summary>For the self-test: the size of the last frame's buffer, and the row width read from the video.</summary>
+    internal uint LastLength;
+    internal int StrideForTest => _stride;
+
     /// <summary>The next frame (top row first) and when it's shown, or null at the end.</summary>
     public (byte[] Pixels, TimeSpan Time)? Next()
     {
@@ -106,13 +110,29 @@ internal sealed unsafe class MediaReader : IDisposable
                     uint max, length;
                     // IMFMediaBuffer::Lock (3) / Unlock (4)
                     Check(((delegate* unmanaged[Stdcall]<IntPtr, byte**, uint*, uint*, int>)Slot(buffer, 3))(buffer, &data, &max, &length), "lock");
+                    LastLength = length;
                     var pixels = new byte[Width * Height * 4];
-                    int stride = Math.Abs(_stride), row = Width * 4;
+                    int stride = Math.Abs(_stride), row = Width * 4, rows = Height;
                     bool bottomUp = _stride < 0;
+                    // Decoders work in blocks of 16 pixels: a 200 × 120 video can come out as 208 × 128,
+                    // with the frame size and row width still saying 200. The buffer's own size tells.
+                    long total = length;
+                    if (total > (long)stride * Height && total % 4 == 0)
+                    {
+                        bool done = false;
+                        foreach (int align in new[] { 16, 32, 64, 128 })
+                        {
+                            int aw = (Width + align - 1) / align * align;
+                            foreach (int ah in new[] { Height, (Height + 15) / 16 * 16, (Height + 31) / 32 * 32 })
+                                if ((long)aw * ah * 4 == total) { stride = aw * 4; rows = ah; done = true; break; }
+                            if (done) break;
+                        }
+                    }
+                    int lastRow = bottomUp ? rows - 1 : 0;
                     fixed (byte* dst = pixels)
                         for (int y = 0; y < Height; y++)
                         {
-                            byte* from = data + (long)(bottomUp ? Height - 1 - y : y) * stride;
+                            byte* from = data + (long)(bottomUp ? lastRow - y : y) * stride;
                             Buffer.MemoryCopy(from, dst + (long)y * row, row, row);
                             for (int x = 3; x < row; x += 4) dst[(long)y * row + x] = 255;
                         }

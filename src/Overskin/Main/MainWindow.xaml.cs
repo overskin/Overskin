@@ -58,10 +58,30 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _grabTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private int _grabTicks;
 
+    /// <summary>
+    /// A page's content leaves 6 px on the right because the scroll bar sits there too. When the page
+    /// is short enough that no scroll bar shows, that left the right edge narrower than the left one,
+    /// so the right gap is widened to match while the bar is hidden.
+    /// </summary>
+    static void KeepSidesEven(System.Windows.Controls.ScrollViewer page)
+    {
+        void Fit()
+        {
+            if (page.Content is not FrameworkElement content) return;
+            var m = content.Margin;
+            double right = page.ComputedVerticalScrollBarVisibility == Visibility.Visible ? 6 : m.Left;
+            if (m.Right != right) content.Margin = new Thickness(m.Left, m.Top, right, m.Bottom);
+        }
+        page.ScrollChanged += (_, _) => Fit();
+        page.Loaded += (_, _) => Fit();
+        page.IsVisibleChanged += (_, _) => Fit();
+    }
+
     public MainWindow()
     {
         Theming.Apply(_settings.AccentColor, _settings.BackgroundTone); // before any control looks up its colours
         InitializeComponent();
+        foreach (var page in new[] { PageCapture, PageSettings, TraceScroll }) KeepSidesEven(page);
         AutoHideRow.ContextMenu = Redaction.KindsMenu();
         Redaction.KindsChanged += () => { _settings.AutoHideKinds = Redaction.Kinds; _settings.Save(); };
 
@@ -95,6 +115,7 @@ public partial class MainWindow : Window
         RefreshCatalog();
         SetUpFolds();
         SetUpCleanUp();
+        SetUpUpdates();
         Loaded += (_, _) => FadeIn();
 
         _loading = false;
@@ -2310,10 +2331,11 @@ public partial class MainWindow : Window
                 var ed = new EditorWindow(shotImg!, traceImage, "Overskin 2026-11-16 14.03.22.png", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { }, Trace = _ => { } });
                 ed.Show();
                 await Task.Delay(400);
-                ed.AddForTest(new Annotation { Kind = AnnotationKind.Arrow, Points = { new Point(80, 820), new Point(330, 600) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 5 });
-                ed.AddForTest(new Annotation { Kind = AnnotationKind.Rectangle, Points = { new Point(600, 200), new Point(1080, 740) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 5 });
-                ed.AddForTest(new Annotation { Kind = AnnotationKind.Text, Points = { new Point(620, 760) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 6, Text = "five tools in one" });
-                ed.AddForTest(new Annotation { Kind = AnnotationKind.Highlighter, Points = { new Point(560, 120), new Point(900, 120) }, Color = Color.FromRgb(0xFA, 0xCC, 0x15), Size = 8 });
+                // marks placed for the sunset picture in docs: a box round the sun, a note, an arrow to the cabin
+                ed.AddForTest(new Annotation { Kind = AnnotationKind.Rectangle, Points = { new Point(670, 380), new Point(850, 560) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 5 });
+                ed.AddForTest(new Annotation { Kind = AnnotationKind.Text, Points = { new Point(660, 300) }, Color = Color.FromRgb(0xFF, 0xFF, 0xFF), Size = 6, Text = "golden hour" });
+                ed.AddForTest(new Annotation { Kind = AnnotationKind.Arrow, Points = { new Point(440, 790), new Point(330, 650) }, Color = Color.FromRgb(0xEF, 0x44, 0x44), Size = 5 });
+                ed.AddForTest(new Annotation { Kind = AnnotationKind.Text, Points = { new Point(370, 800) }, Color = Color.FromRgb(0xFF, 0xFF, 0xFF), Size = 5, Text = "the cabin" });
                 await Task.Delay(500);
                 var edShot = new RenderTargetBitmap((int)(ed.ActualWidth * 1.5), (int)(ed.ActualHeight * 1.5), 144, 144, PixelFormats.Pbgra32);
                 edShot.Render((FrameworkElement)ed.Content);
@@ -2345,7 +2367,7 @@ public partial class MainWindow : Window
                 var ge = new GifEditorWindow(gclip, "Recording 14.03.22  ·  2 frames", new GifEditorHost { Folder = folder, Saved = _ => { } });
                 ge.Show();
                 await Task.Delay(500);
-                ge.TopBox.Text = "me when the screenshot is already on my clipboard";
+                ge.TopBox.Text = "me logging off for the weekend";
                 await Task.Delay(400);
                 var geShot = new RenderTargetBitmap((int)(ge.ActualWidth * 1.5), (int)(ge.ActualHeight * 1.5), 144, 144, PixelFormats.Pbgra32);
                 geShot.Render((FrameworkElement)ge.Content);

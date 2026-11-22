@@ -429,13 +429,14 @@
                 CornerRadius="{DynamicResource RadiusWindow}">
             <Grid ClipToBounds="True"> <!-- pages slide in; keep them inside the window -->
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="46" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="28" />
                 </Grid.RowDefinitions>
 
-                <!-- ============ top bar: name, pages, window buttons ============ -->
-                <Border Background="{DynamicResource HeaderBg}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1"
+                <!-- ============ top bar: name, pages, window buttons; and the update banner under it ============ -->
+                <StackPanel>
+                <Border Height="46" Background="{DynamicResource HeaderBg}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1"
                         MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -475,6 +476,37 @@
                         </StackPanel>
                     </Grid>
                 </Border>
+                <Border x:Name="UpdateBanner" Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}" BorderThickness="0,0,0,1"
+                        Padding="14,6,8,6" Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <local:Icon Data="{StaticResource IcDownload}" Width="15" Height="15" Foreground="{DynamicResource Accent}" Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock x:Name="UpdateTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="UpdateDetail" Style="{StaticResource Dim}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                            <ProgressBar x:Name="UpdateProgress" Height="3" Minimum="0" Maximum="1" Margin="0,4,10,0" Visibility="Collapsed" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="UpdateNotesButton" Style="{StaticResource Btn}" Height="25" Margin="0,0,6,0" Content="What's new" Click="UpdateNotes_Click"
+                                    ToolTip="The release notes on GitHub" />
+                            <Button x:Name="UpdateInstallButton" Style="{StaticResource BtnAccent}" Height="25" Click="UpdateInstall_Click"
+                                    ToolTip="Downloads the new version from GitHub, installs it over this one (your settings stay) and opens it again">
+                                <StackPanel Orientation="Horizontal">
+                                    <local:Icon Data="{StaticResource IcDownload}" Width="12" Height="12" Margin="0,0,6,0" />
+                                    <TextBlock x:Name="UpdateInstallText" Text="Download and install" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="UpdateCloseButton" Style="{StaticResource BtnIcon}" Width="26" Height="26" Margin="4,0,0,0" Click="UpdateDismiss_Click" ToolTip="Not now">
+                                <local:Icon Data="{StaticResource IcX}" Width="12" Height="12" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                </StackPanel>
 
                 <!-- ============ capture ============ -->
                 <ScrollViewer x:Name="PageCapture" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
@@ -2083,7 +2115,16 @@
                                     <TextBlock x:Name="AboutVersion" Style="{StaticResource Dim}" HorizontalAlignment="Right" />
                                 </Grid>
                                 <Border Style="{StaticResource Rule}" />
-                                <TextBlock Text="Icons by Lucide (ISC License)." Style="{StaticResource Dim}" Margin="0,0,0,0" TextWrapping="Wrap" />
+                                <Grid Height="31">
+                                    <TextBlock Text="Check for updates when Overskin starts" Style="{StaticResource Label}" />
+                                    <ToggleButton x:Name="UpdateCheckSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="UpdateCheck_Click"
+                                                  ToolTip="Asks GitHub for the latest release. A banner shows when there's a newer one; nothing installs until you click" />
+                                </Grid>
+                                <Grid Height="31">
+                                    <TextBlock x:Name="UpdateStatusText" Style="{StaticResource Dim}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,110,0" />
+                                    <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="CheckNow_Click" Content="Check now" />
+                                </Grid>
+                                <TextBlock Text="Icons by Lucide (ISC License)." Style="{StaticResource Dim}" Margin="0,6,0,0" TextWrapping="Wrap" />
                                 <Grid Height="31" Margin="0,8,0,0" ToolTip="If Overskin ever crashes it saves a short report here: attach it to a bug report">
                                     <TextBlock Text="Crash reports" Style="{StaticResource Label}" />
                                     <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="OpenCrashLogs_Click">

@@ -1,5 +1,36 @@
 # Changelog
 
+## 3.2.0
+
+Overskin updates itself, crops videos and GIFs, and snaps to round pictures.
+
+### New
+
+- **Updates from inside the app**: when a newer Overskin is on GitHub, a banner under the tabs
+  says so, with *What's new* and *Download and install*. The installer is downloaded from
+  Overskin's own GitHub release, checked (its size and version), and installed without a window
+  in a few seconds; then Overskin opens again. Your settings, pins, captures, shortcuts and
+  start-with-Windows choice stay as they are. It checks when Overskin starts and twice a day;
+  turn that off, or *Check now*, in Settings → About. Nothing installs until you click.
+- **Crop in the video editor and the GIF editor**: *Draw the crop*, then drag a box on the
+  picture; drag inside it to move it, or its edges and corners to resize it. Hold it to 16:9,
+  9:16 (TikTok, Shorts, Reels), 1:1 or 4:3. Outside the box is dimmed. In videos, blur boxes,
+  text and arrows stay where you put them; in GIFs, the caption fits the cropped picture.
+- **Snapping to pictures finds round ones**: profile pictures and other circles, pill shapes,
+  and pictures with big round corners are outlined to their shape. Square-cornered pictures on
+  gradient backgrounds are found too.
+
+### Fixed
+
+- **The Capture, Settings and Trace pages had a thinner gap on the right than on the left**
+  when they were short enough not to scroll. Both sides now match.
+- **Typing into a screenshot's text** could leave the bottom halves of letters behind, or put new
+  letters over old ones, when another piece of text sat on the same row (a name and its time,
+  or a second column). The whole height of the line now moves.
+- **Stills, blurring and saving from videos whose width isn't a multiple of 16** came out
+  scrambled into slanted stripes: Windows' video decoder pads each row, and that's now read
+  from the frame itself.
+
 ## 3.1.0
 
 A tidier app: shorter pages, hotkeys grouped by what they do, smoother area picking and a

@@ -88,7 +88,7 @@ public partial class GifEditorWindow : Window
         get
         {
             int w = int.TryParse(Chosen(WidthChoices), out int v) ? v : 0;
-            return w <= 0 || w > _clip.Width ? _clip.Width : w;
+            return w <= 0 || w > PictureWidth ? PictureWidth : w;
         }
     }
 
@@ -108,7 +108,7 @@ public partial class GifEditorWindow : Window
         _position = Math.Min(_position, Math.Max(0, _sequence.Count - 1));
 
         int total = _sequence.Sum(s => s.DelayMs);
-        var size = CaptionRenderer.Layout(_clip.Width, _clip.Height, OutputWidth, Caption, out _);
+        var size = CaptionRenderer.Layout(PictureWidth, PictureHeight, OutputWidth, Caption, out _);
         OutputText.Text = $"{(int)size.Width} × {(int)size.Height}";
         TrimText.Text = $"{(b - a + 1)} frames  ·  {total / 1000.0:0.0} s";
     }
@@ -199,7 +199,9 @@ public partial class GifEditorWindow : Window
     {
         frame = Math.Clamp(frame, 0, _clip.Count - 1);
         ShownFrame = frame;
-        Preview.Show(_clip.FrameBitmap(frame), Caption, OutputWidth);
+        // while cropping, the whole frame with no caption, under the crop box; otherwise the GIF as it will be
+        if (Cropping) Preview.Show(_clip.FrameBitmap(frame), new CaptionSettings(CaptionStyle.None, "", "", 1), _clip.Width);
+        else Preview.Show(Picture(frame), Caption, OutputWidth);
         _syncing = true;
         Scrubber.Value = frame;
         _syncing = false;
@@ -279,7 +281,7 @@ public partial class GifEditorWindow : Window
                 for (int i = 0; i < sequence.Count; i++)
                 {
                     var (frame, delay) = sequence[i];
-                    byte[] px = CaptionRenderer.Render(_clip.FrameBitmap(frame), outW, caption, out int w, out int h);
+                    byte[] px = CaptionRenderer.Render(Picture(frame), outW, caption, out int w, out int h);
                     writer ??= new GifWriter(file, w, h);
                     var wr = writer;
                     await Task.Run(() => wr.AddFrame(px, delay));

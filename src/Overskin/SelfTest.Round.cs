@@ -158,6 +158,39 @@ public partial class App
             Pump(200);
             log.Add($"video editor blur list: {ed.BlurCountForTest} box (expect 1)");
 
+            // cropping: the editor keeps the box to even sizes, and the saved video is just that part
+            ed.SetCropForTest(new Rect(301, 41, 199, 119));
+            var editorCrop = ed.CropForTest;
+            ed.ActivateCropForTest();
+            Pump(200);
+            SaveWindow(ed, "video-editor-crop.png");
+            string cropped = Path.Combine(tmp, "stills-cropped.mp4");
+            Task.Run(() => VideoBlur.RenderAsync(src, cropped, Array.Empty<VideoBlur>(), 4, null, new Int32Rect(300, 40, 200, 120))).GetAwaiter().GetResult();
+            var cf = MediaReader.FrameAt(cropped, TimeSpan.FromSeconds(2.0));
+            var left = new byte[4];
+            cf.CopyPixels(new Int32Rect(6, 60, 1, 1), left, 4, 0);    // the source's x 306: the time-brightness half
+            var checks = new byte[40 * 40 * 4];
+            cf.CopyPixels(new Int32Rect(100, 40, 40, 40), checks, 40 * 4, 0); // the source's x 400 to 440: the checkerboard
+            if (Environment.GetEnvironmentVariable("OVERSKIN_TEST_OUT") is { Length: > 0 } cropDir)
+            {
+                var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(cf));
+                using (var fs = File.Create(Path.Combine(cropDir, "video-crop.png"))) enc.Save(fs);
+                var whole = MediaReader.FrameAt(src, TimeSpan.FromSeconds(2.0));
+                var enc2 = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                enc2.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(whole));
+                using (var fs = File.Create(Path.Combine(cropDir, "video-whole.png"))) enc2.Save(fs);
+            }
+            using (var probe = new MediaReader(cropped))
+            {
+                probe.Next();
+                log.Add($"video crop reader: {probe.Width}x{probe.Height} stride {probe.StrideForTest} buffer {probe.LastLength} (rows of {probe.Width * 4}, {probe.Width * probe.Height * 4} in all)");
+            }
+            int dark = 0, light = 0;
+            for (int i = 1; i < checks.Length; i += 4) { if (checks[i] < 60) dark++; else if (checks[i] > 195) light++; }
+            log.Add($"video crop: editor box {editorCrop?.X},{editorCrop?.Y} {editorCrop?.Width}x{editorCrop?.Height} (expect 300,40 198x118, even) " +
+                    $"saved {cf.PixelWidth}x{cf.PixelHeight} (expect 200x120) left brightness {left[1]} (expect about 120) checkerboard dark {dark} light {light} (expect both several hundred)");
+
             // the viewer plays it like a video site: zoom shown, a click pauses with a sign in the middle
             var viewer = new ViewerWindow(new List<string?> { src }, 0, new ViewerHost { Edit = (_, _, _) => { }, EditVideo = _ => { }, EditGif = _ => { }, Pin = (_, _, _) => { }, ShowInFolder = _ => { }, Changed = () => { } }) { Left = -10000, Top = -10000, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual };
             viewer.Show();
@@ -252,6 +285,129 @@ public partial class App
             log.Add($"toast corners: window background {windowBg.Color} brightest corner pixel {brightest} outline {line.G} (expect no brighter than the outline, nowhere near 255)");
         }
         catch (Exception ex) { log.Add("toast corners: FAILED " + ex); }
+
+        // ---- pictures inside a screenshot: round ones, big round corners, square corners on a gradient ----
+        try
+        {
+            int w = 1600, h = 1000;
+            var rnd = new Random(11);
+            System.Windows.Media.Imaging.BitmapSource Photo(int pw, int ph)
+            {
+                var bits = new byte[pw * ph * 4];
+                for (int y = 0; y < ph; y++)
+                    for (int x = 0; x < pw; x++)
+                    {
+                        int i = (y * pw + x) * 4;
+                        bits[i] = (byte)Math.Clamp(70 + x * 120 / pw + rnd.Next(-14, 14), 0, 255);
+                        bits[i + 1] = (byte)Math.Clamp(110 + y * 100 / ph + rnd.Next(-14, 14), 0, 255);
+                        bits[i + 2] = (byte)Math.Clamp(210 - x * 90 / pw + rnd.Next(-14, 14), 0, 255);
+                        bits[i + 3] = 255;
+                    }
+                return System.Windows.Media.Imaging.BitmapSource.Create(pw, ph, 96, 96, PixelFormats.Pbgra32, null, bits, pw * 4);
+            }
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x31, 0x33, 0x38)), null, new Rect(0, 0, w, h));
+                // a gradient band, darker to lighter going down
+                dc.DrawRectangle(new LinearGradientBrush(Color.FromRgb(0x1E, 0x1F, 0x22), Color.FromRgb(0x5A, 0x5C, 0x62), 90), null, new Rect(0, 520, w, 480));
+                void Round(Rect r, double radius)
+                {
+                    dc.PushClip(new RectangleGeometry(r, radius, radius));
+                    dc.DrawImage(Photo((int)r.Width, (int)r.Height), r);
+                    dc.Pop();
+                }
+                Round(new Rect(100, 100, 96, 96), 48);      // a profile picture
+                Round(new Rect(300, 100, 180, 180), 90);    // a big one
+                Round(new Rect(600, 100, 320, 220), 70);    // big round corners
+                Round(new Rect(1000, 100, 260, 120), 60);   // a pill
+                dc.DrawImage(Photo(300, 200), new Rect(100, 640, 300, 200)); // square corners, on the gradient
+                dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(0x58, 0x65, 0xF2)), null, new Point(900, 700), 32, 32); // a flat disc: not a picture
+                dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(0x24, 0x80, 0x46)), null, new Rect(1100, 670, 200, 50), 25, 25); // a flat button
+                var face = new Typeface("Segoe UI");
+                for (int line = 0; line < 6; line++)
+                    dc.DrawText(new FormattedText("A line of chat text sitting next to the pictures " + line, System.Globalization.CultureInfo.InvariantCulture,
+                        FlowDirection.LeftToRight, face, 15, Brushes.Gainsboro, 1.0), new Point(600, 360 + line * 24));
+            }
+            var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(visual);
+            var screen = new byte[w * h * 4];
+            rtb.CopyPixels(screen, w * 4, 0);
+            ImageFinder.Find(screen, w, h);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var found = ImageFinder.Find(screen, w, h);
+            sw.Stop();
+            string Show(FoundImage? f) => f is { } v ? $"{v.Bounds.X},{v.Bounds.Y} {v.Bounds.Width}x{v.Bounds.Height} r{v.Radius}" : "none";
+            log.Add($"round pictures: {found.Count} found in {sw.ElapsedMilliseconds} ms (edges {ImageFinder.EdgeMs}, round {ImageFinder.RoundMs}): " +
+                    $"avatar={Show(ImageFinder.At(found, 148, 148))} (expect 100,100 96x96 r48) " +
+                    $"big={Show(ImageFinder.At(found, 390, 190))} (expect 300,100 180x180 r90) " +
+                    $"corners={Show(ImageFinder.At(found, 760, 210))} (expect 600,100 320x220 r~70) " +
+                    $"pill={Show(ImageFinder.At(found, 1130, 160))} (expect 1000,100 260x120 r60) " +
+                    $"square on gradient={Show(ImageFinder.At(found, 250, 740))} (expect 100,640 300x200 r0) " +
+                    $"flat disc={Show(ImageFinder.At(found, 900, 700))} flat button={Show(ImageFinder.At(found, 1200, 695))} text={Show(ImageFinder.At(found, 700, 380))} (expect none, none, none)");
+            if (Environment.GetEnvironmentVariable("OVERSKIN_TEST_OUT") is { Length: > 0 } dir)
+                SaveBgra(screen, w, h, System.IO.Path.Combine(dir, "round-pictures.png"));
+        }
+        catch (Exception ex) { log.Add("round pictures: FAILED " + ex); }
+
+        // ---- cropping a GIF: the output is the cropped size, caption bar and all ----
+        try
+        {
+            var clip = new GifClip { Width = 200, Height = 120 };
+            for (int i = 0; i < 4; i++)
+            {
+                var f = new byte[200 * 120 * 4];
+                for (int k = 0; k < f.Length; k += 4) { f[k] = 40; f[k + 1] = (byte)(60 * i); f[k + 2] = 200; f[k + 3] = 255; }
+                clip.Frames.Add(f);
+                clip.DelaysMs.Add(80);
+            }
+            var gw = new GifEditorWindow(clip, "crop", new GifEditorHost { Folder = Path.GetTempPath(), Saved = _ => { } })
+            { Left = -10000, Top = -10000, ShowActivated = false, ShowInTaskbar = false };
+            gw.Show();
+            Pump(150);
+            var before = gw.OutputSizeForTest;
+            gw.SetCropForTest(new Rect(20, 10, 100, 60));
+            Pump(50);
+            var after = gw.OutputSizeForTest;
+            var rendered = gw.RenderFrameForTest(0);
+            SaveWindow(gw, "gif-editor-crop.png");
+            gw.TopBox.Text = "a caption";
+            Pump(50);
+            var captioned = gw.OutputSizeForTest;
+            gw.Close();
+            log.Add($"gif crop: before {before.Width}x{before.Height} (expect 200x120) cropped {after.Width}x{after.Height} rendered {rendered.W}x{rendered.H} (expect 100x60 both) " +
+                    $"with a caption {captioned.Width}x{captioned.Height} (expect 100 wide, taller than 60)");
+        }
+        catch (Exception ex) { log.Add("gif crop: FAILED " + ex); }
+
+        // ---- updates: reading GitHub's answer, refusing anything that isn't Overskin's own release ----
+        try
+        {
+            string Json(string tag, string url, bool pre = false) =>
+                "{\"tag_name\":\"" + tag + "\",\"html_url\":\"https://github.com/overskin/Overskin/releases/tag/" + tag + "\",\"draft\":false,\"prerelease\":" + (pre ? "true" : "false") +
+                ",\"assets\":[{\"name\":\"notes.txt\",\"browser_download_url\":\"https://github.com/x\",\"size\":1},{\"name\":\"OverskinSetup.exe\",\"browser_download_url\":\"" + url + "\",\"size\":123}]}";
+            var good = Updater.ReadRelease(Json("v9.4.2", "https://github.com/overskin/Overskin/releases/download/v9.4.2/OverskinSetup.exe"));
+            var elsewhere = Updater.ReadRelease(Json("v9.4.2", "https://example.com/OverskinSetup.exe"));
+            var pre = Updater.ReadRelease(Json("v9.5.0-beta", "https://github.com/overskin/Overskin/releases/download/v9.5.0-beta/OverskinSetup.exe", pre: true));
+            log.Add($"update parsing: version {good?.Version} size {good?.InstallerSize} newer than {Updater.Current}={good?.Version > Updater.Current} (expect 9.4.2 123 True) " +
+                    $"other site={(elsewhere == null ? "refused" : "taken")} pre-release={(pre == null ? "skipped" : "taken")} (expect refused, skipped) " +
+                    $"tags: {Updater.ParseTag("v3.1")} {Updater.ParseTag("3.2.0+abc")} {Updater.ParseTag("nope")?.ToString() ?? "none"} (expect 3.1.0 3.2.0 none)");
+
+            // a real look at GitHub and a real download, only when asked (it's 90 MB)
+            if (Environment.GetEnvironmentVariable("OVERSKIN_TEST_NET") == "1")
+            {
+                var newer = Task.Run(() => Updater.CheckAsync()).GetAwaiter().GetResult();
+                using var http = new System.Net.Http.HttpClient();
+                http.DefaultRequestHeaders.UserAgent.ParseAdd("Overskin-Updater");
+                var latest = Updater.ReadRelease(Task.Run(() => http.GetStringAsync($"https://api.github.com/repos/{Updater.Repository}/releases/latest")).GetAwaiter().GetResult());
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                string got = latest == null ? "" : Task.Run(() => Updater.DownloadAsync(latest, null)).GetAwaiter().GetResult();
+                log.Add($"update on GitHub: newer than this copy={(newer == null ? "none" : newer.Version.ToString())} latest={latest?.Version} " +
+                        $"downloaded {(got.Length > 0 ? new FileInfo(got).Length : 0)} bytes in {sw.ElapsedMilliseconds} ms, size and version checked (expect the release's size)");
+                if (got.Length > 0) File.Delete(got);
+            }
+        }
+        catch (Exception ex) { log.Add("updates: FAILED " + ex); }
 
         // ---- the clipboard picture comes back the right way up ----
         try

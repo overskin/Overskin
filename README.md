@@ -4,9 +4,7 @@
 
 # Overskin
 
-**Screenshots, done right.**
-
-A free, open-source screenshot and screen-recording tool for Windows.
+**A free, open-source screenshot and screen-recording tool for Windows.**
 
 [![Download for Windows](https://img.shields.io/badge/Download_for_Windows-OverskinSetup.exe-4f8cff?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/overskin/Overskin/releases/latest/download/OverskinSetup.exe)
 
@@ -55,6 +53,11 @@ It installs for your user only (no administrator rights) into
 with Windows. Remove it from Settings → Apps like any other app. Running a newer setup
 updates it in place and keeps your settings.
 
+**Updates** come to you: when a newer version is on GitHub, a banner under the tabs says so.
+*Download and install* fetches it, installs it in a few seconds and opens Overskin again, with
+your settings, pins and captures kept. Nothing installs until you click, and the check can be
+turned off in Settings → About.
+
 It needs Windows 10 1809 or later (64-bit). Windows SmartScreen may warn about an unsigned
 app the first time: choose **More info → Run anyway**.
 
@@ -86,8 +89,9 @@ for private details), smart erase, crop, rotate, and Beautify.
   choose, so menus and tooltips stay put, and a magnifier shows the exact pixel under the
   cursor.
 - **Snap to pictures**: hover over a picture inside a window, like a photo in a Discord chat,
-  and just that picture is outlined, rounded corners and all. Click to capture it edge to
-  edge; hold Ctrl to take the whole window instead.
+  and just that picture is outlined: square corners, rounded corners, pill shapes and round
+  profile pictures, on plain or gradient backgrounds. Click to capture it edge to edge; hold
+  Ctrl to take the whole window instead.
 - **Capture bar** along the top while you choose: capture an area, a window, one screen or
   every screen (1 to 4); draw first with a pen, arrows, boxes or a highlighter (P, A, B, H; C
   changes colour, Ctrl+Z undoes); include the mouse pointer or not; magnifier on or off (M).
@@ -152,6 +156,8 @@ Capture → **Recording** has the Video and GIF buttons and every video setting.
   it under a size you choose, such as Discord's 10 MB. **Blur** hides part of the video for as
   long as you like: drag a box, or let *Find private details* find the emails, numbers and
   addresses on the frame showing. The camera button **grabs a still** of the frame showing.
+  **Crop** keeps just part of the picture: drag a box, move it, pull its edges, or hold it to
+  16:9, 9:16 (for TikTok, Shorts and Reels), 1:1 or 4:3.
 - **Steps**: click through anything and get a numbered how-to guide: one screenshot per
   click, the click circled, and a sentence such as *Click the "Save" button in Notepad*.
   Reword or drop steps, then save it as one picture, an HTML page, Markdown or a PDF.
@@ -163,7 +169,8 @@ Capture → **Recording** has the Video and GIF buttons and every video setting.
   appears in the recording. Press Ctrl+Alt+G again, or Esc, to stop.
 - **GIF editor**: Discord-style captions (black text on a white bar above the clip) or
   classic top-and-bottom Impact text, trim, speed (0.5× to 2×), normal / reverse / boomerang
-  looping, and output width.
+  looping, output width, and **crop** (any shape, or 16:9, 9:16, 1:1, 4:3; the caption fits the
+  cropped picture).
 - **Copy** puts the GIF on the clipboard as a file, so Ctrl+V in Discord just works. Or save
   it.
 - **Caption a GIF** (beside the recording buttons) opens any existing GIF (or a still picture) in the same editor.
@@ -374,7 +381,8 @@ unless you choose another folder.
 
 ## Privacy
 
-Overskin has no telemetry and never checks in with anything. It makes no network connections. If it
+Overskin has no telemetry and never checks in with anything. Its only network connection is asking
+GitHub whether a newer release exists (turn it off in Settings → About). If it
 crashes, a short report is saved to `%LocalAppData%\Overskin\logs` with the error and the
 Windows version only. Nothing is sent.
 

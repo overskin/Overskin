@@ -224,9 +224,10 @@ public partial class VideoEditorWindow : Window
     {
         if (_busy) return false;
         var (start, end) = Range;
-        if (maxBytes == null && start <= 0.05 && end >= _length - 0.05 && _cuts.Count == 0 && _overlays.Count == 0 && !_zoomsChanged && _blurs.Count == 0)
+        var crop = CropArea;
+        if (maxBytes == null && start <= 0.05 && end >= _length - 0.05 && _cuts.Count == 0 && _overlays.Count == 0 && !_zoomsChanged && _blurs.Count == 0 && crop == null)
         {
-            Toast.Show("Trim, cut or add something first: this is the whole video as it is.");
+            Toast.Show("Trim, cut, crop or add something first: this is the whole video as it is.");
             return false;
         }
         _busy = true;
@@ -249,22 +250,28 @@ public partial class VideoEditorWindow : Window
             }
             // blur boxes: the frames are blurred first, on the whole video (their times are the original's)
             string blurredTemp = output + ".blur.mp4";
-            if (_blurs.Count > 0)
+            if (_blurs.Count > 0 || crop != null)
             {
-                StatusText.Text = "Blurring…";
+                StatusText.Text = _blurs.Count > 0 ? "Blurring…" : "Cropping…";
                 double from = _zooms != null && _zoomsChanged ? 0.5 : 0;
                 var blurs = _blurs.Select(b => b.Clone()).ToList();
-                await VideoBlur.RenderAsync(input, blurredTemp, blurs, _length, new Progress<double>(p => SaveProgress.Value = from + (1 - from) * p * 0.6));
+                await VideoBlur.RenderAsync(input, blurredTemp, blurs, _length, new Progress<double>(p => SaveProgress.Value = from + (1 - from) * p * 0.6), crop);
                 if (input != _path) try { File.Delete(input); } catch { }
                 input = blurredTemp;
                 StatusText.Text = "Saving…";
             }
             var progress = new Progress<double>(p => SaveProgress.Value = p);
-            if (_cuts.Count == 0 && _overlays.Count == 0 && maxBytes == null && !_zoomsChanged && _blurs.Count == 0)
+            if (_cuts.Count == 0 && _overlays.Count == 0 && maxBytes == null && !_zoomsChanged && _blurs.Count == 0 && crop == null)
                 await VideoTrim.TrimAsync(input, temp, TimeSpan.FromSeconds(start), TimeSpan.FromSeconds(end), progress);
             else
-                await VideoEdit.RenderAsync(input, temp, VideoEdit.Keep(start, end, _cuts), _overlays.Select(o => o.Clone()).ToList(),
+            {
+                // labels and arrows were placed on the whole frame: they move with the crop
+                var overlays = _overlays.Select(o => o.Clone()).ToList();
+                if (crop is { } c)
+                    foreach (var o in overlays) { o.A -= new Vector(c.X, c.Y); o.B -= new Vector(c.X, c.Y); }
+                await VideoEdit.RenderAsync(input, temp, VideoEdit.Keep(start, end, _cuts), overlays,
                     Math.Max(2, Player.NaturalVideoHeight), progress, maxBytes);
+            }
             File.Move(temp, output, overwrite: true);
             if (input != _path) try { File.Delete(input); } catch { }
             StatusText.Text = Path.GetFileName(output);

@@ -9,13 +9,16 @@ namespace OverskinSetup;
 /// Add --quiet for no window. Install options: --dir PATH, --no-startmenu, --desktop,
 /// --startup or --no-startup (otherwise left as it is), --launch. Uninstall options: --dir PATH, --remove-settings. --log FILE records
 /// errors in quiet mode. --payload FILE installs that Overskin.exe instead of the bundled one.
+/// --update (with --quiet): Overskin updating itself; shortcuts stay as they are. --wait-for PID
+/// waits for that process (the running Overskin) to close first.
 /// </summary>
 public partial class App : Application
 {
     public sealed class Args
     {
-        public bool Uninstall, Quiet, Relaunched, NoStartMenu, Desktop, Launch, RemoveSettings;
+        public bool Uninstall, Quiet, Relaunched, NoStartMenu, Desktop, Launch, RemoveSettings, Update;
         public bool? Startup;
+        public int WaitFor;
         public string? Dir, Payload, Log, Original;
 
         public static Args Parse(string[] a)
@@ -35,6 +38,8 @@ public partial class App : Application
                     case "--no-startup": r.Startup = false; break;
                     case "--launch": r.Launch = true; break;
                     case "--remove-settings": r.RemoveSettings = true; break;
+                    case "--update": r.Update = true; break;
+                    case "--wait-for": int.TryParse(Next(), out r.WaitFor); break;
                     case "--dir": r.Dir = Next(); break;
                     case "--payload": r.Payload = Next(); break;
                     case "--log": r.Log = Next(); break;
@@ -123,14 +128,26 @@ public partial class App : Application
             }
             else
             {
+                string folder = o.Dir ?? Setup.InstalledFolder ?? Setup.DefaultFolder;
                 var opts = new InstallOptions
                 {
-                    Folder = o.Dir ?? Setup.InstalledFolder ?? Setup.DefaultFolder,
-                    StartMenu = !o.NoStartMenu,
-                    Desktop = o.Desktop,
+                    Folder = folder,
+                    // updating: the shortcuts stay as they were
+                    StartMenu = o.Update ? Setup.HasShortcut(Setup.StartMenuLink, folder) : !o.NoStartMenu,
+                    Desktop = o.Update ? Setup.HasShortcut(Setup.DesktopLink, folder) : o.Desktop,
                     Startup = o.Startup,
                 };
-                Setup.Install(opts, o.Payload, (_, _) => { });
+                WaitForClose(o, folder);
+                try
+                {
+                    Setup.Install(opts, o.Payload, (_, _) => { });
+                }
+                catch when (o.Update && o.Launch)
+                {
+                    // the old copy is still there if the new one couldn't go in: open it again rather than nothing
+                    try { LaunchApp(folder); } catch { }
+                    throw;
+                }
                 if (o.Launch) LaunchApp(opts.Folder);
             }
             return 0;
@@ -140,6 +157,22 @@ public partial class App : Application
             Log(o, ex);
             return 1;
         }
+    }
+
+    /// <summary>Waits (up to half a minute) for the Overskin that started an update to close and free its file.</summary>
+    private static void WaitForClose(Args o, string folder)
+    {
+        if (o.WaitFor > 0)
+        {
+            try
+            {
+                using var p = Process.GetProcessById(o.WaitFor);
+                p.WaitForExit(30_000);
+            }
+            catch { } // already gone
+        }
+        if (!o.Update) return;
+        for (int i = 0; i < 40 && Setup.InUse(Setup.Normalize(folder)); i++) System.Threading.Thread.Sleep(250);
     }
 
     public static void LaunchApp(string folder)

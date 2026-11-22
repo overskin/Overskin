@@ -379,6 +379,19 @@ public partial class MainWindow
         }
         Check("library count", () => $"\"{LibraryCount.Text}\" usage \"{CleanUpUsage.Text}\"");
 
+        // the update banner, as it shows when a newer version is out
+        SelectTab(TabCaptureIndex);
+        var shown = ShowUpdateForTest(new Release(new Version(3, 2, 0), "v3.2.0", "https://github.com/overskin/Overskin/releases/tag/v3.2.0",
+            "https://github.com/overskin/Overskin/releases/download/v3.2.0/OverskinSetup.exe", 1));
+        log.Add($"update banner: shown={shown.Shown} \"{shown.Title}\" \"{shown.Detail}\"");
+        await Task.Delay(500);
+        var banner = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(ActualWidth * 2), (int)(ActualHeight * 2), 192, 192, System.Windows.Media.PixelFormats.Pbgra32);
+        banner.Render((FrameworkElement)Content);
+        var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(banner));
+        using (var file = File.Create(Path.Combine(folder, "update-banner.png"))) png.Save(file);
+        UpdateBanner.Visibility = Visibility.Collapsed;
+
         File.WriteAllLines(Path.Combine(folder, "checks.txt"), log);
     }
 #endif

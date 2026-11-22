@@ -18,7 +18,8 @@ internal static class FrameRender
     /// </summary>
     public delegate byte[] Process(byte[] pixels, int srcWidth, int srcHeight, int width, int height, double time);
 
-    public static async Task RenderAsync(string input, string output, bool highQuality, IProgress<double>? progress, double length, Process process, int fps = 0)
+    public static async Task RenderAsync(string input, string output, bool highQuality, IProgress<double>? progress, double length, Process process, int fps = 0,
+        int outWidth = 0, int outHeight = 0)
     {
         string silent = Path.Combine(Path.GetTempPath(), $"Overskin-frames-{Guid.NewGuid():N}.mp4");
         try
@@ -26,7 +27,7 @@ internal static class FrameRender
             await Task.Run(() =>
             {
                 using var reader = new MediaReader(input);
-                int w = reader.Width & ~1, h = reader.Height & ~1;
+                int w = (outWidth > 0 ? outWidth : reader.Width) & ~1, h = (outHeight > 0 ? outHeight : reader.Height) & ~1;
                 int rate = fps > 0 ? fps : (int)Math.Round(reader.FrameRate);
                 var queue = new BlockingCollection<VideoFrame>(boundedCapacity: 6);
                 var encoding = Task.Run(() => VideoEncoder.EncodeAsync(silent, w, h, Math.Max(1, rate), queue, highQuality));
@@ -85,15 +86,31 @@ public sealed class VideoBlur
     /// <summary>What it hides, when it was found by "Find private details" (shown in the list).</summary>
     public string Label { get; set; } = "";
 
-    /// <summary>Makes the video again with every box blurred while it's due.</summary>
-    public static Task RenderAsync(string input, string output, IReadOnlyList<VideoBlur> blurs, double length, IProgress<double>? progress = null) =>
+    /// <summary>
+    /// Makes the video again with every box blurred while it's due, and cut down to
+    /// <paramref name="crop"/> (in the video's pixels, even sizes) when there is one.
+    /// </summary>
+    public static Task RenderAsync(string input, string output, IReadOnlyList<VideoBlur> blurs, double length, IProgress<double>? progress = null,
+        System.Windows.Int32Rect? crop = null) =>
         FrameRender.RenderAsync(input, output, true, progress, length, (src, srcW, srcH, w, h, t) =>
         {
-            var pixels = ZoomTrack.Crop(src, srcW, w, h);
+            int fw = srcW & ~1, fh = srcH & ~1;
+            var pixels = ZoomTrack.Crop(src, srcW, fw, fh);
             foreach (var b in blurs)
-                if (t >= b.Start && t < b.End) Blur(pixels, w, h, b.Area);
-            return pixels;
-        });
+                if (t >= b.Start && t < b.End) Blur(pixels, fw, fh, b.Area);
+            return crop is { } c ? Cut(pixels, fw, fh, c) : pixels;
+        }, outWidth: crop?.Width ?? 0, outHeight: crop?.Height ?? 0);
+
+    /// <summary>The part of a frame inside <paramref name="area"/>.</summary>
+    public static byte[] Cut(byte[] pixels, int w, int h, System.Windows.Int32Rect area)
+    {
+        int x = Math.Clamp(area.X, 0, w - 1), y = Math.Clamp(area.Y, 0, h - 1);
+        int cw = Math.Min(area.Width, w - x), ch = Math.Min(area.Height, h - y);
+        var o = new byte[area.Width * area.Height * 4];
+        for (int row = 0; row < ch; row++)
+            Buffer.BlockCopy(pixels, ((y + row) * w + x) * 4, o, row * area.Width * 4, cw * 4);
+        return o;
+    }
 
     /// <summary>
     /// Blurs a box heavily: averages it into a coarse grid and spreads that back out smoothly,

@@ -58,6 +58,8 @@ public sealed class AppSettings
     public string LibrarySort { get; set; } = "Newest";
     /// <summary>Captures older than this many days go to the Recycle Bin; 0 keeps them.</summary>
     public int CleanUpDays { get; set; }
+    /// <summary>Look on GitHub for a newer Overskin when it starts (and twice a day).</summary>
+    public bool CheckForUpdates { get; set; } = true;
     /// <summary>Settings cards on the Capture tab left open; the rest show just their heading.</summary>
     public List<string> OpenCards { get; set; } = new();
 

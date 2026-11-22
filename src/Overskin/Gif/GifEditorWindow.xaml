@@ -69,6 +69,8 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <local:GifPreview x:Name="Preview" Margin="24" />
+                    <!-- the crop box, over the whole frame while cropping -->
+                    <Canvas x:Name="CropCanvas" Margin="24" ClipToBounds="True" Visibility="Collapsed" />
                     <Border Grid.Row="1" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="12,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -127,6 +129,29 @@
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
                                         <local:Icon Data="{StaticResource IcCrop}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Crop" Style="{StaticResource Heading}" />
+                                        <TextBlock x:Name="CropText" Style="{StaticResource Dim}" Margin="8,0,0,0" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <StackPanel x:Name="CropShapes" Orientation="Horizontal" Margin="-5,0,0,8">
+                                        <RadioButton Style="{StaticResource Seg}" GroupName="CropShape" MinWidth="0" Padding="9,0" Content="Free" Tag="0" IsChecked="True" Checked="CropShape_Checked" ToolTip="Any shape" />
+                                        <RadioButton Style="{StaticResource Seg}" GroupName="CropShape" MinWidth="0" Padding="9,0" Content="16:9" Tag="16:9" Checked="CropShape_Checked" ToolTip="Widescreen, like YouTube" />
+                                        <RadioButton Style="{StaticResource Seg}" GroupName="CropShape" MinWidth="0" Padding="9,0" Content="9:16" Tag="9:16" Checked="CropShape_Checked" ToolTip="Tall, like TikTok, Shorts and Reels" />
+                                        <RadioButton Style="{StaticResource Seg}" GroupName="CropShape" MinWidth="0" Padding="9,0" Content="1:1" Tag="1:1" Checked="CropShape_Checked" ToolTip="Square" />
+                                        <RadioButton Style="{StaticResource Seg}" GroupName="CropShape" MinWidth="0" Padding="9,0" Content="4:3" Tag="4:3" Checked="CropShape_Checked" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button x:Name="CropButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,0" Click="CropMode_Click" Content="Draw the crop"
+                                                ToolTip="Then drag on the picture. Drag inside the box to move it, or its edges and corners to resize it" />
+                                        <Button Style="{StaticResource Btn}" Height="26" Click="CropReset_Click" Content="Reset" ToolTip="Keep the whole picture" />
+                                    </StackPanel>
+                                    <TextBlock Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,8,0,0" Text="The caption fits the cropped picture. Done shows the GIF as it will be saved." />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcScissors}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
                                         <TextBlock Text="Trim" Style="{StaticResource Heading}" />
                                         <TextBlock x:Name="TrimText" Style="{StaticResource Dim}" Margin="8,0,0,0" />
                                     </StackPanel>

@@ -687,8 +687,23 @@ public partial class EditorWindow
             leftMost = Math.Min(leftMost, Math.Min(r.Left, Edges(i)[0]));
         }
         double pad = (bottom - top) * 0.25, bandTop = top - pad, bandBottom = bottom + pad;
-        if (lo > 0) bandTop = Math.Max(bandTop, (_words.Take(lo).Where((_, k) => _wordLine[k] == _wordLine[lo - 1]).Max(w => w.Bounds.Bottom) + top) / 2);
-        if (hi + 1 < _words.Count) bandBottom = Math.Min(bandBottom, (_words.Skip(hi + 1).Where((_, k) => _wordLine[hi + 1 + k] == _wordLine[hi + 1]).Min(w => w.Bounds.Top) + bottom) / 2);
+        // stop halfway to the text just above and just below, but only text that really is above or
+        // below (overlapping this line across): the line before or after in reading order can sit
+        // beside this one (a name and its time, another column), and halving the gap to that cut the
+        // letters in two, so only their tops moved and the bottoms were left behind under new letters
+        double middle = (top + bottom) / 2;
+        for (int k = 0; k < _words.Count; k++)
+        {
+            if (_wordLine[k] == line) continue;
+            var b = _words[k].Bounds;
+            if (b.Right <= leftMost || b.Left >= right) continue;
+            double centre = (b.Top + b.Bottom) / 2;
+            if (centre < middle && b.Bottom <= top + (bottom - top) * 0.2) bandTop = Math.Max(bandTop, (b.Bottom + top) / 2);
+            else if (centre > middle && b.Top >= bottom - (bottom - top) * 0.2) bandBottom = Math.Min(bandBottom, (b.Top + bottom) / 2);
+        }
+        // and never less than the words themselves
+        bandTop = Math.Min(bandTop, top - 1);
+        bandBottom = Math.Max(bandBottom, bottom + 1);
         BasePixels();
         int y0 = Math.Clamp((int)Math.Floor(bandTop), 0, _pxH), y1 = Math.Clamp((int)Math.Ceiling(bandBottom), 0, _pxH);
         return (lo, hi, y0, y1, Math.Min(_pxW, (int)Math.Ceiling(right) + 2), leftMost);
@@ -912,11 +927,11 @@ public partial class EditorWindow
     }
 
     /// <summary>For the self-test: pretend the reader found these words, and select some of them.</summary>
-    internal string SelectWordsForTest(List<OcrWord> words, int from, int to)
+    internal string SelectWordsForTest(List<OcrWord> words, int from, int to, int[]? lines = null)
     {
         _words = words.ToList();
         ResetEdges();
-        _wordLine = words.Select(w => (int)Math.Round(w.Bounds.Top / 20)).ToList();
+        _wordLine = lines?.ToList() ?? words.Select(w => (int)Math.Round(w.Bounds.Top / 20)).ToList();
         _wordsFor = _base;
         _reading = Task.CompletedTask;
         _anchor = (from, 0);

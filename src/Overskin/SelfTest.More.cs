@@ -632,6 +632,19 @@ public partial class App
                 }
             }
             ed2.CloseForTest();
+
+            // the same, with another line beside this one on the same row (a time after a name): the whole
+            // height of the letters moves, none of the old bottoms are left behind
+            var beside = hw.Append(new OcrWord("12:30", new Rect(300, hw[0].Bounds.Top, 34, hw[0].Bounds.Height))).ToList();
+            var ed3 = new EditorWindow(before, null, "type", host);
+            ed3.SelectWordsForTest(beside, 0, 0, new[] { 0, 0, 1 });
+            var e3 = ed3.EdgesForTest(0);
+            var typing3 = ed3.ClickAndTypeForTest(new Point(e3[^1] - 0.2, hw[0].Bounds.Top + hw[0].Bounds.Height / 2), " big");
+            for (int spin = 0; !typing3.IsCompleted && spin < 300; spin++) { DoEvents(); Thread.Sleep(10); }
+            var s3 = Starts(Pixels(ed3.BaseForTest));
+            string besideOff = s3.Count == s2.Count ? s3.Zip(s2, (u, v) => Math.Abs(u - v)).Max().ToString() : $"runs {s3.Count} vs {s2.Count}";
+            ed3.CloseForTest();
+            log.Add($"typing beside another line: letters off from the real thing by at most {besideOff} px (expect 0 to 2, no leftover halves)");
             log.Add($"typing: fonts recognised {right}/{cases.Length} (expect 5/5) [{string.Join("; ", found)}] slowest match {slowest:0} ms (expect under 600, once per line) " +
                     $"typed \" big\": words={model} (expect Hello|big|world) read back \"{readBack}\" (expect Hello big world) " +
                     $"letters off from the real thing by at most {letterOff} px (expect 0 to 2)");
