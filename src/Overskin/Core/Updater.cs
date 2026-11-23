@@ -22,6 +22,12 @@ public static class Updater
     private const string InstallerName = "OverskinSetup.exe";
     private const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Overskin";
 
+#if STORE
+    /// <summary>The Store copy is updated by the Microsoft Store, so it never looks on GitHub.</summary>
+    public static bool Enabled => false;
+#else
+    public static bool Enabled => true;
+
     private static readonly HttpClient Http = MakeClient();
 
     private static HttpClient MakeClient()
@@ -31,6 +37,7 @@ public static class Updater
         client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
         return client;
     }
+#endif
 
     /// <summary>This copy's version (major.minor.build).</summary>
     public static Version Current
@@ -78,6 +85,10 @@ public static class Updater
     /// <summary>The newest release when it's newer than this copy; null when up to date or offline.</summary>
     public static async Task<Release?> CheckAsync(CancellationToken ct = default)
     {
+#if STORE
+        await Task.CompletedTask;
+        return null;
+#else
         try
         {
             string json = await Http.GetStringAsync($"https://api.github.com/repos/{Repository}/releases/latest", ct);
@@ -89,11 +100,16 @@ public static class Updater
             CrashLog.Note("update check: " + ex.GetType().Name + " " + ex.Message);
             return null;
         }
+#endif
     }
 
     /// <summary>Downloads the installer to a temporary file and checks it; returns its path.</summary>
     public static async Task<string> DownloadAsync(Release release, IProgress<double>? progress, CancellationToken ct = default)
     {
+#if STORE
+        await Task.CompletedTask;
+        throw new InvalidOperationException("The Microsoft Store keeps this copy of Overskin up to date.");
+#else
         string folder = Path.Combine(Path.GetTempPath(), "Overskin", "Update");
         Directory.CreateDirectory(folder);
         string path = Path.Combine(folder, $"OverskinSetup-{release.Version}.exe");
@@ -135,6 +151,7 @@ public static class Updater
         }
         File.Move(part, path, overwrite: true);
         return path;
+#endif
     }
 
     /// <summary>The folder Overskin is installed in, if it was installed with the installer.</summary>

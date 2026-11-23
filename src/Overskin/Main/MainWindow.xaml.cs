@@ -336,13 +336,13 @@ public partial class MainWindow : Window
         HintGrabKey.Visibility = HintGrabText.Visibility = _settings.GrabWithCtrlAlt ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void StartupSwitch_Click(object sender, RoutedEventArgs e)
+    private async void StartupSwitch_Click(object sender, RoutedEventArgs e)
     {
         bool want = StartupSwitch.IsChecked == true;
-        if (!StartupRegistration.Set(want))
+        if (await StartupRegistration.SetAsync(want) is { } problem)
         {
-            StartupSwitch.IsChecked = !want;
-            Toast.Show("Windows didn't allow changing the startup setting.", true);
+            StartupSwitch.IsChecked = StartupRegistration.IsEnabled;
+            Toast.Show(problem, true);
         }
     }
 

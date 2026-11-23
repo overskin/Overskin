@@ -1674,12 +1674,12 @@
                                     <TextBlock x:Name="AboutVersion" Style="{StaticResource Dim}" HorizontalAlignment="Right" />
                                 </Grid>
                                 <Border Style="{StaticResource Rule}" />
-                                <Grid Height="31">
+                                <Grid x:Name="UpdateCheckRow" Height="31">
                                     <TextBlock Text="Check for updates when Overskin starts" Style="{StaticResource Label}" />
                                     <ToggleButton x:Name="UpdateCheckSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="UpdateCheck_Click"
                                                   ToolTip="Asks GitHub for the latest release. A banner shows when there's a newer one; nothing installs until you click" />
                                 </Grid>
-                                <Grid Height="31">
+                                <Grid x:Name="UpdateStatusRow" Height="31">
                                     <TextBlock x:Name="UpdateStatusText" Style="{StaticResource Dim}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,110,0" />
                                     <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="CheckNow_Click" Content="Check now" />
                                 </Grid>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Microsoft Store package for Overskin. Built by src/Store/build-store.ps1.
+
+  Before uploading to Partner Center, replace the three TODO_FROM_PARTNER_CENTER values below
+  with the ones from Partner Center → your app → Product identity:
+    Identity Name            = Package/Identity/Name
+    Identity Publisher       = Package/Identity/Publisher (the whole "CN=..." text)
+    PublisherDisplayName     = Package/Properties/PublisherDisplayName
+  Until then, build-store.ps1 packs with a local test identity so the package can still be
+  installed and tried on this PC (it can't be uploaded like that).
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap desktop rescap">
+
+  <Identity
+    Name="TODO_FROM_PARTNER_CENTER"
+    Publisher="CN=TODO_FROM_PARTNER_CENTER"
+    Version="3.3.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Overskin</DisplayName>
+    <PublisherDisplayName>TODO_FROM_PARTNER_CENTER</PublisherDisplayName>
+    <Logo>Images\StoreLogo.png</Logo>
+    <Description>Screenshots, screen recording, editing and pinning for Windows.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="Overskin" Executable="Overskin.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Overskin"
+        Description="Screenshots, screen recording, editing and pinning for Windows."
+        BackgroundColor="transparent"
+        Square150x150Logo="Images\Square150x150Logo.png"
+        Square44x44Logo="Images\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Images\Wide310x150Logo.png" ShortName="Overskin">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+            <uap:ShowOn Tile="wide310x150Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:SplashScreen Image="Images\SplashScreen.png" BackgroundColor="#121316" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!-- start with Windows: off until the user turns it on in Settings, like the GitHub copy -->
+        <desktop:Extension Category="windows.startupTask" Executable="Overskin.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="OverskinStartup" Enabled="false" DisplayName="Overskin" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <DeviceCapability Name="microphone" />
+    <DeviceCapability Name="webcam" />
+  </Capabilities>
+</Package>

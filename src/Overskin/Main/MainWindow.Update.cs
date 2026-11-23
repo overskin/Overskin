@@ -14,6 +14,12 @@ public partial class MainWindow
 
     private void SetUpUpdates()
     {
+        if (!Updater.Enabled)
+        {
+            // the Microsoft Store updates this copy: no check, no banner, nothing to set
+            UpdateCheckRow.Visibility = UpdateStatusRow.Visibility = Visibility.Collapsed;
+            return;
+        }
         UpdateCheckSwitch.IsChecked = _settings.CheckForUpdates;
         UpdateStatusText.Text = $"You have Overskin {Updater.Current.ToString(3)}.";
         if (App.Quiet) return; // developer runs never reach out
@@ -28,6 +34,7 @@ public partial class MainWindow
     /// <summary>Asks GitHub for the latest release; <paramref name="quietly"/> skips it when turned off and says nothing when up to date.</summary>
     private async Task CheckForUpdateAsync(bool quietly)
     {
+        if (!Updater.Enabled) return;
         if (quietly && !_settings.CheckForUpdates) return;
         if (_updating) return;
         if (!quietly) UpdateStatusText.Text = "Checking…";

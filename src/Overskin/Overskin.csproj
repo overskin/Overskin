@@ -28,6 +28,18 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
+  <!--
+    The Microsoft Store build: dotnet publish -p:Store=true (src/Store/build-store.ps1 does it).
+    STORE turns off the GitHub updater and uses the package's startup task. Not single-file:
+    the MSIX package is compressed already, and Windows runs the files from the package.
+  -->
+  <PropertyGroup Condition="'$(Store)' == 'true'">
+    <DefineConstants>$(DefineConstants);STORE</DefineConstants>
+    <PublishSingleFile>false</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <Resource Include="Assets\overskin.ico" />
   </ItemGroup>

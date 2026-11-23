@@ -163,7 +163,12 @@ public sealed class AppSettings
     {
         FilePath = DefaultPath();
         // the real place first; then settings left next to the exe by older versions, read once and moved
+#if STORE
+        // the Store copy's folder is read-only and it never had older homes to move from
+        var candidates = new List<string> { DefaultPath() };
+#else
         var candidates = new[] { DefaultPath(), ExeFolderPath() }.Distinct().Concat(LegacyPaths()).ToList();
+#endif
         for (int i = 0; i < candidates.Count; i++)
         {
             string path = candidates[i];

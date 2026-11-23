@@ -30,7 +30,8 @@ public partial class App : Application
         bool developerRun = e.Args.Length > 0 && e.Args[0] is "--snapshot" or "--selftest" or "--smoke";
         string scope = developerRun ? ".dev" : "";
         Quiet = developerRun;
-        bool startInTray = e.Args.Contains(StartupRegistration.TrayArgument);
+        // the GitHub copy is started at sign-in with --tray; the Store copy by its startup task
+        bool startInTray = e.Args.Contains(StartupRegistration.TrayArgument) || (!developerRun && StartupRegistration.LaunchedAtSignIn);
         string activateName = ActivateEventName + scope;
         int run = Array.IndexOf(e.Args, RunArgument);
         string? command = run >= 0 && run + 1 < e.Args.Length ? e.Args[run + 1] : null;
