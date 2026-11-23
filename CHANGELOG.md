@@ -8,6 +8,21 @@
   same features. It's signed by Microsoft (no SmartScreen warning), updated by the Store, and
   makes no network requests. Start with Windows uses the Store's startup task, listed in Task
   Manager → Startup apps. The Store and GitHub copies keep separate settings.
+- **Choose how drawings fade while recording**: *Drawings fade away* turns fading on or off,
+  and *Fade after* sets how long each stays (half a second to 15 seconds). With fading off,
+  what you draw stays until you stop drawing, then fades all together.
+
+### Improved
+
+- **Snapping to pictures finds far more of them.** Pictures whose corners aren't all the same
+  (a chat bubble's tail, a card with only its top corners rounded, gallery tiles), iOS-style
+  corners, oval or cut corners, very round corners, a corner covered by hover buttons, dark
+  photos in a dark chat, pictures on frosted or noisy backgrounds, a picture right under a
+  header, image-search grids with 2 px gaps, and screenshots of apps or web pages posted in a
+  chat (with the pictures inside them found too).
+- **Fewer wrong snaps**: buttons, key labels, coloured calendar events and spreadsheet cells
+  are no longer taken for pictures, and a picture with a horizon or a caption strip across it
+  is snapped to whole, not in halves.
 
 ### Changed
 

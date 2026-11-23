@@ -55,11 +55,21 @@ public static class ImageFinder
         });
         ct.ThrowIfCancellationRequested();
 
+        // a faint edge comes in pieces; for pairing, pieces close together on a line are also tried
+        // joined up (how much of a side really shows is still counted from the pieces)
+        var topChains = new List<Seg>[h];
+        var bottomChains = new List<Seg>[h];
+        for (int y = 1; y < h - 1; y++)
+        {
+            topChains[y] = Chains(tops[y]);
+            bottomChains[y] = Chains(bottoms[y]);
+        }
+
         // bottoms by where they start and end, to pair with tops quickly
         var bottomsByStart = new Dictionary<int, List<Seg>>();
         var bottomsByEnd = new Dictionary<int, List<Seg>>();
         for (int y = 1; y < h - 1; y++)
-            foreach (var s in bottoms[y])
+            foreach (var s in bottomChains[y])
             {
                 if (!bottomsByStart.TryGetValue(s.A, out var l1)) bottomsByStart[s.A] = l1 = new();
                 l1.Add(s);
@@ -73,7 +83,7 @@ public static class ImageFinder
         for (int y = 1; y < h - 1; y++)
         {
             ct.ThrowIfCancellationRequested();
-            foreach (var top in tops[y])
+            foreach (var top in topChains[y])
             {
                 // bottoms below that line up with it; each corner may be rounded differently (or be
                 // hidden under something), so the ends may differ by up to a corner's size
@@ -97,6 +107,11 @@ public static class ImageFinder
                     // the two line up: either covers most of the other (both may be in pieces)
                     if (Cover(bottoms[bot.Pos], top.A, top.B).Share < 0.6 && Cover(tops[top.Pos], bot.A, bot.B).Share < 0.6) continue;
                     if (Rect(px, tops, bottoms, lefts, rights, top, bot, w) is not { } rect) continue;
+                    // its sides carry on past the bottom (or top) into more picture: a slice of a
+                    // bigger picture (the sky above a horizon), so keep looking further down
+                    var rb0 = rect.Bounds;
+                    if (rect.Below > 6 && Busy(px, w, rb0.X + 4, rb0.X + rb0.Width - 5, rb0.Y + rb0.Height + 2, rb0.Y + rb0.Height + 2 + Math.Min(40, rect.Below - 3))) continue;
+                    if (rect.Above > 6 && Busy(px, w, rb0.X + 4, rb0.X + rb0.Width - 5, rb0.Y - 3 - Math.Min(40, rect.Above - 3), rb0.Y - 3)) continue;
                     var bounds = TakeSoftEdges(px, w, h, rect.Bounds, rect.Radius);
                     if (bounds.Width < MinSide || bounds.Height < MinSide) break;
                     if (found.Any(f => Same(f.Bounds, bounds)) || plain.Any(f => Same(f.Bounds, bounds))) break;
@@ -122,11 +137,36 @@ public static class ImageFinder
             // most of it is a picture, with a bar along one edge (a title bar, a caption strip)
             bool barAndPicture = found.Any(f => Inside(f.Bounds, bounds, -3) && SharedSides(f.Bounds, bounds) >= 3
                                                 && (long)f.Bounds.Width * f.Bounds.Height >= area * 0.6);
-            bool screenshot = bounds.Width >= 160 && bounds.Height >= 100
-                              && all.Count(r => Inside(r, bounds, 4) && !Same(r, bounds)) >= 3
+            // several panels inside, or a bar across it (a title bar), and a different colour from round it
+            int panels = all.Count(r => Inside(r, bounds, 4) && !Same(r, bounds));
+            int bars = all.Count(r => !Same(r, bounds) && Inside(r, bounds, -3) && SharedSides(r, bounds) >= 3);
+            bool screenshot = bounds.Width >= 160 && bounds.Height >= 100 && (panels >= 3 || bars >= 1)
                               && ToneGap(px, w, h, bounds) >= 20;
             if (holdsPicture || barAndPicture || screenshot) found.Add(new FoundImage(bounds, radius));
         }
+        // two pictures touching with no gap, in line and the same size across: one picture that a
+        // straight line (a horizon, a split) runs through
+        for (bool joined = true; joined;)
+        {
+            joined = false;
+            for (int i = 0; i < found.Count && !joined; i++)
+                for (int j = 0; j < found.Count && !joined; j++)
+                {
+                    if (i == j) continue;
+                    Int32Rect a = found[i].Bounds, b = found[j].Bounds;
+                    bool stacked = Math.Abs(a.X - b.X) <= 3 && Math.Abs(a.Width - b.Width) <= 4 && Math.Abs(b.Y - (a.Y + a.Height)) <= 1;
+                    bool sideBySide = Math.Abs(a.Y - b.Y) <= 3 && Math.Abs(a.Height - b.Height) <= 4 && Math.Abs(b.X - (a.X + a.Width)) <= 1;
+                    if (!stacked && !sideBySide) continue;
+                    int x0 = Math.Min(a.X, b.X), y0 = Math.Min(a.Y, b.Y);
+                    var union = new Int32Rect(x0, y0, Math.Max(a.X + a.Width, b.X + b.Width) - x0, Math.Max(a.Y + a.Height, b.Y + b.Height) - y0);
+                    var both = new FoundImage(union, Math.Min(found[i].Radius, found[j].Radius));
+                    found.RemoveAt(Math.Max(i, j));
+                    found.RemoveAt(Math.Min(i, j));
+                    if (!found.Any(f => Same(f.Bounds, union))) found.Add(both);
+                    joined = true;
+                }
+        }
+
         found.RemoveAll(r => found.Any(o => !o.Equals(r) && Inside(r.Bounds, o.Bounds, -3) && SharedSides(r.Bounds, o.Bounds) >= 3
                                             && (long)o.Bounds.Width * o.Bounds.Height < (long)r.Bounds.Width * r.Bounds.Height * 1.5));
         EdgeMs = sw.ElapsedMilliseconds;
@@ -283,6 +323,22 @@ public static class ImageFinder
     }
 
 
+    /// <summary>The pieces on a line, plus runs of pieces with small gaps between them, joined.</summary>
+    private static List<Seg> Chains(List<Seg>? line)
+    {
+        var all = new List<Seg>();
+        if (line == null) return all;
+        all.AddRange(line);
+        for (int i = 0; i < line.Count; i++)
+        {
+            int end = i;
+            while (end + 1 < line.Count && line[end + 1].A - line[end].B <= 16) end++;
+            if (end > i) all.Add(new Seg(line[i].Pos, line[i].A, line[end].B));
+            i = end;
+        }
+        return all;
+    }
+
     /// <summary>How much of [from, to] the edges on one line cover (0 to 1), and where they start and end.</summary>
     private static (double Share, int First, int Last) Cover(List<Seg>? line, int from, int to)
     {
@@ -304,7 +360,7 @@ public static class ImageFinder
     /// ends. Each side has to show for a good part of its length, but a corner may be rounded
     /// differently from the others, or hidden under something (a toolbar, a badge) that sticks out.
     /// </summary>
-    private static (Int32Rect Bounds, int Radius)? Rect(byte[] px, List<Seg>[] tops, List<Seg>[] bottoms, List<Seg>[] lefts, List<Seg>[] rights, Seg top, Seg bot, int w)
+    private static (Int32Rect Bounds, int Radius, int Above, int Below)? Rect(byte[] px, List<Seg>[] tops, List<Seg>[] bottoms, List<Seg>[] lefts, List<Seg>[] rights, Seg top, Seg bot, int w)
     {
         int y0 = top.Pos, y1 = bot.Pos;
         int innerL = Math.Min(top.A, bot.A), innerR = Math.Max(top.B, bot.B);
@@ -374,7 +430,8 @@ public static class ImageFinder
         Corner(xr - cb.Last, y1 - cr.Last);
         if (radii.Count < 2) return null;
         // the least round corner: a mask that size never cuts into the picture
-        return (new Int32Rect(xl, y0, xr - xl + 1, y1 - y0 + 1), radii.Min());
+        int above = Math.Max(y0 - rl.First, y0 - rr.First), below = Math.Max(rl.Last - y1, rr.Last - y1);
+        return (new Int32Rect(xl, y0, xr - xl + 1, y1 - y0 + 1), radii.Min(), above, below);
     }
 
     /// <summary>Where the edges on a line that touch [from, to] really start and end, beyond it too.</summary>
@@ -399,6 +456,27 @@ public static class ImageFinder
         if (Math.Abs(a.X + a.Width - b.X - b.Width) <= 3) n++;
         if (Math.Abs(a.Y + a.Height - b.Y - b.Height) <= 3) n++;
         return n;
+    }
+
+    /// <summary>Whether a strip has picture-like content: not mostly one colour.</summary>
+    private static bool Busy(byte[] px, int w, int x0, int x1, int y0, int y1)
+    {
+        if (x1 - x0 < 8 || y1 < y0 || y0 < 0 || (y1 + 1) * w * 4 > px.Length) return false;
+        var counts = new Dictionary<int, int>();
+        var all = new List<int>();
+        int stepX = Math.Max(1, (x1 - x0) / 60), stepY = Math.Max(1, (y1 - y0) / 8);
+        for (int y = y0; y <= y1; y += stepY)
+            for (int x = x0; x <= x1; x += stepX)
+            {
+                int i = (y * w + x) * 4;
+                int key = (px[i] >> 3) | (px[i + 1] >> 3 << 5) | (px[i + 2] >> 3 << 10);
+                counts[key] = counts.GetValueOrDefault(key) + 1;
+                all.Add(px[i] | (px[i + 1] << 8) | (px[i + 2] << 16));
+            }
+        int mode = counts.MaxBy(kv => kv.Value).Key;
+        int mb = (mode & 31) << 3, mg = ((mode >> 5) & 31) << 3, mr = ((mode >> 10) & 31) << 3;
+        int near = all.Count(c => Math.Abs((c & 255) - mb) <= 18 && Math.Abs(((c >> 8) & 255) - mg) <= 18 && Math.Abs(((c >> 16) & 255) - mr) <= 18);
+        return near < all.Count * 0.7;
     }
 
     /// <summary>Whether a row is (nearly) one colour from x0 to x1.</summary>
@@ -506,7 +584,7 @@ public static class ImageFinder
                 gap = 0;
                 same = 0;
             }
-            else if (start >= 0 && (++gap > 40 || (Diff(s, o) <= GrainTolerance && ++same >= 3)))
+            else if (start >= 0 && (++gap > 40 || (Diff(s, o) <= GrainTolerance && ++same >= 2)))
             {
                 // a gap, or a stretch where the line is the background itself: nothing is there
                 Close();
@@ -551,15 +629,49 @@ public static class ImageFinder
         int step = Math.Max(1, (int)Math.Sqrt(r.Width * (double)r.Height / 6000));
         int samples = 0, textured = 0;
         var colours = new HashSet<int>();
+        var counts = new Dictionary<int, int>();
+        var picked = new List<int>();
         for (int y = r.Y + 1; y < r.Y + r.Height - 1; y += step)
             for (int x = r.X + 1; x < r.X + r.Width - 1; x += step)
             {
                 int i = (y * w + x) * 4, j = i - 4;
                 samples++;
                 if (Math.Abs(px[i] - px[j]) + Math.Abs(px[i + 1] - px[j + 1]) + Math.Abs(px[i + 2] - px[j + 2]) > 6) textured++;
-                colours.Add((px[i] >> 3) | (px[i + 1] >> 3 << 5) | (px[i + 2] >> 3 << 10));
+                int key = (px[i] >> 3) | (px[i + 1] >> 3 << 5) | (px[i + 2] >> 3 << 10);
+                colours.Add(key);
+                counts[key] = counts.GetValueOrDefault(key) + 1;
+                picked.Add(px[i] | (px[i + 1] << 8) | (px[i + 2] << 16));
             }
         if (samples == 0) return false;
+        // something this small is only a picture if it looks like a photo (a thumbnail): small
+        // flat things are buttons and labels
+        if (Math.Min(r.Width, r.Height) < 60 && !(textured >= samples * 0.3 && colours.Count >= 48)) return false;
+
+        // a control (a button, a key, a chip, a text box): nearly all one colour, give or take a
+        // soft gradient, smooth, with a few words on it. A photo has grain all over; an
+        // illustration has several big areas of colour.
+        int mode = counts.MaxBy(kv => kv.Value).Key;
+        int mb = (mode & 31) << 3, mg = ((mode >> 5) & 31) << 3, mr = ((mode >> 10) & 31) << 3;
+        int near = picked.Count(c => Math.Abs((c & 255) - mb) <= 18 && Math.Abs(((c >> 8) & 255) - mg) <= 18 && Math.Abs(((c >> 16) & 255) - mr) <= 18);
+        if (near >= samples * 0.6 && textured < samples * 0.2) return false;
+
+        // a control's inside edge is its one colour all the way round; a picture's changes
+        {
+            var ring = new List<int>();
+            int inset = 3, skip0 = radius + 4;
+            void At(int x, int y) { int i = (y * w + x) * 4; ring.Add(px[i] | (px[i + 1] << 8) | (px[i + 2] << 16)); }
+            for (int x = r.X + skip0; x < r.X + r.Width - skip0; x += 2) { At(x, r.Y + inset); At(x, r.Y + r.Height - 1 - inset); }
+            for (int y = r.Y + skip0; y < r.Y + r.Height - skip0; y += 2) { At(r.X + inset, y); At(r.X + r.Width - 1 - inset, y); }
+            if (ring.Count >= 16)
+            {
+                var rc = new Dictionary<int, int>();
+                foreach (int c in ring) { int k = (c & 255) >> 3 | (((c >> 8) & 255) >> 3 << 5) | (((c >> 16) & 255) >> 3 << 10); rc[k] = rc.GetValueOrDefault(k) + 1; }
+                int rm = rc.MaxBy(kv => kv.Value).Key;
+                int rb = (rm & 31) << 3, rg = ((rm >> 5) & 31) << 3, rr2 = ((rm >> 10) & 31) << 3;
+                int same = ring.Count(c => Math.Abs((c & 255) - rb) <= 12 && Math.Abs(((c >> 8) & 255) - rg) <= 12 && Math.Abs(((c >> 16) & 255) - rr2) <= 12);
+                if (same >= ring.Count * 0.9) return false;
+            }
+        }
         if (textured >= samples * 0.25 && colours.Count >= 48) return true;
         if (colours.Count < 8) return false;
 

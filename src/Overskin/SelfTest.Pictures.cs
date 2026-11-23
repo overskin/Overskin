@@ -477,6 +477,214 @@ public partial class App
                 Clipped(dc, new RectangleGeometry(p, 8, 8), Photo(420, 300, 29, brightness: 95), p);
             }, new[] { p }, Array.Empty<Point>()));
         }
+        // 30. a JPEG-compressed screenshot of a page with a photo on it, posted in a chat
+        {
+            var outer = new Rect(150, 80, 600, 400);
+            var inner = new Rect(300, 190, 300, 190);
+            BitmapSource Jpeg()
+            {
+                var v = new DrawingVisual();
+                using (var d = v.RenderOpen())
+                {
+                    d.DrawRectangle(Brushes.White, null, new Rect(0, 0, 600, 400));
+                    Text(d, "Weekend photos", 200, 40, Brushes.Black, 26);
+                    Clipped(d, new RectangleGeometry(new Rect(150, 110, 300, 190), 10, 10), Photo(300, 190, 30), new Rect(150, 110, 300, 190));
+                    Text(d, "More pictures from the trip below.", 170, 320, Brushes.DimGray, 14);
+                }
+                var r = new RenderTargetBitmap(600, 400, 96, 96, PixelFormats.Pbgra32);
+                r.Render(v);
+                var enc = new JpegBitmapEncoder { QualityLevel = 55 };
+                enc.Frames.Add(BitmapFrame.Create(r));
+                var ms = new System.IO.MemoryStream();
+                enc.Save(ms);
+                ms.Position = 0;
+                var dec = BitmapFrame.Create(ms, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+                dec.Freeze();
+                return dec;
+            }
+            var jpeg = Jpeg();
+            list.Add(new Scene("jpeg screenshot", 900, 560, dc =>
+            {
+                dc.DrawRectangle(chat, null, new Rect(0, 0, 900, 560));
+                Clipped(dc, new RectangleGeometry(outer, 8, 8), jpeg, outer);
+            }, new[] { outer, inner }, Array.Empty<Point>()));
+        }
+        // 31. a spreadsheet: a grid of cells, some filled with colour
+        {
+            list.Add(new Scene("spreadsheet", 900, 520, dc =>
+            {
+                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 900, 520));
+                var grid = new Pen(Hex("#E1E1E1"), 1);
+                for (int c = 0; c <= 9; c++) dc.DrawLine(grid, new Point(40.5 + c * 90, 40), new Point(40.5 + c * 90, 500));
+                for (int r = 0; r <= 20; r++) dc.DrawLine(grid, new Point(40, 40.5 + r * 23), new Point(850, 40.5 + r * 23));
+                dc.DrawRectangle(Hex("#C6EFCE"), null, new Rect(221, 87, 179, 68));
+                dc.DrawRectangle(Hex("#FFEB9C"), null, new Rect(491, 179, 89, 91));
+                var rnd = new Random(31);
+                for (int r = 0; r < 19; r++) for (int c = 0; c < 9; c++)
+                    if (rnd.Next(3) > 0) Text(dc, rnd.Next(10, 9999).ToString(), 48 + c * 90, 43 + r * 23, Brushes.Black, 13);
+            }, Array.Empty<Rect>(), new[] { new Point(300, 120), new Point(530, 220), new Point(100, 300) }));
+        }
+        // 32. image search results: square corners, 2 px apart, different widths, captions under them
+        {
+            var ps = new[] { new Rect(40, 60, 240, 180), new Rect(282, 60, 150, 180), new Rect(434, 60, 300, 180), new Rect(40, 270, 200, 160), new Rect(242, 270, 260, 160), new Rect(504, 270, 230, 160) };
+            list.Add(new Scene("image search grid", 780, 470, dc =>
+            {
+                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 780, 470));
+                for (int i = 0; i < ps.Length; i++)
+                {
+                    dc.DrawImage(Photo((int)ps[i].Width, (int)ps[i].Height, 70 + i), ps[i]);
+                    Text(dc, "site" + i + ".com", ps[i].X + 2, ps[i].Bottom + 4, Brushes.DimGray, 11);
+                }
+            }, ps, Array.Empty<Point>()));
+        }
+        // 33. the desktop: a wallpaper photo, a window on it, and a photo inside the window
+        {
+            var win = new Rect(160, 90, 560, 380);
+            var photo = new Rect(200, 170, 300, 200);
+            list.Add(new Scene("desktop window", 960, 600, dc =>
+            {
+                dc.DrawImage(Photo(960, 600, 33), new Rect(0, 0, 960, 600));
+                dc.DrawRoundedRectangle(Brushes.White, new Pen(Hex("#80808080"), 1), win, 8, 8);
+                dc.DrawRectangle(Hex("#F3F3F3"), null, new Rect(win.X + 1, win.Y + 1, win.Width - 2, 32));
+                Text(dc, "Photos", win.X + 12, win.Y + 8, Brushes.Black, 13);
+                Clipped(dc, new RectangleGeometry(photo, 6, 6), Photo(300, 200, 34), photo);
+                Text(dc, "IMG_2041.jpg  ·  4032 × 3024", 520, 180, Brushes.DimGray, 12);
+                dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(230, 32, 32, 32)), null, new Rect(0, 552, 960, 48)); // taskbar
+            }, new[] { photo }, new[] { new Point(480, 576) })); // the window itself may be snapped to: it's the window's own outline
+        }
+        // 34. a calendar: flat coloured event blocks with text, rounded
+        {
+            list.Add(new Scene("calendar", 900, 560, dc =>
+            {
+                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 900, 560));
+                var line = new Pen(Hex("#E0E0E0"), 1);
+                for (int d = 0; d <= 5; d++) dc.DrawLine(line, new Point(80.5 + d * 160, 20), new Point(80.5 + d * 160, 540));
+                for (int hr = 0; hr <= 10; hr++) dc.DrawLine(line, new Point(80, 20.5 + hr * 52), new Point(880, 20.5 + hr * 52));
+                var events = new[] { (0, 1, 2, "#039BE5"), (1, 3, 1, "#33B679"), (2, 0, 3, "#8E24AA"), (3, 5, 2, "#F4511E"), (4, 2, 1, "#F6BF26") };
+                foreach (var (day, start, len, col) in events)
+                {
+                    var r = new Rect(84 + day * 160, 23 + start * 52, 150, len * 52 - 6);
+                    dc.DrawRoundedRectangle(Hex(col), null, r, 4, 4);
+                    Text(dc, "Meeting with the team", r.X + 6, r.Y + 4, Brushes.White, 12);
+                    Text(dc, "10:00 – 11:00", r.X + 6, r.Y + 20, Brushes.White, 11);
+                }
+            }, Array.Empty<Rect>(), new[] { new Point(160, 100), new Point(400, 220), new Point(400, 80), new Point(560, 330) }));
+        }
+        // 35. a video grid: 16:9 thumbnails with round corners, titles and channel icons under them
+        {
+            var ps = new[] { new Rect(40, 40, 320, 180), new Rect(376, 40, 320, 180), new Rect(40, 310, 320, 180), new Rect(376, 310, 320, 180) };
+            list.Add(new Scene("video grid", 740, 560, dc =>
+            {
+                dc.DrawRectangle(Hex("#0F0F0F"), null, new Rect(0, 0, 740, 560));
+                for (int i = 0; i < ps.Length; i++)
+                {
+                    Clipped(dc, new RectangleGeometry(ps[i], 12, 12), Photo(320, 180, 80 + i), ps[i]);
+                    dc.DrawEllipse(Hex("#FF5722"), null, new Point(ps[i].X + 18, ps[i].Bottom + 26), 18, 18);
+                    Text(dc, "A video title that goes on", ps[i].X + 46, ps[i].Bottom + 12, Brushes.White, 14);
+                    Text(dc, "Channel name · 1.2M views", ps[i].X + 46, ps[i].Bottom + 34, Brushes.Gray, 12);
+                }
+            }, ps, new[] { new Point(140, 238), new Point(476, 508) }));
+        }
+        // 36. cut (chamfered) corners
+        {
+            var p = new Rect(200, 100, 420, 280);
+            list.Add(new Scene("chamfered corners", 820, 480, dc =>
+            {
+                dc.DrawRectangle(Hex("#202124"), null, new Rect(0, 0, 820, 480));
+                var g = new StreamGeometry();
+                using (var c = g.Open())
+                {
+                    double k = 14;
+                    c.BeginFigure(new Point(p.Left + k, p.Top), true, true);
+                    c.LineTo(new Point(p.Right - k, p.Top), true, false); c.LineTo(new Point(p.Right, p.Top + k), true, false);
+                    c.LineTo(new Point(p.Right, p.Bottom - k), true, false); c.LineTo(new Point(p.Right - k, p.Bottom), true, false);
+                    c.LineTo(new Point(p.Left + k, p.Bottom), true, false); c.LineTo(new Point(p.Left, p.Bottom - k), true, false);
+                    c.LineTo(new Point(p.Left, p.Top + k), true, false);
+                }
+                g.Freeze();
+                Clipped(dc, g, Photo(420, 280, 36), p);
+            }, new[] { p }, Array.Empty<Point>()));
+        }
+        // 37. stepped pixel corners, not smoothed (an old app, or zoomed with nearest-neighbour)
+        {
+            var p = new Rect(180, 90, 400, 300);
+            list.Add(new Scene("stepped corners", 780, 480, dc =>
+            {
+                dc.DrawRectangle(Hex("#ECECEC"), null, new Rect(0, 0, 780, 480));
+                var g = new GeometryGroup { FillRule = FillRule.Nonzero };
+                int r = 12;
+                g.Children.Add(new RectangleGeometry(new Rect(p.X + r, p.Y, p.Width - 2 * r, p.Height)));
+                g.Children.Add(new RectangleGeometry(new Rect(p.X, p.Y + r, p.Width, p.Height - 2 * r)));
+                for (int i = 0; i < r; i++)
+                {
+                    int inset = (int)Math.Ceiling(r - Math.Sqrt(r * r - (r - i - 0.5) * (r - i - 0.5)));
+                    g.Children.Add(new RectangleGeometry(new Rect(p.X + inset, p.Y + i, p.Width - 2 * inset, 1)));
+                    g.Children.Add(new RectangleGeometry(new Rect(p.X + inset, p.Bottom - i - 1, p.Width - 2 * inset, 1)));
+                }
+                g.Freeze();
+                Clipped(dc, g, Photo(400, 300, 37), p); // whole pixels only: no smoothing at the steps
+            }, new[] { p }, Array.Empty<Point>()));
+        }
+        // 38. oval corners: wider than tall
+        {
+            var p = new Rect(220, 110, 420, 280);
+            list.Add(new Scene("elliptical corners 30x12", 860, 500, dc =>
+            {
+                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 860, 500));
+                Clipped(dc, new RectangleGeometry(p, 30, 12), Photo(420, 280, 38), p);
+            }, new[] { p }, Array.Empty<Point>()));
+        }
+        // 39. three rounded corners and one square (a Telegram message picture)
+        {
+            var p = new Rect(260, 90, 380, 300);
+            list.Add(new Scene("one square corner", 860, 480, dc =>
+            {
+                dc.DrawRectangle(Hex("#17212B"), null, new Rect(0, 0, 860, 480));
+                Clipped(dc, Corners(p, 24, 24, 0, 24), Photo(380, 300, 39), p);
+                Text(dc, "21:04 ✓✓", p.Right - 70, p.Bottom - 24, Brushes.White, 12);
+            }, new[] { p }, Array.Empty<Point>()));
+        }
+        // 40. display scaling at 150%: off the pixel grid, corners 12 px at 1.5x
+        {
+            var p = new Rect(300.75, 150.25, 450.5, 300.75);
+            list.Add(new Scene("150 percent scaling", 1000, 560, dc =>
+            {
+                dc.DrawRectangle(chat, null, new Rect(0, 0, 1000, 560));
+                Text(dc, "look at this", 300, 110, light, 22);
+                Clipped(dc, new RectangleGeometry(p, 12, 12), Photo(300, 200, 40), p);
+            }, new[] { p }, Array.Empty<Point>()));
+        }
+        // 41. a faint inside outline on the picture (iOS / macOS photo style), on white
+        {
+            var p = new Rect(200, 100, 420, 300);
+            list.Add(new Scene("inner hairline", 820, 500, dc =>
+            {
+                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 820, 500));
+                Clipped(dc, new RectangleGeometry(p, 14, 14), Photo(420, 300, 41, brightness: 40), p);
+                dc.DrawRoundedRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(26, 0, 0, 0)), 1), new Rect(p.X + 0.5, p.Y + 0.5, p.Width - 1, p.Height - 1), 13.5, 13.5);
+            }, new[] { p }, Array.Empty<Point>()));
+        }
+        // 42. a PNG with its own rounded corners and soft shadow, on a light grey page
+        {
+            var p = new Rect(240, 120, 400, 260);
+            list.Add(new Scene("png with own shadow", 880, 520, dc =>
+            {
+                dc.DrawRectangle(Hex("#F5F5F7"), null, new Rect(0, 0, 880, 520));
+                Shadow(dc, p, 18, 24, 10, 0.12);
+                Clipped(dc, new RectangleGeometry(p, 18, 18), Photo(400, 260, 42), p);
+            }, new[] { p }, Array.Empty<Point>()));
+        }
+        // 43. tiny radius, fractional, on a mid-grey page (Slack in light mode)
+        {
+            var p = new Rect(150.5, 90.5, 360, 240);
+            list.Add(new Scene("small radius fractional", 700, 420, dc =>
+            {
+                dc.DrawRectangle(Hex("#F8F8F8"), null, new Rect(0, 0, 700, 420));
+                Text(dc, "Here's the mock-up", 150, 60, Brushes.Black, 15);
+                Clipped(dc, new RectangleGeometry(p, 2.5, 2.5), Photo(360, 240, 43), p);
+                dc.DrawRoundedRectangle(null, new Pen(Hex("#DDDDDD"), 1), p, 2.5, 2.5);
+            }, new[] { p }, Array.Empty<Point>()));
+        }
         return list;
     }
 
@@ -538,6 +746,37 @@ public partial class App
             catch (Exception ex) { log.Add($"pictures / {scene.Name}: FAILED {ex}"); }
         }
         log.Insert(0, $"pictures: {hit}/{total} found exactly, {wrong} of {falseChecks} non-pictures snapped to, {ms} ms in all");
+
+        // real screenshots in a folder: what's found in each, drawn on a copy to look at
+        if (Environment.GetEnvironmentVariable("OVERSKIN_PICTURE_FILES") is { Length: > 0 } folder && dir != null)
+            foreach (var file in System.IO.Directory.GetFiles(folder, "*.png"))
+            {
+                try
+                {
+                    var src = new FormatConvertedBitmap(BitmapFrame.Create(new Uri(file), BitmapCreateOptions.None, BitmapCacheOption.OnLoad), PixelFormats.Bgra32, null, 0);
+                    int fw = src.PixelWidth, fh = src.PixelHeight;
+                    var fpx = new byte[fw * fh * 4];
+                    src.CopyPixels(fpx, fw * 4, 0);
+                    var sw2 = System.Diagnostics.Stopwatch.StartNew();
+                    var found = ImageFinder.Find(fpx, fw, fh);
+                    log.Add($"file {System.IO.Path.GetFileName(file)} {fw}x{fh}: {found.Count} in {sw2.ElapsedMilliseconds} ms: " +
+                            string.Join(" ", found.Select(f => $"{f.Bounds.X},{f.Bounds.Y} {f.Bounds.Width}x{f.Bounds.Height} r{f.Radius}")));
+                    var v = new DrawingVisual();
+                    using (var d = v.RenderOpen())
+                    {
+                        d.DrawImage(src, new Rect(0, 0, fw, fh));
+                        var pen = new Pen(Brushes.Lime, 4);
+                        foreach (var f in found) d.DrawRectangle(null, pen, new Rect(f.Bounds.X, f.Bounds.Y, f.Bounds.Width, f.Bounds.Height));
+                    }
+                    var r = new RenderTargetBitmap(fw, fh, 96, 96, PixelFormats.Pbgra32);
+                    r.Render(v);
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(r));
+                    using var fs = System.IO.File.Create(System.IO.Path.Combine(dir, "file-" + System.IO.Path.GetFileName(file)));
+                    enc.Save(fs);
+                }
+                catch (Exception ex) { log.Add($"file {file}: FAILED {ex.Message}"); }
+            }
     }
 }
 #endif

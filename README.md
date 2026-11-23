@@ -94,9 +94,11 @@ for private details), smart erase, crop, rotate, and Beautify.
   choose, so menus and tooltips stay put, and a magnifier shows the exact pixel under the
   cursor.
 - **Snap to pictures**: hover over a picture inside a window, like a photo in a Discord chat,
-  and just that picture is outlined: square corners, rounded corners, pill shapes and round
-  profile pictures, on plain or gradient backgrounds. Click to capture it edge to edge; hold
-  Ctrl to take the whole window instead.
+  and just that picture is outlined: square corners, rounded corners (each corner its own, iOS
+  style, or hidden under a toolbar), pill shapes and round profile pictures, on plain, gradient
+  or frosted backgrounds, with shadows, borders or faint edges. Gallery tiles are found one by
+  one, and a screenshot posted in a chat is found as a whole, with the pictures inside it too.
+  Click to capture it edge to edge; hold Ctrl to take the whole window instead.
 - **Capture bar** along the top while you choose: capture an area, a window, one screen or
   every screen (1 to 4); draw first with a pen, arrows, boxes or a highlighter (P, A, B, H; C
   changes colour, Ctrl+Z undoes); include the mouse pointer or not; magnifier on or off (M).
@@ -140,7 +142,8 @@ Capture → **Recording** has the Video and GIF buttons and every video setting.
   Windows' own encoder, with no length limit). Click Video again or press Esc to stop. **Pause**
   and carry on with the button on the recording bar or Ctrl+Alt+P.
 - **Draw on the screen** while it records (the pencil on the recording bar, or Ctrl+Alt+D): pen,
-  arrow, box or highlighter, in five colours. It's in the video and fades after a few seconds;
+  arrow, box or highlighter, in five colours. It's in the video and fades after a few seconds
+  (choose how long, or turn fading off so drawings stay until you stop drawing, in Settings);
   the pointer is hidden while you draw. The
   screen is read straight from the graphics card, about three times faster than before.
 - **Sound**: what your speakers play, your microphone (pick which one), or both.
