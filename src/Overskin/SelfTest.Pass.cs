@@ -4,7 +4,7 @@ using System.Windows.Media;
 
 namespace Overskin;
 
-/// <summary>Self-tests for the smooth cursor, video backdrop and shortcut keys, Gartic strokes, and the tray menu.</summary>
+/// <summary>Self-tests for the smooth cursor, video backdrop and shortcut keys, and the tray menu.</summary>
 public partial class App
 {
     private static void PassTests(List<string> log)
@@ -108,61 +108,6 @@ public partial class App
             }
         }
         catch (Exception ex) { log.Add("video look: FAILED " + ex); }
-
-        // ---- Gartic: outlines first, continuous rounded strokes, no dots ----
-        try
-        {
-            int w = 240, h = 180;
-            var px = new byte[w * h * 4];
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
-                {
-                    double d = Math.Sqrt((x - 120) * (x - 120) + (y - 90) * (y - 90));
-                    byte rr = 255, g = 255, b = 255;
-                    if (d < 60) { rr = 230; g = 40; b = 40; }            // red face
-                    if (Math.Abs(d - 60) < 2) { rr = g = b = 15; }        // black outline
-                    if (Math.Abs(x - 100) < 2 && Math.Abs(y - 75) < 8) { rr = g = b = 15; } // eyes
-                    if (Math.Abs(x - 140) < 2 && Math.Abs(y - 75) < 8) { rr = g = b = 15; }
-                    int i = (y * w + x) * 4;
-                    px[i] = b; px[i + 1] = g; px[i + 2] = rr; px[i + 3] = 255;
-                }
-            var src = TraceEngine.PrepareBgra(px, w, h);
-            var palette = new List<(Color, bool)> { (Colors.White, true), (Color.FromRgb(0, 0, 0), false), (Color.FromRgb(230, 40, 40), false), (Color.FromRgb(40, 90, 230), false) };
-            var sizes = new List<double> { 2, 4, 8, 14, 24 };
-            var o = new TraceOptions { Mode = TraceMode.Gartic, Palette = palette, BrushSizes = sizes, OpacityLevels = GarticSetup.OpacityLevels, Blur = 0 };
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var r = TraceEngine.Trace(src, o, default);
-            sw.Stop();
-            double Len(Point[] p) { double s = 0; for (int i = 1; i < p.Length; i++) s += (p[i] - p[i - 1]).Length; return s; }
-            int firstOutline = Enumerable.Range(0, r.Paths.Count).TakeWhile(i => r.ColourIndex![i] == 1).Count();
-            int dots = r.Paths.Count(p => p.Length < 2 || Len(p) < 1);
-            int sharp = 0, turns = 0;
-            foreach (var p in r.Paths)
-                for (int i = 1; i + 1 < p.Length; i++)
-                {
-                    var a = p[i] - p[i - 1];
-                    var b2 = p[i + 1] - p[i];
-                    if (a.Length < 1e-6 || b2.Length < 1e-6) continue;
-                    double turn = Math.Abs(Vector.AngleBetween(a, b2));
-                    turns++;
-                    if (turn > 100) sharp++;
-                }
-            double error = Painter.MeanError(r.Painted!, src, r.Width, r.Height);
-            log.Add($"gartic strokes: {r.Paths.Count} strokes in {sw.ElapsedMilliseconds} ms, first {firstOutline} are black outlines (expect several) " +
-                    $"dots={dots} (expect 0) sharp turns={sharp} of {turns} (expect 0) error={F(error)} (expect under 20)");
-            if (Environment.GetEnvironmentVariable("OVERSKIN_TEST_OUT") is { Length: > 0 } dir)
-                SaveBgra(r.Painted!, r.Width, r.Height, System.IO.Path.Combine(dir, "gartic-painted.png"));
-
-            // the hand: eased speed, a small wobble, exact ends
-            var line = new[] { new Point(0, 0), new Point(300, 0) };
-            var hand = HumanStroke.Path(line, 18, 0.9, new Random(3));
-            double first = (hand[1] - hand[0]).Length, last = (hand[^1] - hand[^2]).Length, most = 0, wobble = 0;
-            for (int i = 1; i < hand.Length; i++) most = Math.Max(most, (hand[i] - hand[i - 1]).Length);
-            foreach (var p in hand) wobble = Math.Max(wobble, Math.Abs(p.Y));
-            log.Add($"gartic hand: {hand.Length} points, first step {F(first)} last {F(last)} fastest {F(most)} px (expect small, small, about 18) " +
-                    $"wobble {F(wobble)} px (expect 0.2 to 0.9) ends {hand[0]} {hand[^1]} (expect 0,0 300,0) travel steps={HumanStroke.Travel(new Point(0, 0), new Point(200, 0), 18).Length}");
-        }
-        catch (Exception ex) { log.Add("gartic strokes: FAILED " + ex); }
 
         // ---- pictures inside a screenshot: a chat full of text, an avatar, a panel, and two sent pictures ----
         try
@@ -341,7 +286,7 @@ public partial class App
             var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
             rtb.Render(dv);
             var shot = ImageLoader.Normalize(rtb);
-            var ed = new EditorWindow(shot, null, "move", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { }, Trace = _ => { } })
+            var ed = new EditorWindow(shot, null, "move", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { } })
             { Left = -10000, Top = -10000, ShowActivated = false, ShowInTaskbar = false };
             ed.Show();
             DoEvents();

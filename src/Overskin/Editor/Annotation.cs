@@ -88,7 +88,7 @@ public sealed class Annotation
     /// <summary>Text that stays readable on any background: dark or light halo depending on the colour.</summary>
     private static Effect Halo(Color c) => new DropShadowEffect
     {
-        Color = TraceEngine.Luma(c) > 140 ? Colors.Black : Colors.White,
+        Color = 0.299 * c.R + 0.587 * c.G + 0.114 * c.B > 140 ? Colors.Black : Colors.White,
         BlurRadius = 4,
         ShadowDepth = 0,
         Opacity = 0.75,

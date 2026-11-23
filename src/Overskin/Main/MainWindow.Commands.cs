@@ -58,7 +58,6 @@ public partial class MainWindow
         {
             new("recent", "Recent captures", "IcImages", ShowRecent, true),
             new("library", "Library", "IcImages", () => ShowTab(TabLibraryIndex)),
-            new("trace", "Trace", "IcPenTool", () => ShowTab(TabTraceIndex)),
             new("settings", "Settings", "IcSettings", () => ShowTab(TabSettingsIndex)),
             new("folder", "Screenshots folder", "IcFolder", () => OpenFolder_Click(this, NoArgs)),
         }),

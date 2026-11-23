@@ -60,7 +60,6 @@
                 <Separator />
                 <MenuItem Header="Copy image" Click="Copy_Click" />
                 <MenuItem Header="Save as PNG…" Click="Save_Click" />
-                <MenuItem Header="Trace this image" Click="Trace_Click" />
                 <Separator />
                 <MenuItem Header="Close" InputGestureText="Esc" Click="Close_Click" />
             </ContextMenu>

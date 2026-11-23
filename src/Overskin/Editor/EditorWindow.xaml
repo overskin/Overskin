@@ -262,12 +262,6 @@
                                 <TextBlock Text="Beautify" />
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="Trace_Click" ToolTip="Open in the Trace tab">
-                            <StackPanel Orientation="Horizontal">
-                                <local:Icon Data="{StaticResource IcPenTool}" Width="13" Height="13" Margin="0,0,6,0" />
-                                <TextBlock Text="Trace" />
-                            </StackPanel>
-                        </Button>
                         <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="Pin_Click" ToolTip="Pin on top of everything">
                             <StackPanel Orientation="Horizontal">
                                 <local:Icon Data="{StaticResource IcPin}" Width="13" Height="13" Margin="0,0,6,0" />

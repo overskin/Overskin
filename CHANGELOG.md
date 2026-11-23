@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.3.0
+
+### Changed
+
+- **Trace has moved to its own project.** The Trace tab (turning a picture into mouse strokes
+  and drawing it in Paint, Krita, skribbl.io or Gartic Phone) is no longer part of Overskin.
+  The tag `v3.2.1` is the last version that includes it. Pins as tracing paper (fade, click-through
+  and the drawing grid) stay in Overskin.
+- Ctrl+Alt+D and Ctrl+Alt+P now only draw on the screen and pause while a video records. The
+  *Stop drawing* shortcut (Esc or Ctrl+Alt+X) is gone with Trace.
+- The after-capture card, the editor, the Library and pinned pictures no longer have a Trace
+  button. The card shows Edit, Pin, Copy and Show in folder.
+- Old settings files load as before; the Trace settings in them are ignored.
+
 ## 3.2.1
 
 ### New

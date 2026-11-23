@@ -17,17 +17,15 @@ namespace Overskin;
 public partial class MainWindow : Window
 {
     private const int HkPin = 1, HkOpacityUp = 2, HkOpacityDown = 3, HkClickThrough = 4;
-    private const int HkAbort = 5, HkAbortEsc = 6, HkPickEsc = 7, HkDraw = 8, HkPause = 9, HkPaletteEsc = 10, HkSnip = 11;
+    private const int HkPickEsc = 7, HkDraw = 8, HkSnip = 11;
     private const int HkRegion = 12, HkWindow = 13, HkScreen = 14, HkText = 15, HkColour = 16, HkRecent = 21, HkPinClipboard = 22, HkVideo = 23;
     private const double BaseWidth = 540, BaseHeight = 700, SmallestWidth = 530, SmallestHeight = 560;
-    private const int TabCaptureIndex = 0, TabLibraryIndex = 1, TabPinsIndex = 2, TabTraceIndex = 3, TabSettingsIndex = 4;
+    private const int TabCaptureIndex = 0, TabLibraryIndex = 1, TabPinsIndex = 2, TabSettingsIndex = 3;
 
-    private readonly bool _loading = true;
     private readonly bool _ready;
 
     private AppSettings _settings = AppSettings.Load();
     private readonly WindowManager _manager = new();
-    private readonly MouseDrawer _drawer = new();
     private readonly ObservableCollection<WindowItem> _windows = new();
     private readonly ObservableCollection<ImageOverlayWindow> _images = new();
     private readonly HashSet<IntPtr> _pickedExtras = new();
@@ -39,20 +37,6 @@ public partial class MainWindow : Window
     private int _tab;
     private bool _exiting;
     private bool _cleaned;
-
-    // auto-trace state
-    private readonly DispatcherTimer _traceDebounce = new() { Interval = TimeSpan.FromMilliseconds(90) };
-    private TraceSource? _traceImage;
-    private BitmapSource? _traceSource;
-    private TraceMode _mode = TraceMode.Outline;
-    private PaletteCapture? _paletteCapture;
-    private TraceResult? _trace;
-    private CancellationTokenSource? _traceCts;
-    private Int32Rect? _area;
-    private GhostWindow? _ghost;
-    private bool _ghostSuppressed;
-    private bool _minimizedForDrawing;
-    private string _lastHud = "";
 
     // polls the grab keys while any image is pinned
     private readonly DispatcherTimer _grabTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
@@ -81,7 +65,7 @@ public partial class MainWindow : Window
     {
         Theming.Apply(_settings.AccentColor, _settings.BackgroundTone); // before any control looks up its colours
         InitializeComponent();
-        foreach (var page in new[] { PageCapture, PageSettings, TraceScroll }) KeepSidesEven(page);
+        foreach (var page in new[] { PageCapture, PageSettings }) KeepSidesEven(page);
         AutoHideRow.ContextMenu = Redaction.KindsMenu();
         Redaction.KindsChanged += () => { _settings.AutoHideKinds = Redaction.Kinds; _settings.Save(); };
 
@@ -90,16 +74,11 @@ public partial class MainWindow : Window
         _grabTimer.Tick += (_, _) => UpdateGrab();
         ImageList.ItemsSource = _images;
         LibraryList.ItemsSource = _library;
-        CatalogList.ItemsSource = _catalog;
         _images.CollectionChanged += (_, _) =>
         {
             UpdateStatus();
             if (_images.Count > 0) _grabTimer.Start(); else _grabTimer.Stop();
         };
-        _traceDebounce.Tick += (_, _) => { _traceDebounce.Stop(); RunTrace(); };
-
-        _drawer.Progress += p => Dispatcher.BeginInvoke(() => OnDrawProgress(p));
-        _drawer.Finished += (outcome, message) => Dispatcher.BeginInvoke(() => OnDrawFinished(outcome, message));
 
         var version = Assembly.GetExecutingAssembly().GetName().Version;
         VersionText.Text = version == null ? "" : $"v{version.Major}.{version.Minor}.{version.Build}";
@@ -112,17 +91,14 @@ public partial class MainWindow : Window
         RestorePosition();
         PinsPictures.IsChecked = true;
         RefreshLibrary();
-        RefreshCatalog();
         SetUpFolds();
         SetUpCleanUp();
         SetUpUpdates();
         Loaded += (_, _) => FadeIn();
 
-        _loading = false;
         _ready = true;
         VideoEditorWindow.OpenPicture = (picture, name) => OpenEditor(picture, null, name);
         SelectTab(_settings.LastTab);
-        UpdateTraceLabels();
         UpdateStatus();
     }
 
@@ -146,10 +122,6 @@ public partial class MainWindow : Window
         _picker = new WindowPicker(Dispatcher, _manager.IsOwnWindow);
         _picker.Finished += OnPickFinished;
 
-        _paletteCapture = new PaletteCapture(Dispatcher, _manager.IsOwnWindow);
-        _paletteCapture.Picked += OnPaletteColourPicked;
-        _paletteCapture.Ended += OnPaletteCaptureEnded;
-
         RegisterHotkeys(announceFailures: true);
         RefreshWindows();
         RestorePinnedImages();
@@ -167,7 +139,6 @@ public partial class MainWindow : Window
         {
             e.Cancel = true;
             FadeOutThenHide();
-            _ghost?.Hide();
             if (!_settings.TrayHintShown)
             {
                 _settings.TrayHintShown = true;
@@ -193,7 +164,6 @@ public partial class MainWindow : Window
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
         if (wasHidden) FadeIn();
-        UpdateGhost();
     }
 
     // ---- motion --------------------------------------------------------------------------
@@ -260,19 +230,15 @@ public partial class MainWindow : Window
         if (_cleaned) return;
         _cleaned = true;
 
-        Try(() => _drawer.Shutdown());       // releases the mouse button
         Try(() => _search.Save());
         Try(() => _manager.RestoreAll());    // puts other programs' windows back
         Try(() => _picker?.Dispose());
-        Try(() => _paletteCapture?.Dispose());
         Try(() => _tray?.Dispose());
         Try(() => _hotkeys?.Dispose());
-        Try(() => _traceCts?.Cancel());
         Try(SaveSettings);
         Try(() =>
         {
             foreach (var image in _images.ToList()) image.Close();
-            _ghost?.Close();
             Toast.Shutdown();
         });
 
@@ -289,15 +255,6 @@ public partial class MainWindow : Window
 
     private void ApplySettingsToControls()
     {
-        ThresholdSlider.Value = _settings.Threshold;
-        ScaleSlider.Value = _settings.ScalePercent;
-        SpacingSlider.Value = _settings.FillSpacing;
-        InvertSwitch.IsChecked = _settings.Invert;
-        SelectMode(_settings.TraceMode);
-        BuildPaletteChips();
-        foreach (RadioButton chip in SpeedChoices.Children) chip.IsChecked = (string)chip.Tag == _settings.TraceSpeed;
-        foreach (RadioButton chip in CountdownChoices.Children) chip.IsChecked = (string)chip.Tag == _settings.CountdownSeconds.ToString();
-        UpdateSpeedHint();
         CloseToTraySwitch.IsChecked = _settings.CloseToTray;
         AlwaysOnTopSwitch.IsChecked = _settings.AlwaysOnTop;
         GrabSwitch.IsChecked = _settings.GrabWithCtrlAlt;
@@ -316,11 +273,6 @@ public partial class MainWindow : Window
 
     private void SaveSettings()
     {
-        _settings.Threshold = (int)ThresholdSlider.Value;
-        _settings.ScalePercent = (int)ScaleSlider.Value;
-        _settings.FillSpacing = (int)SpacingSlider.Value;
-        _settings.Invert = InvertSwitch.IsChecked == true;
-        _settings.TraceMode = _mode.ToString();
         _settings.CloseToTray = CloseToTraySwitch.IsChecked == true;
         _settings.AlwaysOnTop = AlwaysOnTopSwitch.IsChecked == true;
         _settings.GrabWithCtrlAlt = GrabSwitch.IsChecked == true;
@@ -358,9 +310,6 @@ public partial class MainWindow : Window
         HkUpButton.Content = _settings.HotkeyOpacityUp;
         HkDownButton.Content = _settings.HotkeyOpacityDown;
         HkClickButton.Content = _settings.HotkeyClickThrough;
-        HkAbortButton.Content = _settings.HotkeyAbort;
-        HkDrawButton.Content = _settings.HotkeyDraw;
-        HkPauseButton.Content = _settings.HotkeyPause;
         HkRecPenButton.Content = _settings.HotkeyDraw;
         HkRecPauseButton.Content = _settings.HotkeyPause;
         TileVideoKey.Text = _settings.HotkeyVideo;
@@ -385,8 +334,6 @@ public partial class MainWindow : Window
         ToolColourButton.ToolTip = _settings.HotkeyColour;
         HintClickKey.Text = _settings.HotkeyClickThrough;
         HintGrabKey.Visibility = HintGrabText.Visibility = _settings.GrabWithCtrlAlt ? Visibility.Visible : Visibility.Collapsed;
-        SafetyText.Text = $"Stop any time with Esc or {_settings.HotkeyAbort}, or by pushing the mouse into the top-left corner. " +
-                          $"{_settings.HotkeyPause} pauses. {_settings.HotkeyDraw} starts drawing from inside the game, no need to switch back.";
     }
 
     private void StartupSwitch_Click(object sender, RoutedEventArgs e)
@@ -588,10 +535,7 @@ public partial class MainWindow : Window
         Theming.Apply(_settings.AccentColor, _settings.BackgroundTone);
         SyncAppearanceControls();
         ApplyCaptureSettingsToControls();
-        _ghost?.Close(); // it holds the old accent brush; rebuilt on demand
-        _ghost = null;
         UpdateStatus();
-        UpdateGhost();
         SaveSettings();
     }
 
@@ -668,7 +612,6 @@ public partial class MainWindow : Window
             UiScale = _settings.UiScale,
             WindowWidth = _settings.WindowWidth,
             WindowHeight = _settings.WindowHeight,
-            Palette = _settings.Palette,
             RestoreImages = _settings.RestoreImages,
             PinnedImages = _settings.PinnedImages,
             History = _settings.History,
@@ -677,12 +620,8 @@ public partial class MainWindow : Window
         };
         _settings = fresh;
         Theming.Apply(_settings.AccentColor, _settings.BackgroundTone);
-        _ghost?.Close();
-        _ghost = null;
         ApplySettingsToControls();
         RegisterHotkeys(announceFailures: true);
-        UpdateTraceLabels();
-        ScheduleTrace();
         SaveSettings();
         Toast.Show("Settings reset.");
     }
@@ -702,8 +641,8 @@ public partial class MainWindow : Window
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
-    private RadioButton[] TabButtons => new[] { TabCapture, TabLibrary, TabPins, TabTrace, TabSettings };
-    private FrameworkElement[] Pages => new FrameworkElement[] { PageCapture, PageLibrary, PagePins, PageTrace, PageSettings };
+    private RadioButton[] TabButtons => new[] { TabCapture, TabLibrary, TabPins, TabSettings };
+    private FrameworkElement[] Pages => new FrameworkElement[] { PageCapture, PageLibrary, PagePins, PageSettings };
 
     private void SelectTab(int index)
     {
@@ -725,7 +664,6 @@ public partial class MainWindow : Window
 
         if (_tab == TabPinsIndex && PinsWindows.IsChecked == true) RefreshWindows();
         if (_tab == TabLibraryIndex) RefreshLibrary();
-        UpdateGhost();
     }
 
     private void PinsView_Checked(object sender, RoutedEventArgs e)
@@ -1071,7 +1009,6 @@ public partial class MainWindow : Window
             ["HotkeyOpacityUp"] = _settings.HotkeyOpacityUp,
             ["HotkeyOpacityDown"] = _settings.HotkeyOpacityDown,
             ["HotkeyClickThrough"] = _settings.HotkeyClickThrough,
-            ["HotkeyAbort"] = _settings.HotkeyAbort,
             ["HotkeyDraw"] = _settings.HotkeyDraw,
             ["HotkeyPause"] = _settings.HotkeyPause,
             ["HotkeySnip"] = _settings.HotkeySnip,
@@ -1097,7 +1034,6 @@ public partial class MainWindow : Window
             case "HotkeyOpacityUp": _settings.HotkeyOpacityUp = text; break;
             case "HotkeyOpacityDown": _settings.HotkeyOpacityDown = text; break;
             case "HotkeyClickThrough": _settings.HotkeyClickThrough = text; break;
-            case "HotkeyAbort": _settings.HotkeyAbort = text; break;
             case "HotkeyDraw": _settings.HotkeyDraw = text; break;
             case "HotkeyPause": _settings.HotkeyPause = text; break;
             case "HotkeySnip": _settings.HotkeySnip = text; break;
@@ -1216,12 +1152,8 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>An image arrived by drop or paste: trace it on the trace tab, pin it everywhere else.</summary>
-    private void AcceptImage(BitmapSource image, string name, string? path = null)
-    {
-        if (_tab == TabTraceIndex) LoadTraceImage(image);
-        else PinImage(image, name, path);
-    }
+    /// <summary>An image arrived by drop or paste: pin it.</summary>
+    private void AcceptImage(BitmapSource image, string name, string? path = null) => PinImage(image, name, path);
 
     private static string? BrowseForImage(string title)
     {
@@ -1285,12 +1217,6 @@ public partial class MainWindow : Window
                 try { System.IO.File.Delete(window.SourcePath); } catch { }
             }
         };
-        window.SendToTraceRequested += w =>
-        {
-            SelectTab(TabTraceIndex);
-            LoadTraceImage(w.Original);
-            ShowFromTray();
-        };
         window.OpacityChanged += percent => _settings.ImageOpacity = percent;
         window.PropertyChanged += (_, _) => UpdateStatus();
         window.ClickThroughEnabledFromMenu += () =>
@@ -1332,11 +1258,6 @@ public partial class MainWindow : Window
     }
 
     private void Snip_Click(object sender, RoutedEventArgs e) => SnipAndPin();
-
-    private void ImageTrace_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement { DataContext: ImageOverlayWindow window }) window.RequestTrace();
-    }
 
     private void ImageCopy_Click(object sender, RoutedEventArgs e)
     {
@@ -1391,781 +1312,31 @@ public partial class MainWindow : Window
         }
     }
 
-    // =====================================================================================
-    //  feature 3: auto-trace
-    // =====================================================================================
+    // ---- draw while recording --------------------------------------------------------------
 
-    private static readonly Dictionary<TraceMode, string> ModeHints = new()
-    {
-        [TraceMode.Outline] = "Traces around the edge of every dark shape. Clean, and quick to draw.",
-        [TraceMode.Lines] = "One stroke along the middle of each line. Best for line art, doodles and text.",
-        [TraceMode.Sketch] = "Finds edges by contrast instead of darkness, so it works on photos and colourful pictures.",
-        [TraceMode.Hatch] = "Fills dark areas with parallel strokes. Set the spacing to your brush size for solid fills.",
-        [TraceMode.Shade] = "Hatching that builds up in darker tones, for a shaded pencil look.",
-        [TraceMode.Colour] = "Paints each area in the closest colour from the game's palette, switching colours as it goes.",
-        [TraceMode.Gartic] = "Made for Gartic Phone: sketches the outlines, then paints with its five brush sizes and opacity levels, big strokes first and finer ones after.",
-    };
-
-    private void LoadTrace_Click(object sender, RoutedEventArgs e)
-    {
-        string? file = BrowseForImage("Image to trace");
-        if (file != null && TryLoadFile(file, out var image)) LoadTraceImage(image!);
-    }
-
-    private void LoadTraceImage(BitmapSource image)
-    {
-        _currentCatalogPath = TraceCatalog.Add(image);
-        RefreshCatalog();
-        _traceSource = image;
-        _traceImage = TraceEngine.Prepare(image);
-        TraceEmpty.Visibility = Visibility.Collapsed;
-        TraceStats.Text = "Tracing…";
-        _ghostSuppressed = false;
-        _traceDebounce.Stop();
-        RunTrace();
-    }
-
-    private void TraceParam_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (_loading || !_ready) return;
-        UpdateTraceLabels();
-        ScheduleTrace();
-    }
-
-    private void TraceSwitch_Click(object sender, RoutedEventArgs e) => ScheduleTrace();
-
-    // ---- style ---------------------------------------------------------------------------
-
-    private void SelectMode(string name)
-    {
-        if (!Enum.TryParse(name, out TraceMode mode)) mode = TraceMode.Outline;
-        _mode = mode;
-        foreach (RadioButton chip in ModeChoices.Children)
-        {
-            chip.IsChecked = (string)chip.Tag == mode.ToString();
-            if (Enum.TryParse((string)chip.Tag, out TraceMode m)) chip.ToolTip = ModeHints[m];
-        }
-        UpdateModeUi();
-    }
-
-    private void Mode_Checked(object sender, RoutedEventArgs e)
-    {
-        if (sender is not RadioButton { Tag: string tag } || !Enum.TryParse(tag, out TraceMode mode)) return;
-        _mode = mode;
-        UpdateModeUi();
-        if (_loading || !_ready) return;
-        ScheduleTrace();
-    }
-
-    /// <summary>Shows only the settings that mean something for the chosen style.</summary>
-    private void UpdateModeUi()
-    {
-        static Visibility Show(bool on) => on ? Visibility.Visible : Visibility.Collapsed;
-        bool fills = _mode is TraceMode.Hatch or TraceMode.Shade or TraceMode.Colour;
-
-        bool gartic = _mode == TraceMode.Gartic;
-        ThresholdRow.Visibility = Show(_mode is not (TraceMode.Colour or TraceMode.Gartic));
-        ThresholdLabel.Text = _mode == TraceMode.Sketch ? "Sensitivity" : "Threshold";
-        ThresholdRow.ToolTip = _mode == TraceMode.Sketch
-            ? "Higher finds fainter edges"
-            : "Pixels darker than this are drawn";
-        AutoThresholdButton.Visibility = Show(_mode != TraceMode.Sketch);
-        SpacingRow.Visibility = Show(fills);
-        if (gartic) SpacingRow.Visibility = Visibility.Collapsed; // its brushes are measured instead
-        GarticCard.Visibility = Show(gartic);
-        if (gartic) SyncGarticControls();
-        InvertRow.Visibility = Show(_mode is not (TraceMode.Sketch or TraceMode.Colour or TraceMode.Gartic));
-        PaletteCard.Visibility = Show(_mode is TraceMode.Colour or TraceMode.Gartic);
-        UpdatePaletteHint();
-    }
-
-    private void AutoThreshold_Click(object sender, RoutedEventArgs e)
-    {
-        if (_traceImage == null)
-        {
-            Toast.Show("Load an image first.");
-            return;
-        }
-        int t = TraceEngine.AutoThreshold(_traceImage);
-        // shading reads the threshold as the lightest tone, so leave it room above the split
-        if (_mode == TraceMode.Shade) t = Math.Min(250, t + (255 - t) / 2);
-        ThresholdSlider.Value = t;
-    }
-
-    // ---- speed ---------------------------------------------------------------------------
-
-    /// <summary>Refresh rate of the monitor that will be drawn on (the chosen area, or the one the mouse is on).</summary>
-    private int DrawingRefreshRate()
-    {
-        var pt = _area is { } a ? new POINT(a.X + a.Width / 2, a.Y + a.Height / 2) : CursorPos();
-        return RefreshRate(pt);
-    }
-
-    /// <summary>One screen refresh, plus a millisecond of slack for timer jitter.</summary>
-    private int FrameMs() => (int)Math.Ceiling(1000.0 / DrawingRefreshRate()) + 1;
-
-    private (int Delay, int PointsPerStep) SpeedTiming() => _settings.TraceSpeed switch
-    {
-        "Careful" => (FrameMs() * 2, 1),
-        "Fast" => (1, 1),
-        _ => (FrameMs(), 1),
-    };
-
-    private void Speed_Checked(object sender, RoutedEventArgs e)
-    {
-        if (sender is not RadioButton { Tag: string tag }) return;
-        _settings.TraceSpeed = tag;
-        UpdateSpeedHint();
-        if (!_ready) return;
-        UpdateEstimate();
-    }
-
-    private void Countdown_Checked(object sender, RoutedEventArgs e)
-    {
-        if (sender is RadioButton { Tag: string tag } && int.TryParse(tag, out int s)) _settings.CountdownSeconds = s;
-    }
-
-    private void UpdateSpeedHint()
-    {
-        int hz = DrawingRefreshRate(), frame = FrameMs();
-        SpeedHint.Text = _settings.TraceSpeed switch
-        {
-            "Careful" => $"Two screen refreshes per point ({frame * 2} ms). For laggy games, a busy PC, or when lines come out wobbly.",
-            "Fast" => "For installed programs like Paint, Krita or Photoshop. Too quick for browser games: corners get cut.",
-            _ => $"One point per screen refresh ({hz} Hz, every {frame} ms): the fastest a browser game like skribbl or Gartic can follow. Works everywhere.",
-        };
-    }
-
-    // ---- labels and estimate -------------------------------------------------------------
-
-    private void UpdateTraceLabels()
-    {
-        ThresholdText.Text = ((int)ThresholdSlider.Value).ToString();
-        ScaleText.Text = (int)ScaleSlider.Value + "%";
-        SpacingText.Text = (int)SpacingSlider.Value + " px";
-        ResolutionRow.ToolTip = _area != null
-            ? "100% traces at the size of the chosen area: one pixel per screen pixel. Lower is faster, higher is finer."
-            : "Relative to the picture's own size. Once you set an area, 100% matches the screen.";
-        UpdateEstimate();
-    }
-
-    private DrawSettings CurrentDrawSettings(int? countdown = null)
-    {
-        var (delay, perStep) = SpeedTiming();
-        return new DrawSettings
-        {
-            DelayMs = delay,
-            PointsPerStep = perStep,
-            // a swatch or tool click only needs a few refreshes to register; Careful stays generous
-            SelectPauseMs = _settings.TraceSpeed == "Careful" ? 140 : Math.Max(40, 3 * FrameMs()),
-            CountdownSeconds = countdown ?? _settings.CountdownSeconds,
-            StopOnMouseMove = true, // grabbing the mouse always stops a drawing
-        };
-    }
-
-    private static int ColourSwitches(TraceResult trace)
-    {
-        if (trace.ColourIndex == null) return 0;
-        int switches = 0, last = -1;
-        foreach (int k in trace.ColourIndex)
-        {
-            if (k != last) switches++;
-            last = k;
-        }
-        // Gartic: brush size and opacity are buttons to click too
-        foreach (var list in new[] { trace.SizeIndex, trace.OpacityIndex })
-        {
-            if (list == null) continue;
-            last = -1;
-            foreach (int k in list)
-            {
-                if (k != last) switches++;
-                last = k;
-            }
-        }
-        return switches;
-    }
-
-    private void UpdateEstimate()
-    {
-        if (_trace == null || _trace.Paths.Count == 0)
-        {
-            EstimateText.Text = "";
-            return;
-        }
-        int points = _trace.PointCount;
-        if (_trace.SizeIndex != null)
-        {
-            // Gartic strokes are sent eased, one short step per tick: count those steps instead
-            double scale = DrawingRect() is { } r ? r.Width / (double)Math.Max(1, _trace.Width) : 1, cruise = GarticCruise(), steps = 0;
-            foreach (var path in _trace.Paths)
-            {
-                double length = 0;
-                for (int i = 1; i < path.Length; i++) length += (path[i] - path[i - 1]).Length;
-                steps += length * scale / cruise * 1.3 + 6;
-            }
-            points = (int)steps;
-        }
-        var estimate = MouseDrawer.Estimate(_trace.Paths.Count, points, ColourSwitches(_trace), CurrentDrawSettings());
-        EstimateText.Text = "About " + FormatTime(estimate);
-    }
-
-    private static string FormatTime(TimeSpan t)
-    {
-        if (t.TotalSeconds < 1) return "1 s";
-        if (t.TotalMinutes < 1) return $"{(int)Math.Ceiling(t.TotalSeconds)} s";
-        if (t.TotalHours < 1) return $"{(int)t.TotalMinutes} min {t.Seconds:00} s";
-        return $"{(int)t.TotalHours} h {t.Minutes:00} min";
-    }
-
-    // ---- tracing -------------------------------------------------------------------------
-
-    private void ScheduleTrace()
-    {
-        if (_traceImage == null) return;
-        _traceDebounce.Stop();
-        _traceDebounce.Start();
-    }
-
-    /// <summary>With an area chosen, 100% detail means one traced pixel per screen pixel there.</summary>
-    private double BaseScale()
-    {
-        if (_area is not { } area || _traceImage == null) return 1.0;
-        var fit = Placement.Fit(area, _traceImage.Width, _traceImage.Height);
-        return fit.Width / (double)_traceImage.Width;
-    }
-
-    private TraceOptions CurrentOptions() => _mode == TraceMode.Gartic ? GarticOptions() : new()
-    {
-        Mode = _mode,
-        Threshold = (int)ThresholdSlider.Value,
-        Invert = InvertSwitch.IsChecked == true,
-        Blur = 1,
-        Scale = BaseScale() * ScaleSlider.Value / 100.0,
-        MinPathLength = 8,
-        Tolerance = 1.0,
-        Spacing = SpacingSlider.Value,
-        Angle = _mode == TraceMode.Hatch ? 45 : 0,
-        Crosshatch = false,
-        Levels = 3,
-        OutlineToo = true,
-        Palette = _settings.Palette.Select(p => (p.Color, p.Skip)).ToList(),
-    };
-
-    private async void RunTrace()
-    {
-        if (_traceImage == null) return;
-
-        _traceCts?.Cancel();
-        var cts = _traceCts = new CancellationTokenSource();
-        var image = _traceImage;
-        var options = CurrentOptions();
-
-        try
-        {
-            var result = await Task.Run(() => TraceEngine.Trace(image, options, cts.Token), cts.Token);
-            if (cts.IsCancellationRequested) return; // a newer run has superseded this one
-
-            _trace = result;
-            Preview.Set(result, showBackdrop: true);
-
-            if (result.Paths.Count == 0)
-            {
-                TraceStats.Text = result.Message ?? "Nothing to draw.";
-            }
-            else
-            {
-                string strokes = result.Paths.Count == 1 ? "1 stroke" : $"{result.Paths.Count:N0} strokes";
-                string colours = result.ColourIndex is { } idx ? $"  ·  {idx.Distinct().Count()} colours" : "";
-                TraceStats.Text = $"{strokes}  ·  {result.PointCount:N0} points{colours}  ·  {result.Width} × {result.Height}";
-            }
-            _ghostSuppressed = false;
-            UpdateEstimate();
-            UpdateGhost();
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            TraceStats.Text = "Couldn't trace this image: " + ex.Message;
-        }
-    }
-
-    // ---- catalog -------------------------------------------------------------------------
-
-    private readonly System.Collections.ObjectModel.ObservableCollection<CatalogItem> _catalog = new();
-    private string? _currentCatalogPath;
-
-    private void RefreshCatalog()
-    {
-        var known = _catalog.ToDictionary(c => c.Path, StringComparer.OrdinalIgnoreCase);
-        _catalog.Clear();
-        foreach (var item in TraceCatalog.Load())
-        {
-            var shown = known.TryGetValue(item.Path, out var old) ? old : item;
-            shown.IsCurrent = string.Equals(shown.Path, _currentCatalogPath, StringComparison.OrdinalIgnoreCase);
-            _catalog.Add(shown);
-            if (shown.Thumb == null) _ = TraceCatalog.LoadThumbAsync(shown);
-        }
-        CatalogCount.Text = _catalog.Count == 0 ? "" : _catalog.Count.ToString();
-        CatalogEmpty.Visibility = _catalog.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        CatalogScroll.Visibility = _catalog.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-    }
-
-    private static CatalogItem? CatalogOf(object sender) => (sender as FrameworkElement)?.DataContext as CatalogItem;
-
-    private void CatalogOpen_Click(object sender, RoutedEventArgs e)
-    {
-        if (CatalogOf(sender) is not { } item) return;
-        if (TryLoadFile(item.Path, out var image)) LoadTraceImage(image!);
-        else RefreshCatalog();
-    }
-
-    private void CatalogPin_Click(object sender, RoutedEventArgs e)
-    {
-        if (CatalogOf(sender) is { } item && TryLoadFile(item.Path, out var image))
-            PinImage(image!, "Catalog picture", item.Path);
-    }
-
-    private void CatalogRemove_Click(object sender, RoutedEventArgs e)
-    {
-        if (CatalogOf(sender) is not { } item) return;
-        TraceCatalog.Remove(item.Path);
-        RefreshCatalog();
-    }
-
-    private void CatalogAdd_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new OpenFileDialog { Title = "Add pictures to the catalog", Filter = ImageLoader.FileFilter, Multiselect = true };
-        if (dialog.ShowDialog(this) != true) return;
-        int added = 0;
-        foreach (string file in dialog.FileNames)
-        {
-            try
-            {
-                if (TraceCatalog.Add(ImageLoader.LoadFile(file)) != null) added++;
-            }
-            catch
-            {
-                // skip files that aren't pictures
-            }
-        }
-        RefreshCatalog();
-        Toast.Show(added == 1 ? "1 picture added." : $"{added} pictures added.");
-    }
-
-    /// <summary>The strip scrolls sideways with the ordinary mouse wheel.</summary>
-    private void CatalogScroll_Wheel(object sender, MouseWheelEventArgs e)
-    {
-        if (CatalogScroll.ScrollableWidth <= 0) return; // nothing to scroll: let the page scroll instead
-        CatalogScroll.ScrollToHorizontalOffset(CatalogScroll.HorizontalOffset - e.Delta * 0.6);
-        e.Handled = true;
-    }
-
-    // ---- game colours --------------------------------------------------------------------
-
-    private void BuildPaletteChips()
-    {
-        PaletteSwatches.Children.Clear();
-        foreach (var swatch in _settings.Palette)
-        {
-            var s = swatch;
-            var brush = new SolidColorBrush(s.Color);
-            brush.Freeze();
-            var chip = new System.Windows.Controls.Primitives.ToggleButton
-            {
-                Style = (Style)FindResource("PaletteChip"),
-                Background = brush,
-                IsChecked = !s.Skip,
-                ToolTip = PaletteTip(s),
-            };
-            chip.Click += (_, _) =>
-            {
-                s.Skip = chip.IsChecked != true;
-                chip.ToolTip = PaletteTip(s);
-                SyncGarticControls();
-                ScheduleTrace();
-            };
-            chip.MouseRightButtonUp += (_, a) =>
-            {
-                a.Handled = true;
-                _settings.Palette.Remove(s);
-                BuildPaletteChips();
-                ScheduleTrace();
-            };
-            PaletteSwatches.Children.Add(chip);
-        }
-
-        int count = _settings.Palette.Count;
-        PaletteCount.Text = count == 0 ? "" : count.ToString();
-        PaletteSwatches.Visibility = count == 0 ? Visibility.Collapsed : Visibility.Visible;
-        UpdatePaletteHint();
-        SyncGarticControls();
-    }
-
-    private static string PaletteTip(PaletteSwatch s) =>
-        s.Skip ? $"{s.Hex}, left blank. Click to use it." : $"{s.Hex}. Click to leave it blank, right-click to remove.";
-
-    private void UpdatePaletteHint()
-    {
-        if (_paletteCapture?.IsActive == true)
-            PaletteHint.Text = "Click each colour in the game's palette. Right-click or press Esc when you're done.";
-        else if (_settings.Palette.Count == 0)
-            PaletteHint.Text = "Open the game, click Pick from screen, then click every colour you want. Your clicks won't reach the game.";
-        else
-            PaletteHint.Text = "Crossed-out colours are left blank, like the canvas white. Right-click one to remove it. Pick again if the game window moves.";
-    }
-
-    private void PickColours_Click(object sender, RoutedEventArgs e)
-    {
-        if (_paletteCapture == null) return;
-        if (_paletteCapture.IsActive)
-        {
-            _paletteCapture.Stop();
-            return;
-        }
-        if (!_paletteCapture.Start())
-        {
-            Toast.Show("Couldn't start colour picking.", true);
-            return;
-        }
-        PickColoursLabel.Text = "Done";
-        SyncGarticControls();
-        _hotkeys?.Register(HkPaletteEsc, new Hotkey(ModifierKeys.None, Key.Escape), () => _paletteCapture.Stop());
-        UpdatePaletteHint();
-        WindowState = WindowState.Minimized; // out of the way of the game's palette; it comes back when done
-        Toast.ShowSticky("Click each colour in the game's palette. Right-click or Esc to finish.");
-    }
-
-    private void OnPaletteColourPicked(int x, int y, Color colour)
-    {
-        if (_garticPickStep >= 0)
-        {
-            GarticButtonPicked(x, y, colour);
-            return;
-        }
-
-        string hex = Theming.ToHex(colour);
-        // clicking the same swatch again updates it instead of adding a duplicate
-        var existing = _settings.Palette.FirstOrDefault(p => Math.Abs(p.X - x) <= 6 && Math.Abs(p.Y - y) <= 6);
-        if (existing != null)
-        {
-            existing.Hex = hex;
-        }
-        else
-        {
-            bool nearWhite = colour.R > 235 && colour.G > 235 && colour.B > 235;
-            _settings.Palette.Add(new PaletteSwatch { X = x, Y = y, Hex = hex, Skip = nearWhite });
-        }
-        BuildPaletteChips();
-        ScheduleTrace();
-        Toast.ShowSticky($"Added {hex}  ·  {_settings.Palette.Count} colours.  Right-click or Esc to finish.");
-    }
-
-    private void OnPaletteCaptureEnded()
-    {
-        _hotkeys?.Unregister(HkPaletteEsc);
-        if (_garticPickStep >= 0)
-        {
-            bool cancelled = _garticPending != null;
-            _garticPickStep = -1;
-            _garticPending = null;
-            SyncGarticControls();
-            Toast.Hide();
-            if (cancelled) Toast.Show("Cancelled. Gartic's buttons weren't changed.");
-            SaveSettings();
-            ShowFromTray();
-            return;
-        }
-        PickColoursLabel.Text = "Pick from screen";
-        UpdatePaletteHint();
-        SyncGarticControls();
-        Toast.Hide();
-        SaveSettings();
-        ShowFromTray();
-    }
-
-    private void ClearPalette_Click(object sender, RoutedEventArgs e)
-    {
-        if (_settings.Palette.Count == 0) return;
-        _settings.Palette.Clear();
-        BuildPaletteChips();
-        ScheduleTrace();
-    }
-
-    // ---- placement -----------------------------------------------------------------------
-
-    private void SetArea_Click(object sender, RoutedEventArgs e)
-    {
-        if (_drawer.IsRunning) return;
-
-        _ghost?.Hide();
-        Hide(); // get out of the way so the whole screen can be chosen
-        var picker = new AreaSelectWindow(_traceSource);
-        picker.ShowDialog();
-        Show();
-        Activate();
-
-        if (picker.Selection is { } selection)
-        {
-            _area = selection;
-            UpdateSpeedHint();
-            AreaText.Text = $"{selection.Width} × {selection.Height} at {selection.X}, {selection.Y}";
-            SyncGarticControls();
-            _ghostSuppressed = false;
-            UpdateTraceLabels();
-            // detail is measured against the area, so the trace changes with it
-            _traceDebounce.Stop();
-            RunTrace();
-        }
-        UpdateGhost();
-    }
-
-    /// <summary>The exact screen rectangle the drawing will occupy: the chosen area, aspect-corrected.</summary>
-    private Int32Rect? DrawingRect() =>
-        _area is { } area && _trace != null ? Placement.Fit(area, _trace.Width, _trace.Height) : null;
-
-    private void UpdateGhost()
-    {
-        bool show = _tab == TabTraceIndex && IsVisible && WindowState != WindowState.Minimized
-                    && !_drawer.IsRunning && !_ghostSuppressed
-                    && _trace is { Paths.Count: > 0 } && DrawingRect() != null;
-        if (!show)
-        {
-            _ghost?.Hide();
-            return;
-        }
-        _ghost ??= new GhostWindow();
-        _ghost.Present(_trace!, DrawingRect()!.Value);
-    }
-
-    protected override void OnStateChanged(EventArgs e)
-    {
-        base.OnStateChanged(e);
-        UpdateGhost();
-    }
-
-    // ---- drawing -------------------------------------------------------------------------
-
-    private void Draw_Click(object sender, RoutedEventArgs e)
-    {
-        if (_drawer.IsRunning)
-        {
-            _drawer.Abort("Stopped.");
-            return;
-        }
-        BeginDrawing(countdown: null);
-    }
-
-    /// <summary>The start hotkey: works from inside the game, without switching back to Overskin.</summary>
+    /// <summary>The draw hotkey: while a video records, it turns the on-screen pen on and off.</summary>
     private void HotkeyStartDrawing()
     {
-        // while a video records, the same keys draw on the screen
-        if (_video?.IsRecording == true)
-        {
-            _video.TogglePen();
-            return;
-        }
-        if (_drawer.IsRunning)
-        {
-            _drawer.TogglePause();
-            return;
-        }
-        BeginDrawing(countdown: Math.Min(1, _settings.CountdownSeconds));
+        if (_video?.IsRecording == true) _video.TogglePen();
+        else Toast.Show($"{_settings.HotkeyDraw} draws on the screen while a video records.");
     }
-
-    private void BeginDrawing(int? countdown)
-    {
-        if (_trace == null)
-        {
-            Toast.Show("Load an image to trace first.");
-            return;
-        }
-        if (_trace.Paths.Count == 0)
-        {
-            Toast.Show(_trace.Message ?? "There's nothing to draw.");
-            return;
-        }
-        if (DrawingRect() is not { } rect)
-        {
-            Toast.Show("Choose where to draw first: click Set area.");
-            return;
-        }
-
-        if (_trace.SizeIndex != null)
-        {
-            if (GarticStrokes(_trace, rect) is { } painted)
-            {
-                var basic = CurrentDrawSettings(countdown);
-                StartDrawing(painted, rect, new DrawSettings
-                {
-                    DelayMs = basic.DelayMs, PointsPerStep = basic.PointsPerStep, SelectPauseMs = basic.SelectPauseMs,
-                    CountdownSeconds = basic.CountdownSeconds, StopOnMouseMove = basic.StopOnMouseMove,
-                    Humanize = true, HumanCruise = GarticCruise(),
-                });
-            }
-            return;
-        }
-
-        // working pixels -> physical screen pixels; colour strokes first click their swatch
-        double sx = (double)rect.Width / _trace.Width, sy = (double)rect.Height / _trace.Height;
-        var strokes = new List<DrawStroke>(_trace.Paths.Count);
-        for (int p = 0; p < _trace.Paths.Count; p++)
-        {
-            var path = _trace.Paths[p];
-            var mapped = new Point[path.Length];
-            for (int i = 0; i < path.Length; i++)
-                mapped[i] = new Point(rect.X + path[i].X * sx, rect.Y + path[i].Y * sy);
-
-            Point? select = null;
-            if (_trace.ColourIndex is { } index && index[p] < _settings.Palette.Count)
-            {
-                var swatch = _settings.Palette[index[p]];
-                select = new Point(swatch.X, swatch.Y);
-            }
-            strokes.Add(new DrawStroke(mapped, select));
-        }
-
-        StartDrawing(strokes, rect, CurrentDrawSettings(countdown));
-    }
-
-    /// <summary>Draws just the border of the chosen area: a cheap way to check placement and input.</summary>
-    private void TestBox_Click(object sender, RoutedEventArgs e)
-    {
-        if (_drawer.IsRunning) return;
-        if ((DrawingRect() ?? _area) is not { } rect)
-        {
-            Toast.Show("Choose where to draw first: click Set area.");
-            return;
-        }
-
-        double l = rect.X, t = rect.Y, r = rect.X + rect.Width - 1, b = rect.Y + rect.Height - 1;
-        var box = new[] { new Point(l, t), new Point(r, t), new Point(r, b), new Point(l, b), new Point(l, t) };
-        StartDrawing(new List<DrawStroke> { new(box) }, rect, CurrentDrawSettings());
-    }
-
-    private void StartDrawing(List<DrawStroke> strokes, Int32Rect rect, DrawSettings settings)
-    {
-        _hotkeys?.Register(HkAbortEsc, new Hotkey(ModifierKeys.None, Key.Escape), () => _drawer.Abort("Stopped with Esc."));
-        if (Hotkey.TryParse(_settings.HotkeyAbort, out var abort))
-            _hotkeys?.Register(HkAbort, abort, () => _drawer.Abort($"Stopped with {_settings.HotkeyAbort}."));
-        if (Hotkey.TryParse(_settings.HotkeyPause, out var pause))
-            _hotkeys?.Register(HkPause, pause, () => _drawer.TogglePause());
-
-        if (!_drawer.Start(strokes, settings))
-        {
-            EndDrawingUi();
-            return;
-        }
-
-        _ghost?.Hide();
-        DrawLabel.Text = "Stop";
-        DrawIcon.Data = (Geometry)FindResource("IcSquare");
-        SetAreaButton.IsEnabled = false;
-        TestButton.Visibility = Visibility.Collapsed;
-        PauseButton.Visibility = Visibility.Visible;
-        SetPauseButton(paused: false);
-        ProgressRow.Visibility = Visibility.Visible;
-        DrawProgress.Value = 0;
-        EtaText.Text = "";
-
-        // never let the pen click on our own window
-        var own = VisibleBounds(new WindowInteropHelper(this).Handle);
-        bool overlaps = own.Left < rect.X + rect.Width && own.Right > rect.X && own.Top < rect.Y + rect.Height && own.Bottom > rect.Y;
-        if (!overlaps)
-        {
-            foreach (var s in strokes)
-                if (s.SelectAt is { } p && own.Contains(new POINT((int)p.X, (int)p.Y))) { overlaps = true; break; }
-        }
-        if (overlaps)
-        {
-            _minimizedForDrawing = true;
-            WindowState = WindowState.Minimized;
-        }
-    }
-
-    private void Pause_Click(object sender, RoutedEventArgs e) => _drawer.TogglePause();
-
-    private void SetPauseButton(bool paused)
-    {
-        PauseLabel.Text = paused ? "Resume" : "Pause";
-        PauseIcon.Data = (Geometry)FindResource(paused ? "IcPlay" : "IcPause");
-    }
-
-    private void OnDrawProgress(DrawProgress p)
-    {
-        if (!_drawer.IsRunning) return;
-
-        string hud;
-        if (p.Paused)
-        {
-            SetPauseButton(paused: true);
-            EtaText.Text = "Paused";
-            hud = $"Paused.  Press {_settings.HotkeyPause} to carry on, Esc to stop.";
-        }
-        else if (p.IsCountdown)
-        {
-            EtaText.Text = $"starts in {p.CountdownSeconds}";
-            hud = $"Drawing starts in {p.CountdownSeconds}.  Click into your drawing program now.  Esc cancels.";
-        }
-        else
-        {
-            SetPauseButton(paused: false);
-            DrawProgress.Value = p.Fraction;
-            string left = FormatTime(p.Remaining);
-            EtaText.Text = left + " left";
-            hud = $"Drawing  {(int)(p.Fraction * 100)}%  ·  {left} left  ·  {_settings.HotkeyPause} pauses  ·  Esc stops";
-        }
-
-        if (hud != _lastHud)
-        {
-            _lastHud = hud;
-            Toast.ShowSticky(hud);
-        }
-    }
-
-    private void OnDrawFinished(DrawOutcome outcome, string message)
-    {
-        EndDrawingUi();
-        if (outcome == DrawOutcome.Completed) DrawProgress.Value = 1;
-        _ghostSuppressed = true; // the real drawing is there now; the ghost would only cover it
-
-        bool restore = _minimizedForDrawing;
-        _minimizedForDrawing = false;
-        if (_garticMeasure is { } measure)
-        {
-            _garticMeasure = null;
-            // the test lines are read off the screen first, so Overskin's window mustn't be over them yet
-            if (outcome == DrawOutcome.Completed)
-            {
-                _ = FinishGarticMeasureAsync(measure, restore);
-                return;
-            }
-            Toast.Show(message, warning: outcome == DrawOutcome.Failed);
-        }
-        else Toast.Show(message, warning: outcome == DrawOutcome.Failed);
-        if (restore) WindowState = WindowState.Normal;
-    }
-
 
 #if DEBUG
     /// <summary>Developer aid: renders each tab to a PNG so layout can be checked without a screen.</summary>
-    public async Task SnapshotTabsAsync(string folder, string? traceImage, string prefix = "")
+    public async Task SnapshotTabsAsync(string folder, string? sampleImage, string prefix = "")
     {
         _exiting = true;
         System.IO.Directory.CreateDirectory(folder);
-        if (traceImage != null && _images.Count == 0 && TryLoadFile(traceImage, out var bitmap))
+        if (sampleImage != null && _images.Count == 0 && TryLoadFile(sampleImage, out var bitmap))
         {
-            LoadTraceImage(bitmap!);
-            PinImage(bitmap!, System.IO.Path.GetFileName(traceImage));
+            PinImage(bitmap!, System.IO.Path.GetFileName(sampleImage));
             _images[0].Rotation = 20;
             _images[0].GridDivisions = 4;
             ImageList.SelectedIndex = 0;
-            AddToHistory(traceImage);
-            AddToHistory(traceImage.Replace("rich.png", "test.png"));
+            AddToHistory(sampleImage);
+            AddToHistory(sampleImage.Replace("rich.png", "test.png"));
         }
-        for (int tab = 0; tab < 5; tab++)
+        for (int tab = 0; tab < TabButtons.Length; tab++)
         {
             SelectTab(tab);
             if (tab == TabPinsIndex) PinsPictures.IsChecked = true;
@@ -2278,36 +1449,6 @@ public partial class MainWindow : Window
             using var overlayFile = System.IO.File.Create(System.IO.Path.Combine(folder, "overlay.png"));
             png.Save(overlayFile);
 
-            // the trace tab in each style, with a sample palette for Colour
-            _settings.Palette = new List<PaletteSwatch>
-            {
-                new() { X = 10, Y = 10, Hex = "#FFFFFF", Skip = true },
-                new() { X = 40, Y = 10, Hex = "#000000" },
-                new() { X = 70, Y = 10, Hex = "#E3242B" },
-                new() { X = 100, Y = 10, Hex = "#2563EB" },
-                new() { X = 130, Y = 10, Hex = "#F5C518" },
-            };
-            BuildPaletteChips();
-            SelectTab(TabTraceIndex);
-            foreach (var mode in new[] { "Lines", "Sketch", "Hatch", "Shade", "Colour", "Gartic" })
-            {
-                SelectMode(mode);
-                _traceDebounce.Stop();
-                RunTrace();
-                await Task.Delay(900);
-                foreach (var target in new[] { ("top", 0.0), ("bottom", 2000.0) })
-                {
-                    TraceScroll.ScrollToVerticalOffset(target.Item2);
-                    await Task.Delay(250);
-                    var page = new RenderTargetBitmap((int)(ActualWidth * 2), (int)(ActualHeight * 2), 192, 192, PixelFormats.Pbgra32);
-                    page.Render((FrameworkElement)Content);
-                    var enc = new PngBitmapEncoder();
-                    enc.Frames.Add(BitmapFrame.Create(page));
-                    using var f = System.IO.File.Create(System.IO.Path.Combine(folder, $"trace-{mode}-{target.Item1}.png"));
-                    enc.Save(f);
-                }
-            }
-            TraceScroll.ScrollToTop();
 
             // the colour wheel popup
             SelectTab(TabSettingsIndex);
@@ -2326,9 +1467,9 @@ public partial class MainWindow : Window
             WheelPopup.IsOpen = false;
 
             // the editor with a few marks, and the after-capture card
-            if (traceImage != null && TryLoadFile(traceImage, out var shotImg))
+            if (sampleImage != null && TryLoadFile(sampleImage, out var shotImg))
             {
-                var ed = new EditorWindow(shotImg!, traceImage, "Overskin 2026-11-16 14.03.22.png", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { }, Trace = _ => { } });
+                var ed = new EditorWindow(shotImg!, sampleImage, "Overskin 2026-11-16 14.03.22.png", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { } });
                 ed.Show();
                 await Task.Delay(400);
                 // marks placed for the sunset picture in docs: a box round the sun, a note, an arrow to the cabin
@@ -2344,7 +1485,7 @@ public partial class MainWindow : Window
                 using (var f = System.IO.File.Create(System.IO.Path.Combine(folder, "editor.png"))) edEnc.Save(f);
                 ed.Close();
 
-                CaptureNotice.ShowFor(shotImg!, null, "1200 × 900  ·  Saved and copied", () => { }, () => { }, () => { }, () => { }, () => { });
+                CaptureNotice.ShowFor(shotImg!, null, "1200 × 900  ·  Saved and copied", () => { }, () => { }, () => { }, () => { });
                 await Task.Delay(600);
                 var notice = Application.Current.Windows.OfType<CaptureNotice>().FirstOrDefault();
                 if (notice != null)
@@ -2359,7 +1500,7 @@ public partial class MainWindow : Window
             }
 
             // the GIF editor with a caption
-            if (traceImage != null && TryLoadFile(traceImage, out var gifImg))
+            if (sampleImage != null && TryLoadFile(sampleImage, out var gifImg))
             {
                 var gclip = GifClip.FromImage(gifImg!);
                 gclip.Frames.Add(gclip.Frames[0]);
@@ -2404,18 +1545,4 @@ public partial class MainWindow : Window
         }
     }
 #endif
-
-    private void EndDrawingUi()
-    {
-        _hotkeys?.Unregister(HkAbortEsc);
-        _hotkeys?.Unregister(HkAbort);
-        _hotkeys?.Unregister(HkPause);
-        _lastHud = "";
-        DrawLabel.Text = "Draw";
-        DrawIcon.Data = (Geometry)FindResource("IcPencil");
-        SetAreaButton.IsEnabled = true;
-        TestButton.Visibility = Visibility.Visible;
-        PauseButton.Visibility = Visibility.Collapsed;
-        ProgressRow.Visibility = Visibility.Collapsed;
-    }
 }

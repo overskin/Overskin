@@ -440,7 +440,7 @@ public partial class App : Application
                 }
                 rtb.Render(dv);
                 var livePage = ImageLoader.Normalize(rtb);
-                var ed = new EditorWindow(livePage, null, "test", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { }, Trace = _ => { } });
+                var ed = new EditorWindow(livePage, null, "test", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { } });
                 var text = ed.SelectWordsForTest(new List<OcrWord>
                 {
                     new("Hello", new Rect(20, 20, 60, 14)), new("there", new Rect(90, 20, 60, 14)), new("friend", new Rect(20, 50, 80, 14)),
@@ -757,7 +757,7 @@ public partial class App : Application
             wm.RestoreAll();
             log.Add("restore all:   " + State() + " tracked=" + wm.ModifiedCount);
 
-            // ---- real input: these three move the actual mouse for a moment ----
+            // ---- real input: this moves the actual mouse for a moment ----
             var ui = System.Windows.Threading.Dispatcher.CurrentDispatcher;
             void Pump(int ms)
             {
@@ -771,50 +771,7 @@ public partial class App : Application
 
             if (mouse)
             {
-            // 1. MouseDrawer draws a square on a window of ours; the window must see exactly that.
-            var sheet = new Window
-            {
-                WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, Topmost = true, ShowInTaskbar = false,
-                Left = 160, Top = 160, Width = 320, Height = 320, Background = System.Windows.Media.Brushes.White,
-            };
-            var seen = new List<(string Kind, Point At)>();
-            sheet.PreviewMouseLeftButtonDown += (_, a) => seen.Add(("down", sheet.PointToScreen(a.GetPosition(sheet))));
-            sheet.PreviewMouseLeftButtonUp += (_, a) => seen.Add(("up", sheet.PointToScreen(a.GetPosition(sheet))));
-            sheet.PreviewMouseMove += (_, a) => seen.Add(("move", sheet.PointToScreen(a.GetPosition(sheet))));
-            sheet.Show();
-            Pump(400);
-
-            var o = sheet.PointToScreen(new Point(60, 60));
-            var square = new[] { o, new Point(o.X + 120, o.Y), new Point(o.X + 120, o.Y + 120), new Point(o.X, o.Y + 120), o };
-            var drawer = new MouseDrawer();
-            string drawResult = "";
-            drawer.Finished += (outcome, message) => drawResult = outcome + " / " + message;
-            drawer.Start(new List<DrawStroke> { new(square) }, new DrawSettings { DelayMs = 8, CountdownSeconds = 0 });
-            for (int i = 0; i < 400 && drawResult.Length == 0; i++) Pump(20);
-            Pump(250);
-
-            int downs = seen.Count(e => e.Kind == "down"), ups = seen.Count(e => e.Kind == "up");
-            bool cornersHit = square.All(c => seen.Any(e => Math.Abs(e.At.X - c.X) <= 1 && Math.Abs(e.At.Y - c.Y) <= 1));
-            var firstDown = seen.FirstOrDefault(e => e.Kind == "down").At;
-            log.Add($"draw: {drawResult} downs={downs} ups={ups} cornersHit={cornersHit} firstDownOffset={firstDown.X - o.X:0},{firstDown.Y - o.Y:0} dpi={System.Windows.Media.VisualTreeHelper.GetDpi(sheet).DpiScaleX}");
-            sheet.Close();
-            Pump(150);
-
-            // 2. Area picker: drag a known rectangle and read it back.
-            var area = new AreaSelectWindow(null);
-            area.Show();
-            Pump(500);
-            MouseDrawer.MoveTo(new Point(300, 280));
-            Pump(60);
-            MouseDrawer.SendLeftButton(true);
-            Pump(60);
-            for (int i = 1; i <= 8; i++) { MouseDrawer.MoveTo(new Point(300 + 25 * i, 280 + 20 * i)); Pump(25); }
-            MouseDrawer.SendLeftButton(false);
-            Pump(300);
-            log.Add("area picker: " + (area.Selection is { } sel ? $"{sel.X},{sel.Y} {sel.Width}x{sel.Height} (expected 300,280 200x160)" : "no selection") + " closed=" + !area.IsVisible);
-            if (area.IsVisible) area.Close();
-
-            // 3. Pick mode: the click must be swallowed and report the window under it.
+            // 1. Pick mode: the click must be swallowed and report the window under it.
             wm.SetPinned(h, true); // bring the test Notepad above everything so it is what gets clicked
             Pump(200);
             NativeMethods.GetWindowRect(h, out var nr);
@@ -822,25 +779,23 @@ public partial class App : Application
             var picker = new WindowPicker(ui, wm.IsOwnWindow);
             picker.Finished += hit => picked = hit;
             bool hooked = picker.Start();
-            MouseDrawer.MoveTo(new Point((nr.Left + nr.Right) / 2, nr.Top + 12));
+            TestMouse.MoveTo(new Point((nr.Left + nr.Right) / 2, nr.Top + 12));
             Pump(80);
-            MouseDrawer.SendLeftButton(true);
+            TestMouse.Button(true);
             Pump(60);
-            MouseDrawer.SendLeftButton(false);
+            TestMouse.Button(false);
             Pump(300);
             log.Add($"pick mode: hooked={hooked} pickedNotepad={picked == h} stillActive={picker.IsActive}");
             picker.Dispose();
             wm.RestoreAll();
 
-            // 4. Colour switching: a click on the swatch, then the stroke; both must arrive in order.
+            // 2. Reading the screen, snipping it, and bringing a pinned picture back.
             var board = new Window
             {
                 WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, Topmost = true, ShowInTaskbar = false,
                 Left = 200, Top = 200, Width = 300, Height = 200,
                 Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x22, 0x88, 0xCC)),
             };
-            var events = new List<string>();
-            board.PreviewMouseLeftButtonDown += (_, a) => { var p = board.PointToScreen(a.GetPosition(board)); events.Add($"down {p.X:0},{p.Y:0}"); };
             board.Show();
             Pump(400);
             var b0 = board.PointToScreen(new Point(0, 0));
@@ -879,93 +834,9 @@ public partial class App : Application
             pinned.Close();
             Pump(100);
 
-            var line = new[] { new Point(b0.X + 100, b0.Y + 100), new Point(b0.X + 200, b0.Y + 100) };
-            drawResult = "";
-            drawer.Start(new List<DrawStroke> { new(line, swatchAt), new(line, swatchAt) }, new DrawSettings { DelayMs = 4, CountdownSeconds = 0 });
-            for (int i = 0; i < 300 && drawResult.Length == 0; i++) Pump(20);
-            Pump(200);
-            log.Add($"colour switch: {drawResult} events=[{string.Join(" | ", events)}] (expect: swatch once, then two strokes)");
-
-            // 5. Grabbing the mouse mid-drawing must stop it.
-            var longLine = Enumerable.Range(0, 200).Select(i => new Point(b0.X + 20 + i, b0.Y + 150)).ToArray();
-            drawResult = "";
-            drawer.Start(new List<DrawStroke> { new(longLine) }, new DrawSettings { DelayMs = 10, CountdownSeconds = 0 });
-            Pump(400);
-            MouseDrawer.MoveTo(new Point(b0.X + 150, b0.Y + 40)); // "the user" moves the mouse
-            for (int i = 0; i < 200 && drawResult.Length == 0; i++) Pump(20);
-            log.Add($"stop on move: {drawResult}");
-
-            // 6. Pause lifts the pen and resumes where it left off.
-            events.Clear();
-            drawResult = "";
-            drawer.Start(new List<DrawStroke> { new(longLine) }, new DrawSettings { DelayMs = 10, CountdownSeconds = 0 });
-            Pump(500);
-            drawer.TogglePause();
-            Pump(500);
-            int downsWhilePaused = events.Count;
-            drawer.TogglePause();
-            for (int i = 0; i < 300 && drawResult.Length == 0; i++) Pump(20);
-            log.Add($"pause/resume: {drawResult} pressesBefore={downsWhilePaused} pressesTotal={events.Count} (expect 1 then 2)");
             board.Close();
             Pump(100);
             }
-
-            // ---- engine ----
-            TraceSource Source(int w, int h, Func<int, int, (byte R, byte G, byte B)> pixel)
-            {
-                var gray = new byte[w * h];
-                var rgb = new byte[w * h * 3];
-                for (int y = 0; y < h; y++)
-                    for (int x = 0; x < w; x++)
-                    {
-                        var (r, g, b) = pixel(x, y);
-                        int i = y * w + x;
-                        rgb[i * 3] = r; rgb[i * 3 + 1] = g; rgb[i * 3 + 2] = b;
-                        gray[i] = (byte)((b * 29 + g * 150 + r * 77) >> 8);
-                    }
-                return new TraceSource { Width = w, Height = h, Gray = gray, Rgb = rgb };
-            }
-            (byte, byte, byte) White = (255, 255, 255), Black = (0, 0, 0);
-
-            var square40 = Source(40, 40, (x, y) => x >= 10 && x < 30 && y >= 10 && y < 30 ? Black : White);
-            var outline = TraceEngine.Trace(square40, new TraceOptions { Tolerance = 1, MinPathLength = 4 }, default);
-            log.Add($"outline square: paths={outline.Paths.Count} points={outline.PointCount} first={string.Join(" ", outline.Paths[0])}");
-
-            var hatch = TraceEngine.Trace(square40, new TraceOptions { Mode = TraceMode.Hatch, Spacing = 5, OutlineToo = false }, default);
-            log.Add($"hatch square: strokes={hatch.Paths.Count} points={hatch.PointCount} (rows joined into one zig-zag)");
-            var cross = TraceEngine.Trace(square40, new TraceOptions { Mode = TraceMode.Hatch, Spacing = 5, Angle = 45, Crosshatch = true, OutlineToo = true }, default);
-            log.Add($"crosshatch 45 + outline: strokes={cross.Paths.Count}");
-
-            // a thick plus sign: centrelines should give its two bars, not two outlines
-            var plus = Source(80, 80, (x, y) => (x >= 36 && x < 44 && y >= 10 && y < 70) || (y >= 36 && y < 44 && x >= 10 && x < 70) ? Black : White);
-            var lines = TraceEngine.Trace(plus, new TraceOptions { Mode = TraceMode.Lines, Tolerance = 1, MinPathLength = 4, Blur = 0 }, default);
-            var spans = lines.Paths.Select(p => $"{p.Length}pts {p[0].X:0},{p[0].Y:0}->{p[^1].X:0},{p[^1].Y:0}");
-            log.Add($"lines plus: strokes={lines.Paths.Count} [{string.Join(" ; ", spans)}]");
-
-            // a grey ramp: sketch finds the edge of the square drawn on it
-            var photo = Source(80, 80, (x, y) => x >= 20 && x < 60 && y >= 20 && y < 60 ? ((byte)60, (byte)60, (byte)60) : ((byte)(150 + x), (byte)(150 + x), (byte)(150 + x)));
-            var sketch = TraceEngine.Trace(photo, new TraceOptions { Mode = TraceMode.Sketch, Threshold = 128, Blur = 1, MinPathLength = 8 }, default);
-            log.Add($"sketch: strokes={sketch.Paths.Count} points={sketch.PointCount}");
-
-            var ramp = Source(100, 20, (x, y) => ((byte)(x * 2.5), (byte)(x * 2.5), (byte)(x * 2.5)));
-            var shade = TraceEngine.Trace(ramp, new TraceOptions { Mode = TraceMode.Shade, Threshold = 240, Levels = 3, Spacing = 4, OutlineToo = false }, default);
-            log.Add($"shade ramp: strokes={shade.Paths.Count}  auto threshold of plus={TraceEngine.AutoThreshold(plus)}");
-
-            // red and blue halves on white, palette white/red/blue/black with white skipped
-            var flag = Source(60, 30, (x, y) => y < 5 || y >= 25 ? White : x < 30 ? ((byte)230, (byte)30, (byte)30) : ((byte)30, (byte)40, (byte)220));
-            var palette = new List<(System.Windows.Media.Color, bool)>
-            {
-                (System.Windows.Media.Colors.White, true),
-                (System.Windows.Media.Color.FromRgb(255, 0, 0), false),
-                (System.Windows.Media.Color.FromRgb(0, 0, 255), false),
-                (System.Windows.Media.Colors.Black, false),
-            };
-            var colour = TraceEngine.Trace(flag, new TraceOptions { Mode = TraceMode.Colour, Spacing = 3, OutlineToo = false, Palette = palette, Blur = 0 }, default);
-            var usage = colour.ColourIndex!.GroupBy(k => k).Select(g => $"#{g.Key}x{g.Count()}");
-            log.Add($"colour flag: strokes={colour.Paths.Count} colours=[{string.Join(" ", usage)}] (expect red=1, blue=2, none of white/black)");
-
-            var noPalette = TraceEngine.Trace(flag, new TraceOptions { Mode = TraceMode.Colour }, default);
-            log.Add($"colour without palette: \"{noPalette.Message}\"");
 
             // ---- screenshots (none of these move the mouse) ----
             var swatchWin = new Window
@@ -992,7 +863,7 @@ public partial class App : Application
             // editor: a red box and some text on a white picture, burned into the export
             var whitePx = Enumerable.Repeat((byte)255, 200 * 120 * 3).ToArray();
             var whiteImg = ImageLoader.Normalize(BitmapSource.Create(200, 120, 96, 96, System.Windows.Media.PixelFormats.Bgr24, null, whitePx, 600));
-            var editor = new EditorWindow(whiteImg, null, "test", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { }, Trace = _ => { } });
+            var editor = new EditorWindow(whiteImg, null, "test", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { } });
             editor.Show();
             Pump(400);
             editor.AddForTest(new Annotation { Kind = AnnotationKind.Rectangle, Points = { new Point(40, 30), new Point(160, 90) }, Color = System.Windows.Media.Colors.Red, Size = 4 });
@@ -1214,3 +1085,30 @@ public partial class App : Application
     internal static void DoEventsForTest() => DoEvents();
 #endif
 }
+
+#if DEBUG
+/// <summary>For the self-test: moves and clicks the real mouse, in physical screen pixels.</summary>
+internal static class TestMouse
+{
+    public static void MoveTo(Point screen)
+    {
+        // absolute coordinates are 0..65535 across the whole virtual desktop
+        var vs = NativeMethods.VirtualScreen();
+        double nx = (screen.X - vs.Left) * 65535.0 / Math.Max(1, vs.Width - 1);
+        double ny = (screen.Y - vs.Top) * 65535.0 / Math.Max(1, vs.Height - 1);
+        Send(NativeMethods.MOUSEEVENTF_MOVE | NativeMethods.MOUSEEVENTF_ABSOLUTE | NativeMethods.MOUSEEVENTF_VIRTUALDESK,
+            (int)Math.Round(Math.Clamp(nx, 0, 65535)), (int)Math.Round(Math.Clamp(ny, 0, 65535)));
+    }
+
+    public static void Button(bool down) =>
+        Send(down ? NativeMethods.MOUSEEVENTF_LEFTDOWN : NativeMethods.MOUSEEVENTF_LEFTUP, 0, 0);
+
+    private static void Send(uint flags, int dx, int dy)
+    {
+        var input = new NativeMethods.INPUT[1];
+        input[0].type = NativeMethods.INPUT_MOUSE;
+        input[0].u.mi = new NativeMethods.MOUSEINPUT { dx = dx, dy = dy, dwFlags = flags };
+        NativeMethods.SendInput(1, input, System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.INPUT>());
+    }
+}
+#endif

@@ -15,7 +15,6 @@ public sealed class EditorHost
     /// <summary>Saves into the screenshots folder and returns the new file's path (or null on failure).</summary>
     public required Func<BitmapSource, string?> SaveNew { get; init; }
     public required Action<BitmapSource, string> Pin { get; init; }
-    public required Action<BitmapSource> Trace { get; init; }
     /// <summary>Called after any save, so the library can refresh.</summary>
     public Action<string>? Saved { get; init; }
     public string Folder { get; init; } = "";
@@ -1206,8 +1205,6 @@ public partial class EditorWindow : Window
 
     private void Pin_Click(object sender, RoutedEventArgs e) =>
         _host.Pin(Export(), FilePath != null ? System.IO.Path.GetFileName(FilePath) : TitleText.Text);
-
-    private void Trace_Click(object sender, RoutedEventArgs e) => _host.Trace(Export());
 
     private void Beautify_Click(object sender, RoutedEventArgs e)
     {

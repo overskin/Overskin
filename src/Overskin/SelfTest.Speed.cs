@@ -76,12 +76,12 @@ public partial class App
         long setImage = sw.ElapsedMilliseconds;
         sw.Restart();
         bool notice = false;
-        CaptureNotice.ShowFor(shot, Path.Combine(dir, "a.png"), "2560 × 1440", () => { }, () => { }, () => { }, null, () => { });
+        CaptureNotice.ShowFor(shot, Path.Combine(dir, "a.png"), "2560 × 1440", () => { }, () => { }, () => { }, null);
         DoEvents();
         notice = true;
         long card = sw.ElapsedMilliseconds;
         sw.Restart();
-        CaptureNotice.ShowFor(shot, Path.Combine(dir, "a.png"), "2560 × 1440", () => { }, () => { }, () => { }, null, () => { });
+        CaptureNotice.ShowFor(shot, Path.Combine(dir, "a.png"), "2560 × 1440", () => { }, () => { }, () => { }, null);
         DoEvents();
         long card2 = sw.ElapsedMilliseconds;
         log.Add($"preview card again: {card2} ms");

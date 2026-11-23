@@ -40,7 +40,6 @@ public sealed class AppSettings
     public string HotkeyOpacityUp { get; set; } = "Ctrl+Alt+Up";
     public string HotkeyOpacityDown { get; set; } = "Ctrl+Alt+Down";
     public string HotkeyClickThrough { get; set; } = "Ctrl+Alt+C";
-    public string HotkeyAbort { get; set; } = "Ctrl+Alt+X";
     public string HotkeyDraw { get; set; } = "Ctrl+Alt+D";
     public string HotkeyPause { get; set; } = "Ctrl+Alt+P";
     public string HotkeySnip { get; set; } = "Ctrl+Alt+A";
@@ -128,32 +127,6 @@ public sealed class AppSettings
     public bool RestoreImages { get; set; } = true;
     public List<PinnedImageState> PinnedImages { get; set; } = new();
 
-    // auto-trace
-    public string TraceMode { get; set; } = "Outline";
-    public int Threshold { get; set; } = 128;
-    public bool Invert { get; set; }
-    public int Blur { get; set; } = 1;
-    /// <summary>Working resolution in percent. With an area chosen, 100 = one traced pixel per screen pixel.</summary>
-    public int ScalePercent { get; set; } = 100;
-    public int MinPathLength { get; set; } = 8;
-    public double Tolerance { get; set; } = 1.0;
-    public int FillSpacing { get; set; } = 4;
-    public int HatchAngle { get; set; }
-    public bool Crosshatch { get; set; }
-    public int ShadeLevels { get; set; } = 3;
-    public bool OutlineToo { get; set; } = true;
-    public List<PaletteSwatch> Palette { get; set; } = new();
-    /// <summary>Gartic Phone style: its pen, brush sizes and opacity buttons.</summary>
-    public GarticSetup Gartic { get; set; } = new();
-
-    // drawing
-    public int DelayMs { get; set; } = 1;
-    public int PointsPerStep { get; set; } = 1;
-    public int CountdownSeconds { get; set; } = 3;
-    /// <summary>"Optimized", "Careful" or "Fast".</summary>
-    public string TraceSpeed { get; set; } = "Optimized";
-    public bool StopOnMouseMove { get; set; } = true;
-
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     /// <summary>
@@ -239,18 +212,6 @@ public sealed class AppSettings
     private void Sanitize()
     {
         ImageOpacity = Math.Clamp(ImageOpacity, 10, 100);
-        Threshold = Math.Clamp(Threshold, 0, 255);
-        ScalePercent = Math.Clamp(ScalePercent, 10, 200);
-        MinPathLength = Math.Clamp(MinPathLength, 0, 100);
-        Tolerance = Math.Clamp(Tolerance, 0, 5);
-        FillSpacing = Math.Clamp(FillSpacing, 1, 40);
-        Blur = Math.Clamp(Blur, 0, 4);
-        ShadeLevels = Math.Clamp(ShadeLevels, 2, 5);
-        if (CountdownSeconds is not (0 or 1 or 3 or 5)) CountdownSeconds = 3;
-        if (TraceSpeed == "Instant") TraceSpeed = "Fast"; // Instant was removed
-        if (TraceSpeed is not ("Optimized" or "Careful" or "Fast")) TraceSpeed = "Optimized";
-        if (HatchAngle is not (0 or 45 or 90 or 135)) HatchAngle = 0;
-        Palette ??= new();
         PinnedImages ??= new();
         History ??= new();
         OpenCards ??= new();
@@ -267,20 +228,14 @@ public sealed class AppSettings
         if (HotkeySnip == HotkeyRegion) HotkeySnip = "Ctrl+Alt+A";
         PinnedImages.RemoveAll(s => s == null || string.IsNullOrEmpty(s.Path));
         if (UiScale is not (90 or 100 or 115 or 130 or 150)) UiScale = 100;
-        Palette.RemoveAll(s => s == null || !Theming.TryParseHex(s.Hex, out _));
-        DelayMs = Math.Clamp(DelayMs, 0, 50);
-        PointsPerStep = Math.Clamp(PointsPerStep, 1, 20);
-        LastTab = Math.Clamp(LastTab, 0, 4);
-        if (TraceMode == "Fill") TraceMode = "Hatch"; // name used before 1.3
-        if (!Enum.TryParse<Overskin.TraceMode>(TraceMode, out _)) TraceMode = "Outline";
+        // 4 was Settings before the Trace page left in 3.3; it is 3 now
+        LastTab = Math.Clamp(LastTab, 0, 3);
         if (!Theming.TryParseHex(AccentColor, out _)) AccentColor = Theming.DefaultAccent;
         if (Theming.Themes.All(t => t.Name != BackgroundTone)) BackgroundTone = Theming.DefaultTone;
         if (Theming.Themes.All(t => t.Name != LastDarkTheme || t.Light)) LastDarkTheme = Theming.DefaultTone;
         if (Theming.Themes.All(t => t.Name != LastLightTheme || !t.Light)) LastLightTheme = Theming.DefaultLightTheme;
         Video ??= new VideoOptions();
         Video.Normalize();
-        Gartic ??= new GarticSetup();
-        Gartic.Normalize();
         Watermark ??= new WatermarkOptions();
         Watermark.Normalize();
         Workflows ??= new();

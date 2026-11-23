@@ -70,9 +70,6 @@ public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
     /// <summary>Set before showing to place the picture at actual size over this physical screen rectangle.</summary>
     public Int32Rect? PlaceAt { get; set; }
 
-    /// <summary>Asks the app to load this picture into the Trace tab.</summary>
-    public event Action<ImageOverlayWindow>? SendToTraceRequested;
-
     /// <summary>Raised when opacity changes, so the app can remember it for the next image.</summary>
     public event Action<int>? OpacityChanged;
 
@@ -306,8 +303,6 @@ public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
         }
     }
 
-    public void RequestTrace() => SendToTraceRequested?.Invoke(this);
-
     // ---- drawing grid --------------------------------------------------------------------
 
     private int _grid;
@@ -523,7 +518,6 @@ public partial class ImageOverlayWindow : Window, INotifyPropertyChanged
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
     private void Copy_Click(object sender, RoutedEventArgs e) => CopyToClipboard();
     private void Save_Click(object sender, RoutedEventArgs e) => SaveAs();
-    private void Trace_Click(object sender, RoutedEventArgs e) => RequestTrace();
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

@@ -284,104 +284,6 @@ public partial class App
         catch (Exception ex) { log.Add("compare: FAILED " + ex.Message); }
         try { WorkflowDialogPicture(); } catch (Exception ex) { log.Add("workflow dialog: FAILED " + ex.Message); }
 
-        // ---- Gartic painter: opacity mixing beats plain nearest colours, and every stroke stays on the canvas ----
-        try
-        {
-            int pw = 300, ph = 200;
-            var px = new byte[pw * ph * 4];
-            for (int y = 0; y < ph; y++)
-                for (int x = 0; x < pw; x++)
-                {
-                    int o = (y * pw + x) * 4;
-                    double r = 255, g = 255, b = 255;
-                    if (y < 60) { double t = y / 60.0; r = 140 + 115 * t; g = 190 + 65 * t; b = 255; } // sky fading to white
-                    double dc = Math.Sqrt((x - 90) * (x - 90) + (y - 120) * (y - 120));
-                    if (dc < 55) { r = 250; g = 170; b = 180; } // soft pink disc
-                    if (dc < 30) { r = 220; g = 30; b = 40; }   // red middle
-                    if (x > 180 && x < 270 && y > 90 && y < 170) { r = 30; g = 40; b = 110; } // dark blue box
-                    px[o] = (byte)b; px[o + 1] = (byte)g; px[o + 2] = (byte)r; px[o + 3] = 255;
-                }
-            var source = TraceEngine.PrepareBgra(px, pw, ph);
-            var palette = new[] { "#000000", "#FFFFFF", "#E02020", "#2040E0", "#F0E020", "#20A040" }
-                .Select(hex => (Theming.TryParseHex(hex, out var c) ? c : System.Windows.Media.Colors.Black, false)).ToList();
-            var sizes = new double[] { 2, 5, 10, 18, 30 };
-            TraceResult Run(int levels) => TraceEngine.Trace(source, new TraceOptions
-            {
-                Mode = TraceMode.Gartic, Palette = palette, BrushSizes = sizes, OpacityLevels = levels, Tolerance2 = 28,
-            }, CancellationToken.None);
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var mixed = Run(10);
-            long ms = sw.ElapsedMilliseconds;
-            var flat = Run(1);
-            double mixedErr = Painter.MeanError(mixed.Painted!, source, pw, ph), flatErr = Painter.MeanError(flat.Painted!, source, pw, ph);
-
-            // what nearest-colour quantising (no opacity, perfect coverage) would give at best
-            double quantErr = 0;
-            for (int i = 0; i < pw * ph; i++)
-            {
-                double best = double.MaxValue;
-                foreach (var (c, _) in palette)
-                    best = Math.Min(best, Painter.Distance(c.R, c.G, c.B, source.Rgb[i * 3], source.Rgb[i * 3 + 1], source.Rgb[i * 3 + 2]));
-                quantErr += best;
-            }
-            quantErr /= pw * ph;
-            bool inside = mixed.Paths.All(p => p.All(q => q.X >= 0 && q.Y >= 0 && q.X <= pw - 1 && q.Y <= ph - 1));
-            bool lists = mixed.SizeIndex!.Count == mixed.Paths.Count && mixed.OpacityIndex!.Count == mixed.Paths.Count && mixed.ColourIndex!.Count == mixed.Paths.Count;
-            int switches = 0;
-            for (int i = 1; i < mixed.Paths.Count; i++)
-                if (mixed.SizeIndex[i] != mixed.SizeIndex[i - 1] || mixed.OpacityIndex[i] != mixed.OpacityIndex[i - 1] || mixed.ColourIndex[i] != mixed.ColourIndex[i - 1]) switches++;
-            log.Add($"gartic painter: error with opacity={mixedErr:0.0} without={flatErr:0.0} nearest colours at best={quantErr:0.0} (expect with < without and with < nearest) " +
-                    $"strokes={mixed.Paths.Count} points={mixed.PointCount} setting switches={switches} sizes used={string.Join(",", mixed.SizeIndex.Distinct().OrderBy(s => s))} " +
-                    $"opacities used={mixed.OpacityIndex.Distinct().Count()} on the canvas={inside} lists line up={lists} (expect True True) in {ms} ms");
-            var perSize = Enumerable.Range(0, 5).Select(s => $"{sizes[s]}px:{mixed.SizeIndex.Count(x => x == s)}");
-            var drawTime = MouseDrawer.Estimate(mixed.Paths.Count, mixed.PointCount, switches * 2, new DrawSettings { DelayMs = 17, PointsPerStep = 1, SelectPauseMs = 51 });
-            log.Add($"gartic painter strokes by brush: {string.Join(" ", perSize)}  drawing time in a browser at 60 Hz: about {drawTime.TotalSeconds:0} s");
-            if (Environment.GetEnvironmentVariable("OVERSKIN_TEST_OUT") is { Length: > 0 } outDir)
-            {
-                void SavePng(byte[] bgra, string name)
-                {
-                    var bmp = System.Windows.Media.Imaging.BitmapSource.Create(pw, ph, 96, 96, System.Windows.Media.PixelFormats.Pbgra32, null, bgra, pw * 4);
-                    var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
-                    enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bmp));
-                    using var f = System.IO.File.Create(System.IO.Path.Combine(outDir, name));
-                    enc.Save(f);
-                }
-                SavePng(px, "gartic-source.png");
-                SavePng(mixed.Painted!, "gartic-painted.png");
-                SavePng(flat.Painted!, "gartic-painted-flat.png");
-            }
-        }
-        catch (Exception ex) { log.Add("gartic painter: FAILED " + ex.GetType().Name + " " + ex.Message + ex.StackTrace); }
-
-        // ---- Gartic setup: brush thickness read back off a picture of the test lines; opacity buttons spaced evenly ----
-        try
-        {
-            int[] thick = { 3, 7, 12, 20, 33 };
-            double[] ys = { 20, 50, 85, 130, 190 };
-            int mw = 200, mh = 240;
-            var visual = new System.Windows.Media.DrawingVisual();
-            using (var dc = visual.RenderOpen())
-            {
-                dc.DrawRectangle(System.Windows.Media.Brushes.White, null, new Rect(0, 0, mw, mh));
-                // a dark blue, and drawn 5 px lower than asked, as a game might
-                var ink = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 50, 160));
-                for (int i = 0; i < 5; i++)
-                    dc.DrawLine(new System.Windows.Media.Pen(ink, thick[i]) { StartLineCap = System.Windows.Media.PenLineCap.Round, EndLineCap = System.Windows.Media.PenLineCap.Round },
-                        new Point(30, ys[i] + 5), new Point(170, ys[i] + 5));
-            }
-            var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(mw, mh, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
-            rtb.Render(visual);
-            // the region starts at (1000, 500) on screen; the lines were drawn from x 1030 to 1170
-            var measured = Overskin.MainWindow.MeasureLines(rtb, 1000, 500, ys.Select(y => y + 500).ToArray(), 1030, 1170);
-            var g = new GarticSetup
-            {
-                OpacityLow = new PaletteSwatch { X = 100, Y = 600 }, OpacityHigh = new PaletteSwatch { X = 280, Y = 600 },
-            };
-            log.Add($"gartic measure: {(measured == null ? "none" : string.Join(",", measured))} (expect about 3,7,12,20,33) " +
-                    $"opacity 1={g.OpacityAt(1)} 5={g.OpacityAt(5)} 10={g.OpacityAt(10)} (expect 100,600 180,600 280,600)");
-        }
-        catch (Exception ex) { log.Add("gartic measure: FAILED " + ex.Message); }
-
         // ---- capture bar Pick: the click takes a colour; it must not capture or close the overlay ----
         try
         {
@@ -421,7 +323,7 @@ public partial class App
             var page = ImageLoader.Normalize(rtb);
             var lines = Task.Run(() => TextRecognizer.RecognizeLinesAsync(page)).GetAwaiter().GetResult();
             var words = lines?.SelectMany(l => l).OrderBy(w => w.Bounds.Left).ToList() ?? new();
-            var ed = new EditorWindow(page, null, "letters", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { }, Trace = _ => { } });
+            var ed = new EditorWindow(page, null, "letters", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { } });
             ed.SelectWordsForTest(words, 0, 0);
             double midY = words.Count > 0 ? words[0].Bounds.Top + words[0].Bounds.Height / 2 : 0;
             var e0 = ed.EdgesForTest(0);
@@ -462,7 +364,7 @@ public partial class App
 
             // the cursor: click between e and l of Hello, Backspace takes the e and the rest of the line closes up;
             // then Backspace at the start of "there" takes the space
-            var ed2 = new EditorWindow(page, null, "letters", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { }, Trace = _ => { } });
+            var ed2 = new EditorWindow(page, null, "letters", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { } });
             ed2.SelectWordsForTest(words, 0, 0);
             var f0 = ed2.EdgesForTest(0);
             var del = ed2.ClickAndDeleteForTest(new Point(f0[2] + 0.4, midY), back: true);
@@ -501,7 +403,7 @@ public partial class App
                     var bmp = new System.Windows.Media.Imaging.RenderTargetBitmap(300, 70, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
                     bmp.Render(v);
                     var ink = F(word).BuildGeometry(new Point(15, 15)).Bounds;
-                    var e3 = new EditorWindow(ImageLoader.Normalize(bmp), null, "font", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { }, Trace = _ => { } });
+                    var e3 = new EditorWindow(ImageLoader.Normalize(bmp), null, "font", new EditorHost { SaveNew = _ => null, Pin = (_, _) => { } });
                     e3.SelectWordsForTest(new List<OcrWord> { new(word, ink) }, 0, 0);
                     var edges = e3.EdgesForTest(0);
                     double worstFont = 0;
@@ -533,7 +435,7 @@ public partial class App
         // ---- typing into a screenshot: the font, size and colour are recognised, and typed letters match a real rendering ----
         try
         {
-            var host = new EditorHost { SaveNew = _ => null, Pin = (_, _) => { }, Trace = _ => { } };
+            var host = new EditorHost { SaveNew = _ => null, Pin = (_, _) => { } };
             System.Windows.Media.Imaging.BitmapSource Page(string font, System.Windows.FontWeight weight, double size, string text,
                 System.Windows.Media.Color ink, System.Windows.Media.Color paper, out Rect inkBox, out List<OcrWord> words)
             {
@@ -655,7 +557,7 @@ public partial class App
         // ---- typing into ClearType-style text (RGB on one, BGR on the other): the typed edges come out coloured the same way ----
         try
         {
-            var host2 = new EditorHost { SaveNew = _ => null, Pin = (_, _) => { }, Trace = _ => { } };
+            var host2 = new EditorHost { SaveNew = _ => null, Pin = (_, _) => { } };
             var results = new List<string>();
             foreach (var (ink, paper, label) in new[] { (System.Windows.Media.Colors.Black, System.Windows.Media.Colors.White, "dark on white"),
                                                          (System.Windows.Media.Colors.White, System.Windows.Media.Color.FromRgb(32, 33, 36), "white on dark") })

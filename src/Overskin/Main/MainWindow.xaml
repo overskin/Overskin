@@ -118,39 +118,6 @@
             </Setter>
         </Style>
 
-        <!-- a picture in the Trace catalog: click to trace it again -->
-        <DataTemplate x:Key="CatalogTile" DataType="{x:Type local:CatalogItem}">
-            <Button Width="78" Height="62" Margin="0,0,6,2" Click="CatalogOpen_Click" Cursor="Hand" FocusVisualStyle="{x:Null}">
-                <Button.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="Trace this" Click="CatalogOpen_Click" />
-                        <MenuItem Header="Pin on screen" Click="CatalogPin_Click" />
-                        <Separator />
-                        <MenuItem Header="Remove from catalog" Click="CatalogRemove_Click" />
-                    </ContextMenu>
-                </Button.ContextMenu>
-                <Button.Template>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="B" Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Line}" BorderThickness="1.5"
-                                CornerRadius="{DynamicResource RadiusSmall}" Padding="2" ClipToBounds="True">
-                            <Image Source="{Binding Thumb}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource LineStrong}" />
-                            </Trigger>
-                            <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                                <Setter TargetName="B" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                            </DataTrigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="B" Property="Opacity" Value="0.8" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Button.Template>
-            </Button>
-        </DataTemplate>
-
         <DataTemplate x:Key="LibraryTile" DataType="{x:Type local:LibraryItem}">
             <Button Style="{StaticResource LibTile}" Width="150" Margin="0,0,8,8" Click="LibraryOpen_Click" ToolTip="{Binding Path}">
                 <Button.ContextMenu>
@@ -169,7 +136,6 @@
                             <MenuItem Header="MP4 video" Tag="MP4" Click="LibraryConvert_Click" />
                         </MenuItem>
                         <MenuItem Header="Pin on screen" Click="LibraryPin_Click" />
-                        <MenuItem Header="Trace" Click="LibraryTrace_Click" />
                         <Separator />
                         <MenuItem Header="Show in folder" Click="LibraryShow_Click" />
                         <MenuItem Header="Delete" Click="LibraryDelete_Click" />
@@ -383,13 +349,6 @@
                     </Grid>
                     <Grid Margin="0,6,0,0">
                         <StackPanel Orientation="Horizontal">
-                            <Button Style="{StaticResource Btn}" Height="23" Padding="9,0" Margin="0,0,5,0" Click="ImageTrace_Click"
-                                    ToolTip="Open this picture in the Trace tab">
-                                <StackPanel Orientation="Horizontal">
-                                    <local:Icon Data="{StaticResource IcPenTool}" Width="12" Height="12" Margin="0,0,5,0" />
-                                    <TextBlock Text="Trace it" />
-                                </StackPanel>
-                            </Button>
                             <Button Style="{StaticResource Btn}" Height="23" Padding="9,0" Margin="0,0,5,0" Click="ImageCopy_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <local:Icon Data="{StaticResource IcCopy}" Width="12" Height="12" Margin="0,0,5,0" />
@@ -462,7 +421,6 @@
                             <RadioButton x:Name="TabCapture" Style="{StaticResource Tab}" GroupName="Tabs" Content="Capture" Checked="Tab_Checked" />
                             <RadioButton x:Name="TabLibrary" Style="{StaticResource Tab}" GroupName="Tabs" Content="Library" Checked="Tab_Checked" />
                             <RadioButton x:Name="TabPins" Style="{StaticResource Tab}" GroupName="Tabs" Content="Pins" Checked="Tab_Checked" />
-                            <RadioButton x:Name="TabTrace" Style="{StaticResource Tab}" GroupName="Tabs" Content="Trace" Checked="Tab_Checked" />
                             <RadioButton x:Name="TabSettings" Style="{StaticResource Tab}" GroupName="Tabs" Content="Settings" Checked="Tab_Checked" />
                         </StackPanel>
 
@@ -739,7 +697,7 @@
                                         <TextBlock Text="Pin it where it was" Style="{StaticResource Label}" />
                                         <ToggleButton x:Name="AfterPinSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
                                     </Grid>
-                                    <Grid Height="31" ToolTip="A small card in the corner with Edit, Pin, Copy and Trace">
+                                    <Grid Height="31" ToolTip="A small card in the corner with Edit, Pin, Copy and Show in folder">
                                         <TextBlock Text="Show a preview" Style="{StaticResource Label}" />
                                         <ToggleButton x:Name="AfterPreviewSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
                                     </Grid>
@@ -1422,381 +1380,6 @@
 
                 </Grid>
 
-                <!-- ============ auto-trace ============ -->
-                <Grid x:Name="PageTrace" Grid.Row="1" Visibility="Collapsed">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <ScrollViewer x:Name="TraceScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
-                        <StackPanel Margin="14,12,6,2">
-
-                            <!-- preview -->
-                            <Border Style="{StaticResource Card}" Padding="0" Height="214">
-                                <Grid>
-                                    <local:PathPreview x:Name="Preview" Margin="12,12,12,30" Stroke="{DynamicResource Accent}" />
-                                    <StackPanel x:Name="TraceEmpty" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                        <local:Icon Data="{StaticResource IcPenTool}" Width="28" Height="28" StrokeWidth="1.5"
-                                                    Foreground="{DynamicResource TextFaint}" />
-                                        <TextBlock Text="Load an image to trace" Style="{StaticResource Dim}" HorizontalAlignment="Center" Margin="0,11,0,0" />
-                                        <TextBlock Text="or drop one here, or paste with Ctrl+V" Style="{StaticResource Dim}" FontSize="11"
-                                                   Foreground="{DynamicResource TextFaint}" HorizontalAlignment="Center" Margin="0,3,0,0" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="TraceStats" Style="{StaticResource Dim}" FontSize="11" VerticalAlignment="Bottom"
-                                               HorizontalAlignment="Left" Margin="13,0,13,9" TextTrimming="CharacterEllipsis" />
-                                    <Button Style="{StaticResource Btn}" Height="25" VerticalAlignment="Top"
-                                            HorizontalAlignment="Right" Margin="0,9,9,0" Click="LoadTrace_Click">
-                                        <StackPanel Orientation="Horizontal">
-                                            <local:Icon Data="{StaticResource IcFolderOpen}" Width="13" Height="13" Margin="0,0,6,0" />
-                                            <TextBlock Text="Load image" />
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
-                            </Border>
-
-                            <!-- catalog -->
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <Grid>
-                                        <StackPanel Orientation="Horizontal">
-                                            <local:Icon Data="{StaticResource IcImages}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
-                                            <TextBlock Text="Catalog" Style="{StaticResource Heading}" />
-                                            <TextBlock x:Name="CatalogCount" Style="{StaticResource Dim}" Margin="8,0,0,0" />
-                                        </StackPanel>
-                                        <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="CatalogAdd_Click"
-                                                ToolTip="Add pictures to the catalog">
-                                            <StackPanel Orientation="Horizontal">
-                                                <local:Icon Data="{StaticResource IcImagePlus}" Width="13" Height="13" Margin="0,0,6,0" />
-                                                <TextBlock Text="Add" />
-                                            </StackPanel>
-                                        </Button>
-                                    </Grid>
-                                    <Border Style="{StaticResource Rule}" />
-                                    <ScrollViewer x:Name="CatalogScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                                                  Focusable="False" Margin="0,0,0,0" PreviewMouseWheel="CatalogScroll_Wheel">
-                                        <ItemsControl x:Name="CatalogList" ItemTemplate="{StaticResource CatalogTile}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                        </ItemsControl>
-                                    </ScrollViewer>
-                                    <TextBlock x:Name="CatalogEmpty" Text="Pictures you trace are kept here, so you can come back to them in one click."
-                                               Style="{StaticResource Dim}" FontSize="11" Foreground="{DynamicResource TextFaint}" TextWrapping="Wrap" Margin="1,8,0,2" />
-                                </StackPanel>
-                            </Border>
-
-                            <!-- mode -->
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <local:Icon Data="{StaticResource IcPenTool}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
-                                        <TextBlock Text="Style" Style="{StaticResource Heading}" />
-                                    </StackPanel>
-                                    <Border Style="{StaticResource Rule}" />
-                                    <UniformGrid x:Name="ModeChoices" Rows="1" Margin="0,0,-6,2">
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Outline" Tag="Outline" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Lines" Tag="Lines" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Sketch" Tag="Sketch" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Hatch" Tag="Hatch" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Shade" Tag="Shade" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Colour" Tag="Colour" Checked="Mode_Checked" />
-                                        <RadioButton Style="{StaticResource Seg}" Margin="0,0,6,6" MinWidth="0" Padding="4,0" GroupName="Mode" Content="Gartic" Tag="Gartic" Checked="Mode_Checked"
-                                                     ToolTip="Gartic Phone: its pen, brush sizes and opacity buttons" />
-                                    </UniformGrid>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- game colours (Colour style only) -->
-                            <Border x:Name="PaletteCard" Style="{StaticResource Card}" Visibility="Collapsed">
-                                <StackPanel>
-                                    <Grid>
-                                        <StackPanel Orientation="Horizontal">
-                                            <local:Icon Data="{StaticResource IcPalette}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
-                                            <TextBlock Text="Game colours" Style="{StaticResource Heading}" />
-                                            <TextBlock x:Name="PaletteCount" Style="{StaticResource Dim}" Margin="8,0,0,0" />
-                                        </StackPanel>
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <Button x:Name="PickColoursButton" Style="{StaticResource Btn}" Height="25" Click="PickColours_Click"
-                                                    ToolTip="Then click each colour in the game's palette">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <local:Icon Data="{StaticResource IcPipette}" Width="13" Height="13" Margin="0,0,6,0" />
-                                                    <TextBlock x:Name="PickColoursLabel" Text="Pick from screen" />
-                                                </StackPanel>
-                                            </Button>
-                                            <Button Style="{StaticResource BtnIcon}" Width="25" Height="25" Margin="4,0,0,0" ToolTip="Remove all colours"
-                                                    Click="ClearPalette_Click">
-                                                <local:Icon Data="{StaticResource IcTrash}" Width="13" Height="13" />
-                                            </Button>
-                                        </StackPanel>
-                                    </Grid>
-                                    <Border Style="{StaticResource Rule}" />
-                                    <WrapPanel x:Name="PaletteSwatches" />
-                                    <TextBlock x:Name="PaletteHint" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap"
-                                               Foreground="{DynamicResource TextFaint}" Margin="1,4,0,0" />
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Gartic Phone: its pen, brush sizes and opacity -->
-                            <Border x:Name="GarticCard" Style="{StaticResource Card}" Visibility="Collapsed">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <local:Icon Data="{StaticResource IcPenTool}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
-                                        <TextBlock Text="Gartic Phone" Style="{StaticResource Heading}" />
-                                    </StackPanel>
-                                    <Border Style="{StaticResource Rule}" />
-                                    <Grid Margin="0,3,0,3" ToolTip="Click Pick colours, then every colour in Gartic's palette. Right-click or Esc when done.">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="28" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <Border x:Name="GarticStep1Dot" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                                BorderBrush="{DynamicResource TextFaint}">
-                                            <TextBlock x:Name="GarticStep1Num" Text="1" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource TextDim}" />
-                                        </Border>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="Game colours" Style="{StaticResource Label}" />
-                                            <TextBlock x:Name="GarticColoursText" Style="{StaticResource Dim}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFaint}" />
-                                        </StackPanel>
-                                        <Button x:Name="GarticColoursButton" Grid.Column="2" Style="{StaticResource Btn}" Height="25" Click="PickColours_Click">
-                                            <StackPanel Orientation="Horizontal">
-                                                <local:Icon Data="{StaticResource IcPipette}" Width="13" Height="13" Margin="0,0,6,0" />
-                                                <TextBlock x:Name="GarticColoursButtonLabel" Text="Pick colours" />
-                                            </StackPanel>
-                                        </Button>
-                                    </Grid>
-                                    <Grid Margin="0,3,0,3" ToolTip="Click the pen, the five brush sizes (smallest first), then the faintest and the full opacity. A message says what to click next.">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="28" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <Border x:Name="GarticStep2Dot" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                                BorderBrush="{DynamicResource TextFaint}">
-                                            <TextBlock x:Name="GarticStep2Num" Text="2" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource TextDim}" />
-                                        </Border>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="Gartic's buttons" Style="{StaticResource Label}" />
-                                            <TextBlock x:Name="GarticButtonsText" Style="{StaticResource Dim}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFaint}" />
-                                        </StackPanel>
-                                        <Button x:Name="GarticPickButton" Grid.Column="2" Style="{StaticResource Btn}" Height="25" Click="GarticPick_Click">
-                                            <StackPanel Orientation="Horizontal">
-                                                <local:Icon Data="{StaticResource IcPipette}" Width="13" Height="13" Margin="0,0,6,0" />
-                                                <TextBlock x:Name="GarticPickButtonLabel" Text="Pick buttons" />
-                                            </StackPanel>
-                                        </Button>
-                                    </Grid>
-                                    <Grid Margin="0,3,0,3" ToolTip="Drag over Gartic's white canvas">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="28" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <Border x:Name="GarticStep3Dot" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                                BorderBrush="{DynamicResource TextFaint}">
-                                            <TextBlock x:Name="GarticStep3Num" Text="3" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource TextDim}" />
-                                        </Border>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="Canvas area" Style="{StaticResource Label}" />
-                                            <TextBlock x:Name="GarticAreaText" Style="{StaticResource Dim}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFaint}" />
-                                        </StackPanel>
-                                        <Button x:Name="GarticAreaButton" Grid.Column="2" Style="{StaticResource Btn}" Height="25" Click="SetArea_Click">
-                                            <StackPanel Orientation="Horizontal">
-                                                <local:Icon Data="{StaticResource IcSquareDashed}" Width="13" Height="13" Margin="0,0,6,0" />
-                                                <TextBlock x:Name="GarticAreaButtonLabel" Text="Set area" />
-                                            </StackPanel>
-                                        </Button>
-                                    </Grid>
-                                    <Grid Margin="0,3,0,3" ToolTip="Draws a short line with each brush in the corner of the canvas, reads how thick they came out, then undoes them with Ctrl+Z">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="28" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <Border x:Name="GarticStep4Dot" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                                BorderBrush="{DynamicResource TextFaint}">
-                                            <TextBlock x:Name="GarticStep4Num" Text="4" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource TextDim}" />
-                                        </Border>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="Brush sizes" Style="{StaticResource Label}" />
-                                            <TextBlock x:Name="GarticSizesText" Style="{StaticResource Dim}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFaint}" />
-                                        </StackPanel>
-                                        <Button x:Name="GarticMeasureButton" Grid.Column="2" Style="{StaticResource Btn}" Height="25" Click="GarticMeasure_Click">
-                                            <StackPanel Orientation="Horizontal">
-                                                <local:Icon Data="{StaticResource IcRuler}" Width="13" Height="13" Margin="0,0,6,0" />
-                                                <TextBlock x:Name="GarticMeasureButtonLabel" Text="Measure" />
-                                            </StackPanel>
-                                        </Button>
-                                    </Grid>
-                                    <Border Style="{StaticResource Rule}" />
-                                    <Grid Height="31" ToolTip="Layering a colour at low opacity makes in-between shades the palette doesn't have">
-                                        <TextBlock Text="Mix shades with opacity" Style="{StaticResource Label}" />
-                                        <ToggleButton x:Name="GarticOpacitySwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="GarticSetting_Click" />
-                                    </Grid>
-                                    <TextBlock x:Name="GarticNextText" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextFaint}" Margin="1,4,0,0" />
-                                </StackPanel>
-                            </Border>
-
-                            <!-- adjust -->
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <local:Icon Data="{StaticResource IcSlidersHorizontal}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
-                                        <TextBlock Text="Adjust" Style="{StaticResource Heading}" />
-                                    </StackPanel>
-                                    <Border Style="{StaticResource Rule}" />
-
-                                    <Grid x:Name="ThresholdRow" Height="27">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="96" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="40" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="ThresholdLabel" Text="Threshold" Style="{StaticResource Label}" />
-                                        <Slider x:Name="ThresholdSlider" Grid.Column="1" Minimum="0" Maximum="255" SmallChange="1" LargeChange="16"
-                                                Value="128" ValueChanged="TraceParam_Changed" />
-                                        <TextBlock x:Name="ThresholdText" Grid.Column="2" Style="{StaticResource Value}" />
-                                        <Button x:Name="AutoThresholdButton" Grid.Column="3" Style="{StaticResource Btn}" Height="22" Padding="8,0" Margin="8,0,0,0"
-                                                Content="Auto" FontSize="11" Click="AutoThreshold_Click" ToolTip="Pick the threshold that best splits this picture" />
-                                    </Grid>
-                                    <Grid Height="27" x:Name="ResolutionRow">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="96" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="52" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Detail" Style="{StaticResource Label}" />
-                                        <Slider x:Name="ScaleSlider" Grid.Column="1" Minimum="10" Maximum="200" SmallChange="5" LargeChange="10"
-                                                TickFrequency="5" IsSnapToTickEnabled="True" Value="100" ValueChanged="TraceParam_Changed" />
-                                        <TextBlock x:Name="ScaleText" Grid.Column="2" Style="{StaticResource Value}" />
-                                    </Grid>
-                                    <Grid x:Name="SpacingRow" Height="27" ToolTip="Gap between fill lines. Match it to the brush size you draw with.">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="96" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="52" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Line spacing" Style="{StaticResource Label}" />
-                                        <Slider x:Name="SpacingSlider" Grid.Column="1" Minimum="1" Maximum="40" SmallChange="1" LargeChange="2"
-                                                TickFrequency="1" IsSnapToTickEnabled="True" Value="4" ValueChanged="TraceParam_Changed" />
-                                        <TextBlock x:Name="SpacingText" Grid.Column="2" Style="{StaticResource Value}" />
-                                    </Grid>
-                                    <Grid x:Name="InvertRow" Height="29" ToolTip="Draw the light areas instead of the dark ones">
-                                        <TextBlock Text="Invert" Style="{StaticResource Label}" />
-                                        <ToggleButton x:Name="InvertSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="TraceSwitch_Click" />
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- drawing -->
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <Grid>
-                                        <StackPanel Orientation="Horizontal">
-                                            <local:Icon Data="{StaticResource IcGauge}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
-                                            <TextBlock Text="Drawing" Style="{StaticResource Heading}" />
-                                        </StackPanel>
-                                        <TextBlock x:Name="EstimateText" Style="{StaticResource Dim}" HorizontalAlignment="Right" />
-                                    </Grid>
-                                    <Border Style="{StaticResource Rule}" />
-                                    <Grid Height="31">
-                                        <TextBlock Text="Speed" Style="{StaticResource Label}" />
-                                        <StackPanel x:Name="SpeedChoices" Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <RadioButton Style="{StaticResource Seg}" GroupName="Speed" Content="Optimized" Tag="Optimized" Checked="Speed_Checked" />
-                                            <RadioButton Style="{StaticResource Seg}" GroupName="Speed" Content="Careful" Tag="Careful" Checked="Speed_Checked" />
-                                            <RadioButton Style="{StaticResource Seg}" GroupName="Speed" Content="Fast" Tag="Fast" Checked="Speed_Checked" />
-                                        </StackPanel>
-                                    </Grid>
-                                    <TextBlock x:Name="SpeedHint" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap"
-                                               Foreground="{DynamicResource TextFaint}" Margin="1,0,0,6" />
-                                    <Grid Height="31" ToolTip="Time to click into the drawing program after pressing Draw">
-                                        <TextBlock Text="Countdown" Style="{StaticResource Label}" />
-                                        <StackPanel x:Name="CountdownChoices" Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <RadioButton Style="{StaticResource Seg}" GroupName="Countdown" Content="Off" Tag="0" Checked="Countdown_Checked" />
-                                            <RadioButton Style="{StaticResource Seg}" GroupName="Countdown" Content="1 s" Tag="1" Checked="Countdown_Checked" />
-                                            <RadioButton Style="{StaticResource Seg}" GroupName="Countdown" Content="3 s" Tag="3" Checked="Countdown_Checked" />
-                                            <RadioButton Style="{StaticResource Seg}" GroupName="Countdown" Content="5 s" Tag="5" Checked="Countdown_Checked" />
-                                        </StackPanel>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- how to stop -->
-                            <Grid Margin="2,1,8,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <local:Icon Data="{StaticResource IcInfo}" Width="13" Height="13" Foreground="{DynamicResource TextFaint}"
-                                            VerticalAlignment="Top" Margin="0,2,7,0" />
-                                <TextBlock x:Name="SafetyText" Grid.Column="1" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap"
-                                           Foreground="{DynamicResource TextFaint}" />
-                            </Grid>
-                        </StackPanel>
-                    </ScrollViewer>
-
-                    <!-- action bar -->
-                    <Border Grid.Row="1" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="14,10,14,10">
-                        <StackPanel>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Button x:Name="SetAreaButton" Style="{StaticResource Btn}" Click="SetArea_Click"
-                                        ToolTip="Drag a rectangle on screen where the drawing should go">
-                                    <StackPanel Orientation="Horizontal">
-                                        <local:Icon Data="{StaticResource IcSquareDashedMousePointer}" Width="14" Height="14" Margin="0,0,6,0" />
-                                        <TextBlock Text="Set area" />
-                                    </StackPanel>
-                                </Button>
-                                <TextBlock x:Name="AreaText" Grid.Column="1" Text="No area chosen" Style="{StaticResource Dim}" Margin="10,0,6,0"
-                                           TextTrimming="CharacterEllipsis" />
-                                <Button x:Name="TestButton" Grid.Column="2" Style="{StaticResource Btn}" Margin="0,0,6,0"
-                                        Click="TestBox_Click" ToolTip="Draw only the border of the area, to check placement first">
-                                    <StackPanel Orientation="Horizontal">
-                                        <local:Icon Data="{StaticResource IcSquareDashed}" Width="14" Height="14" Margin="0,0,6,0" />
-                                        <TextBlock Text="Test box" />
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="PauseButton" Grid.Column="3" Style="{StaticResource Btn}" Margin="0,0,6,0" MinWidth="84"
-                                        Click="Pause_Click" Visibility="Collapsed">
-                                    <StackPanel Orientation="Horizontal">
-                                        <local:Icon x:Name="PauseIcon" Data="{StaticResource IcPause}" Width="14" Height="14" Margin="0,0,6,0" />
-                                        <TextBlock x:Name="PauseLabel" Text="Pause" />
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="DrawButton" Grid.Column="4" Style="{StaticResource BtnAccent}" MinWidth="84" Click="Draw_Click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <local:Icon x:Name="DrawIcon" Data="{StaticResource IcPencil}" Width="14" Height="14" StrokeWidth="1.6" Margin="0,0,6,0" />
-                                        <TextBlock x:Name="DrawLabel" Text="Draw" />
-                                    </StackPanel>
-                                </Button>
-                            </Grid>
-                            <Grid x:Name="ProgressRow" Margin="0,10,0,0" Visibility="Collapsed">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <ProgressBar x:Name="DrawProgress" Minimum="0" Maximum="1" VerticalAlignment="Center" />
-                                <TextBlock x:Name="EtaText" Grid.Column="1" Style="{StaticResource Dim}" Margin="10,0,0,0" MinWidth="78"
-                                           TextAlignment="Right" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </Grid>
-
                 <!-- ============ settings ============ -->
                 <ScrollViewer x:Name="PageSettings" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled" Focusable="False">
@@ -1951,12 +1534,12 @@
                                     <Button x:Name="HkGifButton" Style="{StaticResource Btn}" Tag="HotkeyGif" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="28" ToolTip="Shared with Trace: the same keys pause and draw there">
+                                <Grid Height="28">
                                     <TextBlock Text="Pause or resume the recording" Style="{StaticResource Label}" />
                                     <Button x:Name="HkRecPauseButton" Style="{StaticResource Btn}" Tag="HotkeyPause" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
-                                <Grid Height="28" ToolTip="Shared with Trace: the same keys pause and draw there">
+                                <Grid Height="28">
                                     <TextBlock Text="Draw on the screen while recording" Style="{StaticResource Label}" />
                                     <Button x:Name="HkRecPenButton" Style="{StaticResource Btn}" Tag="HotkeyDraw" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
@@ -1995,30 +1578,6 @@
                                     <TextBlock Text="Lower opacity" Style="{StaticResource Label}" />
                                     <Button x:Name="HkDownButton" Style="{StaticResource Btn}" Tag="HotkeyOpacityDown" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
-                                </Grid>
-                                <Border Style="{StaticResource Rule}" Margin="0,6,0,2" />
-                                <StackPanel Orientation="Horizontal" Margin="0,6,0,3">
-                                    <local:Icon Data="{StaticResource IcPenTool}" Width="12" Height="12" Foreground="{DynamicResource Accent}" Margin="0,0,7,0" />
-                                    <TextBlock Text="Trace" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" />
-                                </StackPanel>
-                                <Grid Height="28" ToolTip="Also turns the pen on and off while recording">
-                                    <TextBlock Text="Start drawing in the chosen area" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkDrawButton" Style="{StaticResource Btn}" Tag="HotkeyDraw" MinWidth="124" Height="23"
-                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
-                                </Grid>
-                                <Grid Height="28" ToolTip="Also pauses and resumes a recording">
-                                    <TextBlock Text="Pause or resume drawing" Style="{StaticResource Label}" />
-                                    <Button x:Name="HkPauseButton" Style="{StaticResource Btn}" Tag="HotkeyPause" MinWidth="124" Height="23"
-                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
-                                </Grid>
-                                <Grid Height="28">
-                                    <TextBlock Text="Stop drawing" Style="{StaticResource Label}" />
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <Border Style="{StaticResource Key}"><TextBlock Text="Esc" Style="{StaticResource KeyText}" /></Border>
-                                        <TextBlock Text="or" Style="{StaticResource Dim}" Margin="0,0,8,0" />
-                                        <Button x:Name="HkAbortButton" Style="{StaticResource Btn}" Tag="HotkeyAbort" MinWidth="124" Height="23"
-                                                Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
-                                    </StackPanel>
                                 </Grid>
                             </StackPanel>
                         </Border>

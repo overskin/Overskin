@@ -14,7 +14,7 @@
     <RootNamespace>Overskin</RootNamespace>
     <Version>3.2.1</Version>
     <Product>Overskin</Product>
-    <Description>Screenshots, annotations, pinning and tracing for Windows.</Description>
+    <Description>Screenshots, screen recording, editing and pinning for Windows.</Description>
 
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\overskin.ico</ApplicationIcon>

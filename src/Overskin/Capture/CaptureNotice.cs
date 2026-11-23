@@ -25,10 +25,10 @@ public sealed class CaptureNotice : Window
     private bool _closing;
 
     public static void ShowFor(BitmapSource image, string? path, string caption,
-        Action edit, Action pin, Action copy, Action? openFolder, Action trace)
+        Action edit, Action pin, Action copy, Action? openFolder)
     {
         _current?.FadeAway();
-        _current = new CaptureNotice(image, path, caption, edit, pin, copy, openFolder, trace);
+        _current = new CaptureNotice(image, path, caption, edit, pin, copy, openFolder);
         _current.Show();
     }
 
@@ -39,7 +39,7 @@ public sealed class CaptureNotice : Window
         _current is { } c ? (c._grow.ScaleX, c._slide.Y, c.Opacity) : null;
 
     private CaptureNotice(BitmapSource image, string? path, string caption,
-        Action edit, Action pin, Action copy, Action? openFolder, Action trace)
+        Action edit, Action pin, Action copy, Action? openFolder)
     {
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
@@ -73,7 +73,6 @@ public sealed class CaptureNotice : Window
         actions.Children.Add(Action("IcPencil", "Edit", edit));
         actions.Children.Add(Action("IcPin", "Pin", pin));
         actions.Children.Add(Action("IcCopy", "Copy", copy));
-        actions.Children.Add(Action("IcPenTool", "Trace", trace));
         if (openFolder != null) actions.Children.Add(Action("IcFolderOpen", "Show in folder", openFolder));
 
         var close = new Button { Style = (Style)FindResource("BtnIcon"), ToolTip = "Dismiss", HorizontalAlignment = HorizontalAlignment.Right };
@@ -126,7 +125,7 @@ public sealed class CaptureNotice : Window
         b.Click += (_, _) =>
         {
             act();
-            if (tip is "Edit" or "Pin" or "Trace") FadeAway();
+            if (tip is "Edit" or "Pin") FadeAway();
         };
         return b;
     }

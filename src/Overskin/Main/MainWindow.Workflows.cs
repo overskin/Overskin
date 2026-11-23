@@ -27,9 +27,8 @@ public partial class MainWindow
         ["lowering opacity"] = _settings.HotkeyOpacityDown,
         ["click-through"] = _settings.HotkeyClickThrough,
         ["snip and pin"] = _settings.HotkeySnip,
-        ["starting a drawing"] = _settings.HotkeyDraw,
-        ["pausing a drawing"] = _settings.HotkeyPause,
-        ["stopping a drawing"] = _settings.HotkeyAbort,
+        ["drawing on a recording"] = _settings.HotkeyDraw,
+        ["pausing a recording"] = _settings.HotkeyPause,
     };
 
     /// <summary>What already uses a hotkey, leaving out <paramref name="except"/>; null when it's free.</summary>

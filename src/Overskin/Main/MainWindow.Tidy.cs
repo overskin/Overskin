@@ -290,7 +290,7 @@ public partial class MainWindow
     }
 
 #if DEBUG
-    /// <summary>Checks for the folding cards, hotkey groups, Trace styles, tray and clean-up, written next to the snapshots.</summary>
+    /// <summary>Checks for the folding cards, hotkey groups, tray and clean-up, written next to the snapshots.</summary>
     private async Task WriteTidyChecksAsync(string folder)
     {
         var log = new List<string>();
@@ -314,26 +314,6 @@ public partial class MainWindow
             $"recording pause={HkRecPauseButton.Content} pen={HkRecPenButton.Content} video tile={TileVideoKey.Text} hint=\"{RecordHint.Text}\" " +
             $"(expect {_settings.HotkeyPause} {_settings.HotkeyDraw} {_settings.HotkeyVideo})");
         Check("tray quick actions", () => string.Join(" | ", QuickActionsForTest()));
-
-        SelectTab(TabTraceIndex);
-        await Task.Delay(500);
-        Check("trace styles", () =>
-        {
-            var chips = ModeChoices.Children.OfType<RadioButton>().ToList();
-            var clipped = new List<string>();
-            double top = double.NaN;
-            bool oneRow = true;
-            foreach (var chip in chips)
-            {
-                var y = chip.TranslatePoint(new Point(0, 0), ModeChoices).Y;
-                if (double.IsNaN(top)) top = y; else if (Math.Abs(y - top) > 1) oneRow = false;
-                var text = new System.Windows.Media.FormattedText((string)chip.Content, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-                    new System.Windows.Media.Typeface(chip.FontFamily, chip.FontStyle, chip.FontWeight, chip.FontStretch), chip.FontSize,
-                    System.Windows.Media.Brushes.Black, 1);
-                if (text.Width + 8 > chip.ActualWidth) clipped.Add($"{chip.Content} {text.Width:0}>{chip.ActualWidth:0}");
-            }
-            return $"{chips.Count} styles, one row={oneRow}, clipped=[{string.Join(", ", clipped)}] (expect 7, True, none)";
-        });
 
         Check("clean-up picks", () =>
         {
@@ -368,7 +348,7 @@ public partial class MainWindow
         // the preview card pops up: small, low and see-through at first, then full size in place
         {
             var pixel = System.Windows.Media.Imaging.BitmapSource.Create(64, 40, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[64 * 40 * 4], 64 * 4);
-            CaptureNotice.ShowFor(pixel, null, "test", () => { }, () => { }, () => { }, null, () => { });
+            CaptureNotice.ShowFor(pixel, null, "test", () => { }, () => { }, () => { }, null);
             await Task.Delay(40);
             var early = CaptureNotice.StateForTest;
             await Task.Delay(700);

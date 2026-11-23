@@ -54,7 +54,6 @@ public partial class MainWindow
     private async Task<bool> ClearTheScreen()
     {
         bool wasShown = IsVisible && WindowState != WindowState.Minimized;
-        _ghost?.Hide();
         Toast.HideNow();
         CaptureNotice.CloseAll();
         if (wasShown) Hide();
@@ -64,11 +63,7 @@ public partial class MainWindow
 
     private void Reappear(bool wasShown)
     {
-        if (wasShown)
-        {
-            Show();
-            UpdateGhost();
-        }
+        if (wasShown) Show();
     }
 
     /// <summary>Counts down in the toast, then clears it so it isn't captured.</summary>
@@ -111,7 +106,7 @@ public partial class MainWindow
 
     private async void Guarded(Func<Task> work)
     {
-        if (_captureBusy || _drawer.IsRunning) return;
+        if (_captureBusy) return;
         _captureBusy = true;
         try { await work(); }
         catch (Exception ex) { Toast.Show("Something went wrong: " + ex.Message, true); }
@@ -359,8 +354,7 @@ public partial class MainWindow
                 edit: () => OpenEditor(image, path, CaptureName(path)),
                 pin: () => PinImage(image, CaptureName(path), path, placeAt: where),
                 copy: () => CopyImage(image, quiet: false, path),
-                openFolder: path != null ? () => ShowInFolder(path) : null,
-                trace: () => SendToTrace(image));
+                openFolder: path != null ? () => ShowInFolder(path) : null);
         }
         else
         {
@@ -492,20 +486,12 @@ public partial class MainWindow
         catch { Toast.Show("Couldn't open the folder.", true); }
     }
 
-    private void SendToTrace(BitmapSource image)
-    {
-        SelectTab(TabTraceIndex);
-        LoadTraceImage(image);
-        ShowFromTray();
-    }
-
     private void OpenEditor(BitmapSource image, string? path, string name)
     {
         var editor = new EditorWindow(image, path, name, new EditorHost
         {
             SaveNew = SaveCapture,
             Pin = (bmp, n) => PinImage(bmp, n),
-            Trace = SendToTrace,
             Saved = p => { AddToHistory(p); RefreshLibrary(); },
             Folder = _settings.SaveFolder,
         });
@@ -951,11 +937,6 @@ public partial class MainWindow
     private void LibraryPin_Click(object sender, RoutedEventArgs e)
     {
         if (ItemOf(sender) is { } item && LoadLibraryImage(item) is { } image) PinImage(image, Path.GetFileName(item.Path), item.Path);
-    }
-
-    private void LibraryTrace_Click(object sender, RoutedEventArgs e)
-    {
-        if (ItemOf(sender) is { } item && LoadLibraryImage(item) is { } image) SendToTrace(image);
     }
 
     private void LibraryShow_Click(object sender, RoutedEventArgs e)
