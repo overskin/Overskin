@@ -2,6 +2,13 @@
 
 ## 3.3.0
 
+### New
+
+- **Overskin on the Microsoft Store**: a Store version alongside the GitHub installer, with the
+  same features. It's signed by Microsoft (no SmartScreen warning), updated by the Store, and
+  makes no network requests. Start with Windows uses the Store's startup task, listed in Task
+  Manager → Startup apps. The Store and GitHub copies keep separate settings.
+
 ### Changed
 
 - **Trace has moved to its own project.** The Trace tab (turning a picture into mouse strokes

@@ -20,10 +20,10 @@
 
 </div>
 
-Capture any area, window or scrolling page; record MP4 videos with auto-zoom and a smooth,
-motion-blurred cursor, or GIFs; mark it up, fix a typo in the screenshot itself, hide private
-details, beautify it and drag it straight into any app. Plus pins: float any picture or window
-on top of your screen, fade it and use it as tracing paper.
+Record videos that zoom in on every click with a smooth, motion-blurred cursor. Fix a typo
+inside a screenshot, in the picture's own font. Hide emails, card numbers and keys
+automatically before you share. Around that: capture any area, window or scrolling page, GIFs,
+a full editor, and pins that float any picture or window on top of your screen.
 
 One installer, no administrator rights, no account, and nothing leaves your PC.
 
@@ -31,12 +31,11 @@ One installer, no administrator rights, no account, and nothing leaves your PC.
 
 | | |
 | --- | --- |
-| **Auto-zoom videos** | MP4 recordings glide in on every click and follow the pointer, with sound, your webcam in a corner, and an optional backdrop. |
-| **Smooth cursor** | The pointer in your videos glides with no lag, lands exactly on each click and gets motion blur, like a professionally edited demo. |
-| **Edit text in screenshots** | Select, delete or type words inside any screenshot. New letters come out in the picture's own font, size and colour. |
+| **Auto-zoom videos with a smooth cursor** | MP4 recordings glide in on every click and follow the pointer. The cursor glides with no lag, lands exactly on each click and gets motion blur, like a professionally edited demo. With sound, your webcam in a corner, and an optional backdrop. |
+| **Edit text inside screenshots** | Select, delete or type words inside any screenshot. New letters come out in the picture's own font, size and colour. |
+| **Auto-hide private details** | Finds and blurs emails, card numbers, addresses, IPs and keys before you share, in one click or automatically on every capture. |
 | **Move things in screenshots** | Lift a word, an icon or a picture off and drag it anywhere; the gap fills in. Swap a picture for another. |
 | **Live text** | Copy the words in any screenshot, and search your whole library by them. Offline. |
-| **Auto-hide** | Finds and blurs emails, card numbers, addresses, IPs and keys before you share. |
 | **Smart erase** | Paint over text or an icon and it's filled in from what's around it. |
 | **Steps** | Click through a task and get a numbered how-to guide as a picture, web page, Markdown or PDF. |
 | **Scrolling capture** | Scrolls the window for you and stitches the whole page together. |
@@ -45,19 +44,27 @@ One installer, no administrator rights, no account, and nothing leaves your PC.
 
 ## Download
 
-Download **`OverskinSetup.exe`** from the [latest release](../../releases/latest) and run it.
+**From the Microsoft Store**: [Get it from Microsoft](TODO_STORE_LINK). Installs and updates
+through the Store, with no warning from Windows.
+
+**From GitHub**: download **`OverskinSetup.exe`** from the [latest release](../../releases/latest) and run it.
 It installs for your user only (no administrator rights) into
 `%LocalAppData%\Programs\Overskin`, with optional Start menu and desktop shortcuts and start
 with Windows. Remove it from Settings → Apps like any other app. Running a newer setup
 updates it in place and keeps your settings.
 
-**Updates** come to you: when a newer version is on GitHub, a banner under the tabs says so.
+**Updates** come to you: the Store keeps its copy up to date. In the GitHub copy, when a newer
+version is on GitHub, a banner under the tabs says so.
 *Download and install* fetches it, installs it in a few seconds and opens Overskin again, with
 your settings, pins and captures kept. Nothing installs until you click, and the check can be
 turned off in Settings → About.
 
-It needs Windows 10 1809 or later (64-bit). Windows SmartScreen may warn about an unsigned
-app the first time: choose **More info → Run anyway**.
+It needs Windows 10 1809 or later (64-bit). The GitHub installer isn't signed yet, so Windows
+SmartScreen may warn about it the first time: choose **More info → Run anyway**. The Store
+version is signed by Microsoft and doesn't get this warning.
+
+The Store and GitHub copies keep separate settings. Only one of them runs at a time, and
+captures from both go to the same `Pictures\Overskin` folder.
 
 ### Platforms
 
@@ -323,7 +330,11 @@ again (add `--remove-settings` to delete its settings too).
 Settings are saved in `%AppData%\Overskin\overskin.settings.json` (settings left next to the
 exe by older versions are moved there automatically). The search index, crash reports and
 pinned-picture cache are in `%LocalAppData%\Overskin`. Captures go to `Pictures\Overskin`
-unless you choose another folder.
+unless you choose another folder. The Store copy keeps its settings, index, crash reports and
+cache in its own private package storage instead (Windows redirects those folders for it).
+
+The Microsoft Store package is built with `./src/Store/build-store.ps1` (see the notes at the
+top of the script and of `src/Store/Package.appxmanifest`).
 
 ## Project layout
 
@@ -340,6 +351,7 @@ unless you choose another folder.
 | `src/Overskin/Themes/` | Control styles, palette and icons |
 | `src/Overskin/Assets/` | App icon and logo |
 | `src/Installer/` | `OverskinSetup.exe`: the per-user installer and uninstaller |
+| `src/Store/` | The Microsoft Store package: manifest, tile images and `build-store.ps1` |
 | `src/Shared/` | Code that doesn't depend on Windows, kept apart for the planned Linux and macOS versions |
 | `docs/screenshots/` | The pictures in this README |
 
@@ -356,8 +368,9 @@ unless you choose another folder.
 
 ## Privacy
 
-Overskin has no telemetry and never checks in with anything. Its only network connection is asking
-GitHub whether a newer release exists (turn it off in Settings → About). If it
+Overskin has no telemetry and never checks in with anything. The Microsoft Store version makes
+no network requests at all. The GitHub version's only network connection is asking GitHub
+whether a newer release exists (turn it off in Settings → About). If it
 crashes, a short report is saved to `%LocalAppData%\Overskin\logs` with the error and the
 Windows version only. Nothing is sent.
 
