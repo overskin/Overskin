@@ -94,6 +94,8 @@ public partial class MainWindow
         VidSmoothCursorSwitch.IsChecked = v.SmoothCursor;
         VidMotionBlur.Value = v.MotionBlur;
         VidKeysSwitch.IsChecked = v.ShowKeys;
+        VidPenFadeSwitch.IsChecked = v.PenFades;
+        VidPenLinger.Value = v.PenLinger;
         VidRingsSwitch.IsChecked = v.ClickRings;
         VideoZoomSwitch.IsChecked = v.AutoZoom;
         VidEditableZoomsSwitch.IsChecked = v.EditableZooms;
@@ -224,6 +226,8 @@ public partial class MainWindow
         VidZoomSpeedText.Text = $"{v.ZoomSpeed}";
         VidFollowText.Text = $"{v.FollowSmoothing}";
         VidHoldText.Text = $"{v.ZoomHold:0.#} s";
+        VidPenLingerText.Text = $"{v.PenLinger:0.#} s";
+        VidPenLinger.IsEnabled = v.PenFades;
         foreach (var c in new FrameworkElement[] { VidZoom, VidZoomSpeed, VidFollow, VidHold }) c.IsEnabled = v.AutoZoom;
         foreach (var c in new FrameworkElement[] { VidStyleWhite, VidStyleBlack, VidStyleSystem, VidPointerSize, VidSmoothing, VidSmoothCursorSwitch }) c.IsEnabled = v.Pointer;
         VidMotionBlur.IsEnabled = v.Pointer && v.SmoothCursor;
@@ -249,6 +253,8 @@ public partial class MainWindow
         v.SmoothCursor = VidSmoothCursorSwitch.IsChecked == true;
         v.MotionBlur = (int)VidMotionBlur.Value;
         v.ShowKeys = VidKeysSwitch.IsChecked == true;
+        v.PenFades = VidPenFadeSwitch.IsChecked == true;
+        v.PenLinger = VidPenLinger.Value;
         v.ClickRings = VidRingsSwitch.IsChecked == true;
         v.AutoZoom = VideoZoomSwitch.IsChecked == true;
         v.EditableZooms = VidEditableZoomsSwitch.IsChecked == true;

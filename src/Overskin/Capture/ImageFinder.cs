@@ -18,9 +18,10 @@ public readonly record struct FoundImage(Int32Rect Bounds, int Radius);
 public static class ImageFinder
 {
     private const int MinSide = 36;     // smaller than this isn't worth snapping to
-    private const int MaxRadius = 40;   // the roundest corner recognised
+    private const int MaxRadius = 64;   // the roundest corner recognised
     private const int FlatTolerance = 3;
-    private const int EdgeContrast = 14;
+    private const int GrainTolerance = 7; // an acrylic or noisy background still counts as one colour
+    private const int EdgeContrast = 8;
 
     private readonly record struct Seg(int Pos, int A, int B)
     {
@@ -31,6 +32,9 @@ public static class ImageFinder
     public static List<FoundImage> Find(byte[] px, int w, int h, CancellationToken ct = default)
     {
         var found = new List<FoundImage>();
+#if DEBUG
+        LastPlain.Clear();
+#endif
         if (w < MinSide + 2 || h < MinSide + 2) return found;
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -51,40 +55,80 @@ public static class ImageFinder
         });
         ct.ThrowIfCancellationRequested();
 
-        // bottoms by where they start, to pair with tops quickly
+        // bottoms by where they start and end, to pair with tops quickly
         var bottomsByStart = new Dictionary<int, List<Seg>>();
+        var bottomsByEnd = new Dictionary<int, List<Seg>>();
         for (int y = 1; y < h - 1; y++)
             foreach (var s in bottoms[y])
             {
-                if (!bottomsByStart.TryGetValue(s.A, out var list)) bottomsByStart[s.A] = list = new();
-                list.Add(s);
+                if (!bottomsByStart.TryGetValue(s.A, out var l1)) bottomsByStart[s.A] = l1 = new();
+                l1.Add(s);
+                if (!bottomsByEnd.TryGetValue(s.B, out var l2)) bottomsByEnd[s.B] = l2 = new();
+                l2.Add(s);
             }
 
+        var plain = new List<(Int32Rect Bounds, int Radius)>(); // rectangles that looked like panels, not pictures
+        var candidates = new List<Seg>();
+        var seen = new HashSet<long>();
         for (int y = 1; y < h - 1; y++)
         {
             ct.ThrowIfCancellationRequested();
             foreach (var top in tops[y])
             {
-                // the nearest bottom below with the same ends (rounded corners shorten both the same)
-                Seg? bottom = null;
-                for (int a = top.A - 2; a <= top.A + 2; a++)
+                // bottoms below that line up with it; each corner may be rounded differently (or be
+                // hidden under something), so the ends may differ by up to a corner's size
+                candidates.Clear();
+                seen.Clear();
+                int reach = MaxRadius + 4;
+                void Take(Dictionary<int, List<Seg>> index, int around)
                 {
-                    if (!bottomsByStart.TryGetValue(a, out var list)) continue;
-                    foreach (var b in list)
-                        if (b.Pos >= top.Pos + MinSide - 1 && Math.Abs(b.B - top.B) <= 2 && (bottom == null || b.Pos < bottom.Value.Pos)
-                            && Sides(lefts, rights, top, b, w) != null)
-                            bottom = b;
+                    for (int k = around - reach; k <= around + reach; k++)
+                    {
+                        if (!index.TryGetValue(k, out var list)) continue;
+                        foreach (var c in list)
+                            if (c.Pos >= top.Pos + MinSide - 1 && seen.Add(((long)c.Pos << 32) | (uint)c.A)) candidates.Add(c);
+                    }
                 }
-                if (bottom is not { } bot) continue;
-                if (Sides(lefts, rights, top, bot, w) is not { } sides) continue;
-                var bounds = new Int32Rect(sides.Left, top.Pos, sides.Right - sides.Left + 1, bot.Pos - top.Pos + 1);
-                if (bounds.Width < MinSide || bounds.Height < MinSide) continue;
-                bounds = TakeSoftEdges(px, w, h, bounds, sides.Radius);
-                if (!LooksLikeAPicture(px, w, bounds, sides.Radius)) continue;
-                if (found.Any(f => Same(f.Bounds, bounds))) continue;
-                found.Add(new FoundImage(bounds, sides.Radius));
+                Take(bottomsByStart, top.A);
+                Take(bottomsByEnd, top.B);
+                candidates.Sort((p, q) => p.Pos.CompareTo(q.Pos));
+                foreach (var bot in candidates)
+                {
+                    // the two line up: either covers most of the other (both may be in pieces)
+                    if (Cover(bottoms[bot.Pos], top.A, top.B).Share < 0.6 && Cover(tops[top.Pos], bot.A, bot.B).Share < 0.6) continue;
+                    if (Rect(px, tops, bottoms, lefts, rights, top, bot, w) is not { } rect) continue;
+                    var bounds = TakeSoftEdges(px, w, h, rect.Bounds, rect.Radius);
+                    if (bounds.Width < MinSide || bounds.Height < MinSide) break;
+                    if (found.Any(f => Same(f.Bounds, bounds)) || plain.Any(f => Same(f.Bounds, bounds))) break;
+                    if (LooksLikeAPicture(px, w, bounds, rect.Radius)) found.Add(new FoundImage(bounds, rect.Radius));
+                    else plain.Add((bounds, rect.Radius));
+#if DEBUG
+                    if (!LooksLikeAPicture(px, w, bounds, rect.Radius)) LastPlain.Add(bounds);
+#endif
+                    break; // the nearest bottom that closes a rectangle is this top's
+                }
             }
         }
+        // a plain-looking rectangle can still be a picture of something: a screenshot of a web page
+        // with a photo on it, or of an app, posted in a chat. It holds a sizeable picture, or several
+        // panels of its own and is a different colour from everything round it (a card on a page is
+        // nearly the page's colour)
+        var all = found.Select(f => f.Bounds).Concat(plain.Select(p => p.Bounds)).ToList();
+        foreach (var (bounds, radius) in plain)
+        {
+            if (found.Any(f => Same(f.Bounds, bounds))) continue;
+            long area = (long)bounds.Width * bounds.Height;
+            bool holdsPicture = found.Any(f => Inside(f.Bounds, bounds, 6) && (long)f.Bounds.Width * f.Bounds.Height >= area * 0.12);
+            // most of it is a picture, with a bar along one edge (a title bar, a caption strip)
+            bool barAndPicture = found.Any(f => Inside(f.Bounds, bounds, -3) && SharedSides(f.Bounds, bounds) >= 3
+                                                && (long)f.Bounds.Width * f.Bounds.Height >= area * 0.6);
+            bool screenshot = bounds.Width >= 160 && bounds.Height >= 100
+                              && all.Count(r => Inside(r, bounds, 4) && !Same(r, bounds)) >= 3
+                              && ToneGap(px, w, h, bounds) >= 20;
+            if (holdsPicture || barAndPicture || screenshot) found.Add(new FoundImage(bounds, radius));
+        }
+        found.RemoveAll(r => found.Any(o => !o.Equals(r) && Inside(r.Bounds, o.Bounds, -3) && SharedSides(r.Bounds, o.Bounds) >= 3
+                                            && (long)o.Bounds.Width * o.Bounds.Height < (long)r.Bounds.Width * r.Bounds.Height * 1.5));
         EdgeMs = sw.ElapsedMilliseconds;
         FindRound(px, w, h, found, ct);
         RoundMs = sw.ElapsedMilliseconds - EdgeMs;
@@ -102,6 +146,9 @@ public static class ImageFinder
 
     /// <summary>For the self-test: how long the last search's two halves took.</summary>
     internal static long EdgeMs, RoundMs;
+#if DEBUG
+    internal static readonly List<Int32Rect> LastPlain = new();
+#endif
 
     private static int Diff(byte[] px, int a, int b) =>
         Math.Max(Math.Abs(px[a] - px[b]), Math.Max(Math.Abs(px[a + 1] - px[b + 1]), Math.Abs(px[a + 2] - px[b + 2])));
@@ -236,50 +283,168 @@ public static class ImageFinder
     }
 
 
-    /// <summary>
-    /// The left and right edges that close a top and bottom into a rectangle: just outside their
-    /// ends by the corner radius, and starting and ending that same radius in from the top and
-    /// bottom, so the corners are round (or square, radius 0) and alike.
-    /// </summary>
-    private static (int Left, int Right, int Radius)? Sides(List<Seg>[] lefts, List<Seg>[] rights, Seg top, Seg bottom, int w)
+    /// <summary>How much of [from, to] the edges on one line cover (0 to 1), and where they start and end.</summary>
+    private static (double Share, int First, int Last) Cover(List<Seg>? line, int from, int to)
     {
-        int height = bottom.Pos - top.Pos + 1;
-        int? Find(List<Seg>[] columns, int from, int step, out int radius)
+        if (line == null || to < from) return (0, int.MaxValue, int.MinValue);
+        int covered = 0, first = int.MaxValue, last = int.MinValue;
+        foreach (var s in line)
         {
-            radius = -1;
-            for (int r = 0; r <= MaxRadius; r++)
-            {
-                int x = from + step * r;
-                if (x <= 0 || x >= w - 1 || columns[x] == null) break;
-                // starts about r down from the top and ends about r up from the bottom; it may be in
-                // pieces where something sits right beside the picture, but they cover most of it
-                int slack = 2 + r / 3, from0 = top.Pos + r, to0 = bottom.Pos - r;
-                int first = int.MaxValue, last = int.MinValue, covered = 0;
-                foreach (var s in columns[x])
-                {
-                    if (s.B < from0 - slack || s.A > to0 + slack) continue;
-                    // a piece running on past the corner is something beside the picture lining up with it
-                    first = Math.Min(first, Math.Max(s.A, from0));
-                    last = Math.Max(last, Math.Min(s.B, to0));
-                    covered += Math.Min(s.B, to0) - Math.Max(s.A, from0) + 1;
-                }
-                if (first != int.MaxValue && Math.Abs(first - from0) <= slack && Math.Abs(last - to0) <= slack && covered >= (to0 - from0 + 1) * 0.6)
-                {
-                    radius = r;
-                    return x;
-                }
-            }
-            return null;
+            int a = Math.Max(s.A, from), b = Math.Min(s.B, to);
+            if (b < a) continue;
+            covered += b - a + 1;
+            first = Math.Min(first, a);
+            last = Math.Max(last, b);
         }
-        if (Find(lefts, top.A, -1, out int rl) is not { } left) return null;
-        if (Find(rights, top.B, 1, out int rr) is not { } right) return null;
-        if (Math.Abs(rl - rr) > 2 + Math.Max(rl, rr) / 4) return null;
-        // the straight edges start where a round corner first covers a pixel enough to show,
-        // about sqrt(R) short of the true radius R
-        int seen = Math.Max(rl, rr);
-        int radius = seen == 0 ? 0 : (int)Math.Round(Math.Pow((1 + Math.Sqrt(1 + 4.0 * seen)) / 2, 2) + 1);
-        return (left, right, radius);
+        return (covered / (double)(to - from + 1), first, last);
     }
+
+    /// <summary>
+    /// The rectangle a top and a bottom edge make with the best left and right edges near their
+    /// ends. Each side has to show for a good part of its length, but a corner may be rounded
+    /// differently from the others, or hidden under something (a toolbar, a badge) that sticks out.
+    /// </summary>
+    private static (Int32Rect Bounds, int Radius)? Rect(byte[] px, List<Seg>[] tops, List<Seg>[] bottoms, List<Seg>[] lefts, List<Seg>[] rights, Seg top, Seg bot, int w)
+    {
+        int y0 = top.Pos, y1 = bot.Pos;
+        int innerL = Math.Min(top.A, bot.A), innerR = Math.Max(top.B, bot.B);
+
+        (int X, double Share) Best(List<Seg>[] columns, int from, int inner, int step)
+        {
+            // the nearest edge out from the corners that covers most of the side (then the best of
+            // the next few, for a border drawn as two lines); not something further out that lines up
+            int bestX = -1, stopK = int.MaxValue;
+            double best = 0;
+            int startK = -Math.Abs(inner - from) - 2;
+            for (int k = startK; k <= MaxRadius + 2 && k <= stopK; k++)
+            {
+                int x = from + step * k;
+                if (x <= 0 || x >= w - 1) continue;
+                double share = Cover(columns[x], y0, y1).Share;
+                if (share > best + 0.02) { best = share; bestX = x; }
+                if (best >= 0.6 && stopK == int.MaxValue) stopK = k + 3;
+            }
+            return (bestX, best);
+        }
+        // from where the later-starting edge starts out past the earlier one: a header's edge may run
+        // the whole width above a picture that starts further in
+        var (xl, sl) = Best(lefts, innerL, Math.Max(top.A, bot.A), -1);
+        var (xr, sr) = Best(rights, innerR, Math.Min(top.B, bot.B), 1);
+        if (xl < 0 || xr < 0 || xr - xl + 1 < MinSide) return null;
+        var ct = Cover(tops[y0], xl, xr);
+        var cb = Cover(bottoms[y1], xl, xr);
+        var cl = Cover(lefts[xl], y0, y1);
+        var cr = Cover(rights[xr], y0, y1);
+        double[] shares = { ct.Share, cb.Share, sl, sr };
+        if (shares.Min() < 0.4 || shares.Sum() < 2.7) return null;
+
+        // a side that runs on well past a corner belongs to something bigger; then this corner is
+        // only real if the other edge comes right up to that side (a picture flush in a card's corner)
+        var rl = Reach(lefts[xl], y0, y1);
+        var rr = Reach(rights[xr], y0, y1);
+        const int runOn = 4;
+        bool Open(int sideRunsOn, int gapToSide) => sideRunsOn > runOn && gapToSide > 3;
+        if (Open(y0 - rl.First, ct.First - xl) || Open(y0 - rr.First, xr - ct.Last) ||
+            Open(rl.Last - y1, cb.First - xl) || Open(rr.Last - y1, xr - cb.Last)) return null;
+        // and the same the other way: a top or bottom running on past a side that stops short of it
+        var rt = Reach(tops[y0], xl, xr);
+        var rb = Reach(bottoms[y1], xl, xr);
+        if (Open(xl - rt.First, cl.First - y0) || Open(rt.Last - xr, cr.First - y0) ||
+            Open(xl - rb.First, y1 - cl.Last) || Open(rb.Last - xr, y1 - cr.Last)) return null;
+
+        // sides running on past a top or bottom that is one flat colour along its inside: that's a
+        // band inside something bigger (a caption strip, the page under a browser bar), not an edge
+        int m = Math.Min((xr - xl) / 4, MaxRadius / 2 + 2);
+        if ((y0 - rl.First > runOn || y0 - rr.First > runOn) && FlatAlong(px, w, y0 + 2, xl + m, xr - m)) return null;
+        if ((rl.Last - y1 > runOn || rr.Last - y1 > runOn) && FlatAlong(px, w, y1 - 2, xl + m, xr - m)) return null;
+
+        // each corner's roundness, from how far in its two edges start; a corner whose two edges
+        // disagree is hidden under something, and doesn't count
+        var radii = new List<int>();
+        void Corner(int alongX, int alongY)
+        {
+            if (alongX < 0 || alongY < 0) return;
+            if (Math.Abs(alongX - alongY) > 2 + Math.Max(alongX, alongY) / 3) return;
+            int seen = Math.Max(alongX, alongY);
+            radii.Add(seen == 0 ? 0 : (int)Math.Round(Math.Pow((1 + Math.Sqrt(1 + 4.0 * seen)) / 2, 2) + 1));
+        }
+        Corner(ct.First - xl, cl.First - y0);
+        Corner(xr - ct.Last, cr.First - y0);
+        Corner(cb.First - xl, y1 - cl.Last);
+        Corner(xr - cb.Last, y1 - cr.Last);
+        if (radii.Count < 2) return null;
+        // the least round corner: a mask that size never cuts into the picture
+        return (new Int32Rect(xl, y0, xr - xl + 1, y1 - y0 + 1), radii.Min());
+    }
+
+    /// <summary>Where the edges on a line that touch [from, to] really start and end, beyond it too.</summary>
+    private static (int First, int Last) Reach(List<Seg>? line, int from, int to)
+    {
+        int first = from, last = to;
+        if (line == null) return (first, last);
+        foreach (var s in line)
+        {
+            if (s.B < from || s.A > to) continue;
+            first = Math.Min(first, s.A);
+            last = Math.Max(last, s.B);
+        }
+        return (first, last);
+    }
+
+    private static int SharedSides(Int32Rect a, Int32Rect b)
+    {
+        int n = 0;
+        if (Math.Abs(a.X - b.X) <= 3) n++;
+        if (Math.Abs(a.Y - b.Y) <= 3) n++;
+        if (Math.Abs(a.X + a.Width - b.X - b.Width) <= 3) n++;
+        if (Math.Abs(a.Y + a.Height - b.Y - b.Height) <= 3) n++;
+        return n;
+    }
+
+    /// <summary>Whether a row is (nearly) one colour from x0 to x1.</summary>
+    private static bool FlatAlong(byte[] px, int w, int y, int x0, int x1)
+    {
+        if (x1 - x0 < 8) return false;
+        var counts = new Dictionary<int, int>();
+        for (int x = x0; x <= x1; x++)
+        {
+            int i = (y * w + x) * 4;
+            int key = (px[i] >> 4) | (px[i + 1] >> 4 << 4) | (px[i + 2] >> 4 << 8);
+            counts[key] = counts.GetValueOrDefault(key) + 1;
+        }
+        return counts.Values.Max() >= (x1 - x0 + 1) * 0.9;
+    }
+
+    /// <summary>
+    /// How far apart the commonest colour just inside a rectangle and the commonest colour just
+    /// outside it are.
+    /// </summary>
+    private static int ToneGap(byte[] px, int w, int h, Int32Rect r)
+    {
+        int Commonest(int inset)
+        {
+            var counts = new Dictionary<int, int>();
+            void Add(int x, int y)
+            {
+                if (x < 0 || y < 0 || x >= w || y >= h) return;
+                int i = (y * w + x) * 4;
+                int key = (px[i] >> 3) | (px[i + 1] >> 3 << 5) | (px[i + 2] >> 3 << 10);
+                counts[key] = counts.GetValueOrDefault(key) + 1;
+            }
+            int x0 = r.X + inset, y0 = r.Y + inset, x1 = r.X + r.Width - 1 - inset, y1 = r.Y + r.Height - 1 - inset;
+            for (int x = x0; x <= x1; x += 2) { Add(x, y0); Add(x, y1); }
+            for (int y = y0; y <= y1; y += 2) { Add(x0, y); Add(x1, y); }
+            return counts.Count == 0 ? -1 : counts.MaxBy(kv => kv.Value).Key;
+        }
+        int a = Commonest(12), b = Commonest(-4);
+        if (a < 0 || b < 0) return 0;
+        int Ch(int key, int shift) => ((key >> shift) & 31) << 3;
+        return Math.Max(Math.Abs(Ch(a, 0) - Ch(b, 0)), Math.Max(Math.Abs(Ch(a, 5) - Ch(b, 5)), Math.Abs(Ch(a, 10) - Ch(b, 10))));
+    }
+
+    private static bool Inside(Int32Rect inner, Int32Rect outer, int margin) =>
+        inner.X >= outer.X + margin && inner.Y >= outer.Y + margin &&
+        inner.X + inner.Width <= outer.X + outer.Width - margin && inner.Y + inner.Height <= outer.Y + outer.Height - margin;
 
     /// <summary>
     /// The edges along one row (or column) <paramref name="line"/>, with the flat background on
@@ -295,10 +460,10 @@ public static class ImageFinder
         bool canSkip = further >= 0 && further < limit;
         int Index(int along, int across) => horizontal ? (across * w + along) * 4 : (along * w + across) * 4;
         bool Flat(int o, int p) =>
-            Math.Abs(px[o] - px[p]) <= FlatTolerance && Math.Abs(px[o + 1] - px[p + 1]) <= FlatTolerance && Math.Abs(px[o + 2] - px[p + 2]) <= FlatTolerance;
+            Math.Abs(px[o] - px[p]) <= GrainTolerance && Math.Abs(px[o + 1] - px[p + 1]) <= GrainTolerance && Math.Abs(px[o + 2] - px[p + 2]) <= GrainTolerance;
         int Diff(int a, int b) => Math.Max(Math.Abs(px[a] - px[b]), Math.Max(Math.Abs(px[a + 1] - px[b + 1]), Math.Abs(px[a + 2] - px[b + 2])));
 
-        int start = -1, lastHit = -1, hits = 0, gap = 0, rb = 0, rg = 0, rr = 0;
+        int start = -1, lastHit = -1, hits = 0, gap = 0, same = 0, rb = 0, rg = 0, rr = 0;
         void Close()
         {
             int length = lastHit - start + 1;
@@ -307,6 +472,7 @@ public static class ImageFinder
             start = -1;
             hits = 0;
             gap = 0;
+            same = 0;
         }
         for (int i = 1; i < n - 1; i++)
         {
@@ -338,9 +504,11 @@ public static class ImageFinder
                 lastHit = i;
                 hits++;
                 gap = 0;
+                same = 0;
             }
-            else if (start >= 0 && ++gap > 40)
+            else if (start >= 0 && (++gap > 40 || (Diff(s, o) <= GrainTolerance && ++same >= 3)))
             {
+                // a gap, or a stretch where the line is the background itself: nothing is there
                 Close();
             }
         }

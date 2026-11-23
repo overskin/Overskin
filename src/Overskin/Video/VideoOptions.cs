@@ -24,6 +24,11 @@ public sealed class VideoOptions
     /// <summary>Show keyboard shortcuts (never ordinary typing) as a label near the bottom.</summary>
     public bool ShowKeys { get; set; }
 
+    /// <summary>Marks drawn on the screen while recording fade away on their own.</summary>
+    public bool PenFades { get; set; } = true;
+    /// <summary>Seconds a mark stays before it fades.</summary>
+    public double PenLinger { get; set; } = 3;
+
     /// <summary>A Beautify backdrop name to put the recording on, or "None".</summary>
     public string Backdrop { get; set; } = "None";
 
@@ -76,6 +81,7 @@ public sealed class VideoOptions
         ZoomSpeed = Math.Clamp(ZoomSpeed, 0, 100);
         FollowSmoothing = Math.Clamp(FollowSmoothing, 0, 100);
         ZoomHold = Math.Clamp(ZoomHold, 0.5, 8);
+        PenLinger = Math.Clamp(PenLinger <= 0 ? 3 : PenLinger, 0.5, 15);
     }
 
     public VideoOptions With(bool autoZoom)

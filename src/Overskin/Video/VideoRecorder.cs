@@ -83,7 +83,7 @@ public sealed class VideoRecorder : IRecorder
         _frame = new RecordFrameWindow(area);
         _frame.Show();
         // the drawing sheet sits over the area (and is recorded); the bar stays above it
-        _pen = new ScreenPen(area); // shown when it's first turned on
+        _pen = new ScreenPen(area) { AutoFade = options.PenFades, Linger = options.PenLinger }; // shown when it's first turned on
         _bar = new RecordBarWindow(this, area);
         _bar.Show();
         _pen.Touched += () => { _bar?.RaiseAbove(); _bar?.Refresh(); };

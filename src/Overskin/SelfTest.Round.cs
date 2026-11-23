@@ -230,6 +230,19 @@ public partial class App
             pen.Close();
             log.Add($"screen pen: drawing flag on={on} off after={off} marks {marks} then {after} after fading (expect True True 2 then 0)");
 
+            // with fading turned off, marks stay while drawing, and go once the pen is turned off
+            var keep = new ScreenPen(area) { Linger = 0.3, AutoFade = false };
+            keep.Show();
+            keep.SetOn(true);
+            keep.DrawForTest(new Point(20, 20), new Point(200, 120));
+            Pump(1400);
+            int stayed = keep.Marks;
+            keep.SetOn(false);
+            Pump(1200);
+            int gone = keep.Marks;
+            keep.Close();
+            log.Add($"screen pen without fading: {stayed} mark after 1.4 s, {gone} after turning the pen off (expect 1 then 0)");
+
             // the recording bar with pause and the pen
             var recorder = new VideoRecorder(Current.Dispatcher);
             var bar = new RecordBarWindow(recorder, new Int32Rect(-4000, -4000, 600, 400)) { Left = -10000, Top = -10000 };

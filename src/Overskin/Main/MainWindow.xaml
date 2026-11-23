@@ -904,6 +904,19 @@
                                         <TextBlock Text="Show keyboard shortcuts" Style="{StaticResource Label}" />
                                         <ToggleButton x:Name="VidKeysSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
                                     </Grid>
+                                    <Grid Height="31" ToolTip="What you draw on the screen while recording (the draw hotkey) fades away by itself. Turned off, it stays until you stop drawing.">
+                                        <TextBlock Text="Drawings fade away" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="VidPenFadeSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="How long each drawing stays before it fades">
+                                        <TextBlock Text="Fade after" Style="{StaticResource Label}" />
+                                        <Grid HorizontalAlignment="Right" Width="230">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="46" /></Grid.ColumnDefinitions>
+                                            <Slider x:Name="VidPenLinger" Minimum="0.5" Maximum="15" SmallChange="0.5" LargeChange="1" TickFrequency="0.5"
+                                                    IsSnapToTickEnabled="True" ValueChanged="VideoSetting_Changed" />
+                                            <TextBlock x:Name="VidPenLingerText" Grid.Column="1" Style="{StaticResource Value}" />
+                                        </Grid>
+                                    </Grid>
                                 </StackPanel>
                             </Border>
                             <Border x:Name="CardSound" Style="{StaticResource Card}">

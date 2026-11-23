@@ -37,6 +37,11 @@ internal sealed class ScreenPen : Window
     public Color Colour => Colours[ColourIndex % Colours.Length];
     /// <summary>Seconds a mark stays before it fades.</summary>
     public double Linger { get; set; } = 3;
+    /// <summary>
+    /// Marks fade away on their own after <see cref="Linger"/>. When off they stay until the pen
+    /// is turned off, and then all go together.
+    /// </summary>
+    public bool AutoFade { get; set; } = true;
     public bool On { get; private set; }
     /// <summary>Raised when the pen is turned on or off and when a mark starts or ends, so the recording bar can stay on top.</summary>
     public event Action? Touched;
@@ -83,7 +88,11 @@ internal sealed class ScreenPen : Window
         // a near-invisible fill takes the mouse; fully clear lets it through
         _sheet.Background = on ? new SolidColorBrush(Color.FromArgb(1, 0, 0, 0)) : Brushes.Transparent;
         SetClickThrough(!on);
-        if (!on) Finish();
+        if (!on)
+        {
+            Finish();
+            if (!AutoFade) FadeAll();
+        }
         HideWhenClear();
         Touched?.Invoke();
     }
@@ -191,10 +200,21 @@ internal sealed class ScreenPen : Window
     {
         var done = _current;
         _current = null;
-        if (done == null) return;
-        var fade = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(600)) { BeginTime = TimeSpan.FromSeconds(Linger) };
-        fade.Completed += (_, _) => { _sheet.Children.Remove(done); HideWhenClear(); };
-        done.BeginAnimation(OpacityProperty, fade);
+        if (done == null || !AutoFade) return;
+        FadeOut(done, TimeSpan.FromSeconds(Linger));
+    }
+
+    private void FadeOut(UIElement mark, TimeSpan after)
+    {
+        var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(600)) { BeginTime = after };
+        fade.Completed += (_, _) => { _sheet.Children.Remove(mark); HideWhenClear(); };
+        mark.BeginAnimation(OpacityProperty, fade);
+    }
+
+    /// <summary>Marks kept on screen (fading turned off) all go once drawing is turned off.</summary>
+    private void FadeAll()
+    {
+        foreach (UIElement mark in _sheet.Children.Cast<UIElement>().ToList()) FadeOut(mark, TimeSpan.Zero);
     }
 
     /// <summary>Off and with nothing left fading: off the screen altogether.</summary>

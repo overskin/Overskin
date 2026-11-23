@@ -101,6 +101,7 @@ public partial class App : Application
             if (e.Args.Contains("--windows")) { try { WindowList(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else if (e.Args.Contains("--round")) { try { RoundTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else if (e.Args.Contains("--speed")) { try { SpeedTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
+            else if (e.Args.Contains("--pictures")) { try { PictureTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else if (e.Args.Contains("--pass")) { try { PassTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else try { MoreFeatureTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); }
             System.IO.File.WriteAllLines(e.Args[1], quick);
