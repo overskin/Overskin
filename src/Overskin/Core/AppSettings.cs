@@ -190,6 +190,16 @@ public sealed class AppSettings
         return new AppSettings();
     }
 
+#if DEBUG
+    /// <summary>For the self-test: reads settings text the way Load does.</summary>
+    internal static AppSettings? FromJsonForTest(string json)
+    {
+        var loaded = JsonSerializer.Deserialize<AppSettings>(json);
+        loaded?.Sanitize();
+        return loaded;
+    }
+#endif
+
     public void Save()
     {
         string json = JsonSerializer.Serialize(this, JsonOptions);

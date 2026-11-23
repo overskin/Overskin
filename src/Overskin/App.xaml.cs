@@ -839,6 +839,27 @@ public partial class App : Application
             Pump(100);
             }
 
+            // ---- a 3.2.1 settings file, Trace keys and all, still loads and keeps everything else ----
+            try
+            {
+                const string old = """
+                {
+                  "HotkeyRegion": "Ctrl+Alt+Q", "HotkeyAbort": "Ctrl+Alt+X", "HotkeyDraw": "Ctrl+Alt+D",
+                  "LastTab": 4, "AccentColor": "#48C288",
+                  "TraceMode": "Gartic", "Threshold": 140, "Invert": true, "Blur": 2, "ScalePercent": 80,
+                  "MinPathLength": 6, "Tolerance": 1.5, "FillSpacing": 5, "HatchAngle": 45, "Crosshatch": true,
+                  "ShadeLevels": 4, "OutlineToo": false,
+                  "Palette": [ { "X": 10, "Y": 20, "Hex": "#FF0000", "Skip": false } ],
+                  "Gartic": { "Pen": { "X": 1, "Y": 2 }, "Sizes": [ 3, 7, 12 ], "Opacity": true },
+                  "DelayMs": 2, "PointsPerStep": 3, "CountdownSeconds": 5, "TraceSpeed": "Careful", "StopOnMouseMove": false
+                }
+                """;
+                var loaded = AppSettings.FromJsonForTest(old);
+                log.Add($"old settings with Trace keys: loaded={loaded != null} region={loaded?.HotkeyRegion} draw={loaded?.HotkeyDraw} " +
+                        $"accent={loaded?.AccentColor} tab={loaded?.LastTab} (expect True Ctrl+Alt+Q Ctrl+Alt+D #48C288 3)");
+            }
+            catch (Exception ex) { log.Add("old settings with Trace keys: FAILED " + ex.Message); }
+
             // ---- screenshots (none of these move the mouse) ----
             var swatchWin = new Window
             {

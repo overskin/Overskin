@@ -51,6 +51,10 @@ Copy-Item (Join-Path $here "Images") (Join-Path $layout "Images") -Recurse
 
 [xml] $manifest = Get-Content (Join-Path $here "Package.appxmanifest") -Raw
 $identity = $manifest.Package.Identity
+# the package version follows the app's <Version> in Overskin.csproj (3.3.0 → 3.3.0.0)
+[xml] $project = Get-Content (Join-Path $root "src/Overskin/Overskin.csproj") -Raw
+$appVersion = ($project.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ } | Select-Object -First 1)
+if ($appVersion) { $identity.Version = "$appVersion.0" }
 $version = $identity.Version
 if ($identity.Name -like "*TODO*" -or $identity.Publisher -like "*TODO*") {
     # Package names can't contain "_", so the placeholders can't be packed as they are. Use a
