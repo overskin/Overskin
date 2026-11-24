@@ -12,7 +12,9 @@ namespace Overskin;
 
 /// <summary>
 /// The little card that slides in after a capture: a thumbnail and quick actions. It never
-/// takes focus, so it can pop up over a game without interrupting it.
+/// takes focus, so it can pop up over a game without interrupting it. Swipe the card (anywhere
+/// but the thumbnail, which drags the picture out into other apps) left to open the capture in
+/// the viewer, or right to send it away.
 /// </summary>
 public sealed class CaptureNotice : Window
 {
@@ -24,11 +26,20 @@ public sealed class CaptureNotice : Window
     private readonly ScaleTransform _grow = new(0.86, 0.86);
     private bool _closing;
 
+    // swiping: how far the card has to travel, or how fast it's flicked, to count
+    internal const double SwipeDistance = 80, FlickSpeed = 0.7; // units, units per millisecond
+    private readonly Action? _view;
+    private readonly TextBlock _caption;
+    private readonly string _captionText;
+    private double _home = double.NaN, _grabX;
+    private bool _swiping;
+    private (double X, int Time) _last, _prev;
+
     public static void ShowFor(BitmapSource image, string? path, string caption,
-        Action edit, Action pin, Action copy, Action? openFolder)
+        Action edit, Action pin, Action copy, Action? openFolder, Action? view = null)
     {
         _current?.FadeAway();
-        _current = new CaptureNotice(image, path, caption, edit, pin, copy, openFolder);
+        _current = new CaptureNotice(image, path, caption, edit, pin, copy, openFolder, view);
         _current.Show();
     }
 
@@ -38,9 +49,14 @@ public sealed class CaptureNotice : Window
     internal static (double Scale, double Rise, double Opacity)? StateForTest =>
         _current is { } c ? (c._grow.ScaleX, c._slide.Y, c.Opacity) : null;
 
+    /// <summary>For the self-test: the shown card.</summary>
+    internal static CaptureNotice? CurrentForTest => _current;
+
     private CaptureNotice(BitmapSource image, string? path, string caption,
-        Action edit, Action pin, Action copy, Action? openFolder)
+        Action edit, Action pin, Action copy, Action? openFolder, Action? view)
     {
+        _view = view;
+        _captionText = caption;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -67,7 +83,11 @@ public sealed class CaptureNotice : Window
             Padding = new Thickness(4), MinHeight = 60, HorizontalAlignment = HorizontalAlignment.Stretch,
         };
 
-        var text = new TextBlock { Text = caption, Style = (Style)FindResource("Dim"), Margin = new Thickness(2, 9, 0, 8), FontSize = 11.5 };
+        var text = _caption = new TextBlock
+        {
+            Text = caption, Style = (Style)FindResource("Dim"), Margin = new Thickness(2, 9, 0, 8), FontSize = 11.5,
+            ToolTip = view != null ? "Swipe the card left to open it, or right to dismiss it" : "Swipe the card right to dismiss it",
+        };
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal };
         actions.Children.Add(Action("IcPencil", "Edit", edit));
@@ -113,9 +133,126 @@ public sealed class CaptureNotice : Window
         root.Children.Add(card);
         Content = root;
 
-        _timer.Tick += (_, _) => FadeAway();
+        // the card itself (not the thumbnail, which drags the picture out, or the buttons) swipes
+        card.MouseLeftButtonDown += (_, e) =>
+        {
+            if (_closing || IsInside(e.OriginalSource as DependencyObject, thumb)) return;
+            if (!card.CaptureMouse()) return;
+            e.Handled = true;
+            _grabX = e.GetPosition(this).X;
+            BeginSwipe(Environment.TickCount);
+        };
+        card.MouseMove += (_, e) =>
+        {
+            if (!_swiping || !card.IsMouseCaptured) return;
+            // the window moves with the pointer, so where the pointer is in it says how far to go
+            MoveSwipe(Left - _home + e.GetPosition(this).X - _grabX, Environment.TickCount);
+        };
+        card.MouseLeftButtonUp += (_, e) =>
+        {
+            if (!_swiping) return;
+            e.Handled = true;
+            card.ReleaseMouseCapture();
+        };
+        card.LostMouseCapture += (_, _) => { if (_swiping) EndSwipe(Environment.TickCount); };
+
+        _timer.Tick += (_, _) => { if (!_swiping) FadeAway(); };
         MouseEnter += (_, _) => _timer.Stop();
-        MouseLeave += (_, _) => { if (!_closing) _timer.Start(); };
+        MouseLeave += (_, _) => { if (!_closing && !_swiping) _timer.Start(); };
+    }
+
+    private static bool IsInside(DependencyObject? d, DependencyObject outer)
+    {
+        for (; d != null; d = d is Visual ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d))
+            if (ReferenceEquals(d, outer)) return true;
+        return false;
+    }
+
+    /// <summary>The card is picked up: it stops counting down and follows the pointer sideways.</summary>
+    internal void BeginSwipe(int time)
+    {
+        if (_closing) return;
+        _timer.Stop();
+        if (double.IsNaN(_home)) _home = Left;
+        // catch it mid-way if it's still springing back
+        double at = Left, seen = Opacity;
+        BeginAnimation(LeftProperty, null);
+        Left = at;
+        BeginAnimation(OpacityProperty, null);
+        Opacity = seen;
+        _swiping = true;
+        _last = _prev = (at - _home, time);
+    }
+
+    /// <summary>The card is <paramref name="dx"/> units from where it sat (left is negative).</summary>
+    internal void MoveSwipe(double dx, int time)
+    {
+        if (!_swiping) return;
+        // nothing to open: it leans left a little and no further
+        if (dx < 0 && _view == null) dx = -Math.Min(Math.Sqrt(-dx) * 3, 30);
+        Left = _home + dx;
+        // going right it fades as it goes; going left it stays solid, ready to open
+        Opacity = dx > 0 ? Math.Clamp(1 - dx / (ActualWidth * 0.9), 0.15, 1) : 1;
+        if (time != _last.Time) _prev = _last;
+        _last = (dx, time);
+        _caption.Text = Outcome(dx, 0) switch
+        {
+            1 => "Let go to dismiss",
+            -1 => "Let go to open in the viewer",
+            _ => _captionText,
+        };
+    }
+
+    /// <summary>What letting go here does: 1 dismisses, -1 opens the viewer, 0 puts the card back.</summary>
+    private int Outcome(double dx, double speed)
+    {
+        bool far = Math.Abs(dx) >= SwipeDistance;
+        bool flick = Math.Abs(dx) >= SwipeDistance * 0.3 && Math.Abs(speed) >= FlickSpeed && Math.Sign(speed) == Math.Sign(dx);
+        if (!far && !flick) return 0;
+        if (dx > 0) return 1;
+        return _view != null ? -1 : 0;
+    }
+
+    /// <summary>Let go: dismissed, opened, or back into its corner.</summary>
+    internal int EndSwipe(int time)
+    {
+        if (!_swiping) return 0;
+        _swiping = false;
+        double dx = Left - _home;
+        int dt = Math.Max(1, _last.Time - _prev.Time);
+        // only a movement just before letting go counts as a flick, not one before a pause
+        double speed = time - _last.Time > 80 ? 0 : (_last.X - _prev.X) / dt;
+        int outcome = Outcome(dx, speed);
+        _caption.Text = _captionText;
+        if (outcome == 1)
+        {
+            _closing = true;
+            var away = TimeSpan.FromMilliseconds(170);
+            var slide = new DoubleAnimation(_home + ActualWidth + 40, away) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
+            BeginAnimation(LeftProperty, slide);
+            var fade = new DoubleAnimation(0, away);
+            fade.Completed += (_, _) => Close();
+            BeginAnimation(OpacityProperty, fade);
+        }
+        else if (outcome == -1)
+        {
+            try { _view!(); } catch { }
+            FadeAway();
+        }
+        else
+        {
+            var back = new DoubleAnimation(_home, TimeSpan.FromMilliseconds(260)) { EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.3 } };
+            back.Completed += (_, _) =>
+            {
+                if (_swiping || _closing) return;
+                BeginAnimation(LeftProperty, null);
+                Left = _home;
+            };
+            BeginAnimation(LeftProperty, back);
+            BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(160)));
+            if (!IsMouseOver) _timer.Start();
+        }
+        return outcome;
     }
 
     private Button Action(string icon, string tip, Action act)
@@ -143,6 +280,7 @@ public sealed class CaptureNotice : Window
         var area = SystemParameters.WorkArea;
         Left = area.Right - ActualWidth - 4;
         Top = area.Bottom - ActualHeight - 4;
+        _home = Left;
 
         var settle = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.35 };
         var rise = TimeSpan.FromMilliseconds(340);

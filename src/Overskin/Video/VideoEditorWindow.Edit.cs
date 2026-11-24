@@ -185,7 +185,7 @@ public partial class VideoEditorWindow
     {
         string key = $"{o.Kind}|{o.Text}|{o.A}|{o.B}";
         if (_drawn.TryGetValue(o, out var d) && d.Key == key) return (d.Picture, d.At);
-        var (picture, at) = o.Render(Math.Max(2, Player.NaturalVideoHeight));
+        var (picture, at) = o.Render(Math.Max(2, Player.NaturalVideoHeight), Math.Max(2, Player.NaturalVideoWidth));
         _drawn[o] = (key, picture, at);
         return (picture, at);
     }
@@ -252,7 +252,7 @@ public partial class VideoEditorWindow
             return;
         }
         _grabbed = OverlayAt(p);
-        if (_grabbed != null) { _chosen = _grabbed; Play(false); RebuildOverlayList(); DrawOverlays(); }
+        if (_grabbed != null) { _chosen = _grabbed; Play(false); if (_grabbed.Kind != VideoOverlay.Kinds.Caption) RebuildOverlayList(); DrawOverlays(); }
     }
 
     private void Overlay_MouseMove(object sender, MouseEventArgs e)
@@ -266,8 +266,12 @@ public partial class VideoEditorWindow
         else
         {
             var d = p - _grabFrom;
-            _grabbed.A += d;
-            _grabbed.B += d;
+            if (_grabbed.Kind == VideoOverlay.Kinds.Caption) MoveCaptions(d);
+            else
+            {
+                _grabbed.A += d;
+                _grabbed.B += d;
+            }
             _grabFrom = p;
         }
         DrawOverlays();
@@ -311,7 +315,8 @@ public partial class VideoEditorWindow
     private void RebuildOverlayList()
     {
         OverlayList.Children.Clear();
-        foreach (var o in _overlays)
+        // subtitles have their own list
+        foreach (var o in _overlays.Where(o => o.Kind != VideoOverlay.Kinds.Caption))
         {
             var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
             row.ColumnDefinitions.Add(new ColumnDefinition());

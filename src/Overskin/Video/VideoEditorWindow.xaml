@@ -188,6 +188,27 @@
                                                Text="Cut parts show in red under the video and are skipped while it plays." />
                                 </StackPanel>
                             </Border>
+                            <Border x:Name="SubtitlesCard" Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcMic}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Subtitles" Style="{StaticResource Heading}" />
+                                        <TextBlock x:Name="SubtitlesText" Style="{StaticResource Dim}" Margin="8,0,0,0" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <WrapPanel>
+                                        <Button x:Name="SubtitlesButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,6" Click="MakeSubtitles_Click"
+                                                ToolTip="Listens to what's said in the video and writes it out as subtitles, on this PC" Content="Make subtitles" />
+                                        <Button x:Name="ClearSubtitlesButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,6" Click="ClearSubtitles_Click"
+                                                Content="Remove all" ToolTip="Takes every subtitle line off the video" Visibility="Collapsed" />
+                                    </WrapPanel>
+                                    <ScrollViewer x:Name="SubtitleScroll" MaxHeight="260" VerticalScrollBarVisibility="Auto" Visibility="Collapsed" Margin="0,2,0,0">
+                                        <StackPanel x:Name="SubtitleList" Margin="0,0,4,0" />
+                                    </ScrollViewer>
+                                    <TextBlock x:Name="SubtitlesNote" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,4,0,0"
+                                               Text="Works out the words and the language by itself, offline. Fix any word by typing over it; drag the subtitles on the video to move them all." />
+                                </StackPanel>
+                            </Border>
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">

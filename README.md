@@ -117,7 +117,8 @@ for private details), smart erase, crop, rotate, and Beautify.
 - **After capturing**, any mix of copy to the clipboard, save to a folder (PNG or JPG, with a
   quality slider and an optional size limit such as 8 MB),
   open in the viewer or the editor, pin it where it was, and a preview card with Edit, Pin,
-  Copy and Show in folder. Optionally with the mouse pointer drawn in.
+  Copy and Show in folder. Swipe the card left to open the capture in the viewer, or right to
+  dismiss it. Optionally with the mouse pointer drawn in.
 - **Viewer**: a quick, smooth look at what you captured. The arrow keys go through all your
   captures, the wheel zooms towards the mouse, drag to look around, double-click for actual
   size. A film strip shows them all, and the search box finds captures by the words in them.
@@ -168,6 +169,9 @@ Capture → **Recording** has the Video and GIF buttons and every video setting.
   addresses on the frame showing. The camera button **grabs a still** of the frame showing.
   **Crop** keeps just part of the picture: drag a box, move it, pull its edges, or hold it to
   16:9, 9:16 (for TikTok, Shorts and Reels), 1:1 or 4:3.
+  **Subtitles**: *Make subtitles* writes out what's said, timed to the voice, in any of about
+  100 languages, offline. Fix words by typing over them; drag them on the video to move them.
+  They're saved into the video, with an `.srt` file beside it.
 - **Steps**: click through anything and get a numbered how-to guide: one screenshot per
   click, the click circled, and a sentence such as *Click the "Save" button in Notepad*.
   Reword or drop steps, then save it as one picture, an HTML page, Markdown or a PDF.
@@ -326,6 +330,10 @@ That writes `dist/OverskinSetup.exe`, the installer with the app inside it (the 
 is built into `build/app` on the way). Open `Overskin.sln` to work on either in Visual Studio or
 Rider.
 
+The first build downloads the Whisper speech model for subtitles (57 MB, from the whisper.cpp
+project on Hugging Face) into `src/Overskin/Models`, checks it, and packs it into the app. It's
+kept out of git.
+
 `OverskinSetup.exe` also takes `--quiet` with `--dir PATH`, `--no-startmenu`, `--desktop`,
 `--startup` / `--no-startup` and `--launch`. `Uninstall.exe --uninstall --quiet` removes it
 again (add `--remove-settings` to delete its settings too).
@@ -373,7 +381,8 @@ top of the script and of `src/Store/Package.appxmanifest`).
 
 Overskin has no telemetry and never checks in with anything. The Microsoft Store version makes
 no network requests at all. The GitHub version's only network connection is asking GitHub
-whether a newer release exists (turn it off in Settings → About). If it
+whether a newer release exists (turn it off in Settings → About). Subtitles are made on your
+PC by a speech model that comes inside Overskin; your sound never leaves it. If it
 crashes, a short report is saved to `%LocalAppData%\Overskin\logs` with the error and the
 Windows version only. Nothing is sent.
 
@@ -385,6 +394,8 @@ Open an issue. For a crash, attach the newest file from Settings → About → C
 
 - Icons by [Lucide](https://lucide.dev), ISC License.
 - QR codes and barcodes read with [ZXing.Net](https://github.com/micjahn/ZXing.Net), Apache License 2.0.
+- Subtitles by OpenAI's [Whisper](https://github.com/openai/whisper) speech model, run with
+  [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and [Whisper.net](https://github.com/sandrohanea/whisper.net), MIT License.
 
 Full texts are in `THIRD-PARTY-NOTICES.md`.
 

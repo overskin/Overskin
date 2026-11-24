@@ -266,13 +266,21 @@ public partial class VideoEditorWindow : Window
             else
             {
                 // labels and arrows were placed on the whole frame: they move with the crop
-                var overlays = _overlays.Select(o => o.Clone()).ToList();
+                var overlays = _overlays.Select(o => o.Clone()).Where(o => o.Kind != VideoOverlay.Kinds.Caption || o.Text.Trim().Length > 0).ToList();
                 if (crop is { } c)
-                    foreach (var o in overlays) { o.A -= new Vector(c.X, c.Y); o.B -= new Vector(c.X, c.Y); }
+                    foreach (var o in overlays)
+                    {
+                        o.A -= new Vector(c.X, c.Y);
+                        o.B -= new Vector(c.X, c.Y);
+                        // subtitles stay in the middle of what's kept, and inside it
+                        if (o.Kind == VideoOverlay.Kinds.Caption)
+                            o.A = new Point(c.Width / 2.0, Math.Clamp(o.A.Y, c.Height * 0.2, c.Height * 0.97));
+                    }
                 await VideoEdit.RenderAsync(input, temp, VideoEdit.Keep(start, end, _cuts), overlays,
-                    Math.Max(2, Player.NaturalVideoHeight), progress, maxBytes);
+                    Math.Max(2, Player.NaturalVideoHeight), progress, maxBytes, crop?.Width ?? Math.Max(2, Player.NaturalVideoWidth));
             }
             File.Move(temp, output, overwrite: true);
+            if (Captions.Any()) SaveSrt(output, VideoEdit.Keep(start, end, _cuts));
             if (input != _path) try { File.Delete(input); } catch { }
             StatusText.Text = Path.GetFileName(output);
             _saved(output);

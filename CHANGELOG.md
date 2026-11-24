@@ -8,6 +8,16 @@
   same features. It's signed by Microsoft (no SmartScreen warning), updated by the Store, and
   makes no network requests. Start with Windows uses the Store's startup task, listed in Task
   Manager → Startup apps. The Store and GitHub copies keep separate settings.
+- **Subtitles, made for you**: *Make subtitles* in the video editor listens to what's said and
+  writes it out as timed subtitle lines, on your PC with nothing sent anywhere. It works out the
+  language by itself (about 100 of them). Each line lines up with the voice, so nothing shows
+  during pauses. Fix any word by typing over it, remove a line, or drag the subtitles on the
+  video to move them all. Saving puts them into the video, and also writes an `.srt` file beside
+  it for YouTube or VLC, with times that follow your trims and cuts. It uses OpenAI's Whisper
+  speech model, which comes inside Overskin (the installer is about 58 MB bigger for it).
+- **Swipe the preview card**: after a capture, drag the card left to open the capture in the
+  viewer, or right to send it away, like Windows' notifications. Let go early and it springs
+  back. The thumbnail still drags the picture out into other apps.
 - **Choose how drawings fade while recording**: *Drawings fade away* turns fading on or off,
   and *Fade after* sets how long each stays (half a second to 15 seconds). With fading off,
   what you draw stays until you stop drawing, then fades all together.

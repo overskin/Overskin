@@ -48,7 +48,34 @@
     <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
   </ItemGroup>
 
+  <!--
+    Subtitles: the Whisper speech model (OpenAI Whisper "base", quantised for whisper.cpp, MIT)
+    goes inside Overskin.exe, so the installer stays one file and nothing is downloaded when the
+    app runs. It's too big for the repository: a build fetches it the first time, from the
+    whisper.cpp project's own copy, and checks it's the right file.
+  -->
+  <PropertyGroup>
+    <SpeechModel>$(MSBuildThisFileDirectory)Models\ggml-base-q5_1.bin</SpeechModel>
+    <SpeechModelUrl>https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q5_1.bin</SpeechModelUrl>
+    <SpeechModelHash>422F1AE452ADE6F30A004D7E5C6A43195E4433BC370BF23FAC9CC591F01A8898</SpeechModelHash>
+  </PropertyGroup>
+  <Target Name="GetSpeechModel" BeforeTargets="PrepareForBuild" Condition="!Exists('$(SpeechModel)')">
+    <Message Importance="high" Text="Downloading the Whisper speech model (57 MB) for subtitles…" />
+    <DownloadFile SourceUrl="$(SpeechModelUrl)" DestinationFolder="$(MSBuildThisFileDirectory)Models" />
+  </Target>
+  <Target Name="CheckSpeechModel" AfterTargets="GetSpeechModel" BeforeTargets="CoreCompile">
+    <GetFileHash Files="$(SpeechModel)" Algorithm="SHA256">
+      <Output TaskParameter="Hash" PropertyName="SpeechModelActualHash" />
+    </GetFileHash>
+    <Error Condition="'$(SpeechModelActualHash)' != '$(SpeechModelHash)'" Text="Models\ggml-base-q5_1.bin isn't the expected speech model. Delete it and build again." />
+  </Target>
   <ItemGroup>
+    <EmbeddedResource Include="Models\ggml-base-q5_1.bin" LogicalName="Overskin.whisper-model.bin" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
   </ItemGroup>
 

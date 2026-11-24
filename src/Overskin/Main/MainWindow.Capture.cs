@@ -354,7 +354,8 @@ public partial class MainWindow
                 edit: () => OpenEditor(image, path, CaptureName(path)),
                 pin: () => PinImage(image, CaptureName(path), path, placeAt: where),
                 copy: () => CopyImage(image, quiet: false, path),
-                openFolder: path != null ? () => ShowInFolder(path) : null);
+                openFolder: path != null ? () => ShowInFolder(path) : null,
+                view: () => OpenViewer(path, image));
         }
         else
         {

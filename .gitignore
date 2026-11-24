@@ -28,3 +28,6 @@ docs/screenshots/linux-*.png
 
 # the website: kept on this PC until it goes live
 website/
+
+# the Whisper speech model for subtitles: too big for the repository; a build downloads it
+src/Overskin/Models/*.bin

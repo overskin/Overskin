@@ -12,24 +12,43 @@ namespace Overskin;
 /// <summary>A label or an arrow shown over a video between two moments (seconds of the original).</summary>
 public sealed class VideoOverlay
 {
-    public enum Kinds { Text, Arrow }
+    public enum Kinds { Text, Arrow, Caption }
     public Kinds Kind { get; init; }
     public string Text { get; set; } = "";
-    /// <summary>Text: its centre. Arrow: the tail. In video pixels.</summary>
+    /// <summary>Text: its centre. Arrow: the tail. Caption: the middle of its bottom edge. In video pixels.</summary>
     public Point A { get; set; }
     /// <summary>Arrow: the head.</summary>
     public Point B { get; set; }
     public double Start { get; set; }
     public double End { get; set; }
 
-    /// <summary>The overlay drawn for a video <paramref name="videoHeight"/> pixels tall, and where its top-left goes.</summary>
-    public (BitmapSource Picture, Point At) Render(int videoHeight)
+    /// <summary>
+    /// The overlay drawn for a video <paramref name="videoHeight"/> pixels tall, and where its
+    /// top-left goes. A caption wraps to fit <paramref name="videoWidth"/> when it's given.
+    /// </summary>
+    public (BitmapSource Picture, Point At) Render(int videoHeight, int videoWidth = 0)
     {
         var visual = new DrawingVisual();
         Rect bounds;
         using (var dc = visual.RenderOpen())
         {
-            if (Kind == Kinds.Text)
+            if (Kind == Kinds.Caption)
+            {
+                // subtitles: white on a see-through dark band, centred, at most 85% of the width
+                double size = Math.Clamp(videoHeight * 0.042, 13, 72);
+                var ft = new FormattedText(Text.Length == 0 ? " " : Text, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                    new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal), size, Brushes.White, 1.0)
+                { TextAlignment = TextAlignment.Center };
+                double padX = size * 0.5, padY = size * 0.22;
+                if (videoWidth > 0) ft.MaxTextWidth = Math.Max(size * 4, videoWidth * 0.85 - 2 * padX);
+                double w = ft.Width + 2 * padX, h = ft.Height + 2 * padY;
+                bounds = new Rect(A.X - w / 2, A.Y - h, w, h);
+                dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromArgb(190, 0, 0, 0)), null, bounds, size * 0.25, size * 0.25);
+                // centred text in FormattedText lines up inside MaxTextWidth, or its own width without one
+                double textLeft = ft.MaxTextWidth > 0 && ft.MaxTextWidth < double.MaxValue ? A.X - ft.MaxTextWidth / 2 : bounds.X + padX;
+                dc.DrawText(ft, new Point(textLeft, bounds.Y + padY));
+            }
+            else if (Kind == Kinds.Text)
             {
                 double size = Math.Clamp(videoHeight * 0.045, 14, 96);
                 var ft = new FormattedText(Text.Length == 0 ? " " : Text, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
@@ -112,7 +131,7 @@ public static class VideoEdit
 
     /// <param name="maxBytes">When set, the file is made to fit: the picture quality (and if need be its size) is chosen so it comes in under this.</param>
     public static async Task RenderAsync(string input, string output, IReadOnlyList<(double Start, double End)> keep,
-        IReadOnlyList<VideoOverlay> overlays, int videoHeight, IProgress<double>? progress = null, long? maxBytes = null)
+        IReadOnlyList<VideoOverlay> overlays, int videoHeight, IProgress<double>? progress = null, long? maxBytes = null, int videoWidth = 0)
     {
         LastPasses.Clear();
         if (keep.Count == 0 || keep.Sum(k => k.End - k.Start) < 0.1) throw new InvalidOperationException("That leaves nothing to save.");
@@ -138,7 +157,7 @@ public static class VideoEdit
                 {
                     double from = ToOutput(o.Start, keep), to = ToOutput(o.End, keep);
                     if (to - from < 0.05) continue;
-                    var (picture, at) = o.Render(videoHeight);
+                    var (picture, at) = o.Render(videoHeight, videoWidth);
                     string png = Path.Combine(Path.GetTempPath(), $"Overskin-overlay-{Guid.NewGuid():N}.png");
                     var encoder = new PngBitmapEncoder();
                     encoder.Frames.Add(BitmapFrame.Create(picture));

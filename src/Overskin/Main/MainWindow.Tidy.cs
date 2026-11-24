@@ -356,6 +356,39 @@ public partial class MainWindow
             CaptureNotice.CloseAll();
             log.Add($"preview pop-up: early scale={early?.Scale:0.00} rise={early?.Rise:0} opacity={early?.Opacity:0.00}; " +
                     $"settled scale={late?.Scale:0.00} rise={late?.Rise:0} opacity={late?.Opacity:0.00} (expect early smaller/lower/fainter, settled 1.00 0 1.00)");
+
+            // swiping the card: a short slow push springs back, far left opens the viewer, a
+            // quick flick right dismisses it, and with nothing to open it won't go far left
+            int viewed = 0;
+            async Task<CaptureNotice?> Card(bool canView)
+            {
+                CaptureNotice.ShowFor(pixel, null, "test", () => { }, () => { }, () => { }, null, canView ? () => viewed++ : null);
+                await Task.Delay(600);
+                return CaptureNotice.CurrentForTest;
+            }
+            var c1 = await Card(true);
+            double home = c1?.Left ?? 0;
+            c1?.BeginSwipe(0); c1?.MoveSwipe(-20, 50); c1?.MoveSwipe(-50, 400);
+            int back = c1?.EndSwipe(600) ?? 9;
+            await Task.Delay(400);
+            double backLeft = (c1?.Left ?? 0) - home;
+            bool stillOpen = c1?.IsVisible == true;
+            c1?.BeginSwipe(0); c1?.MoveSwipe(-60, 100); c1?.MoveSwipe(-110, 300);
+            int open = c1?.EndSwipe(500) ?? 9;
+            var c2 = await Card(true);
+            c2?.BeginSwipe(0); c2?.MoveSwipe(12, 16); c2?.MoveSwipe(40, 48);
+            int flick = c2?.EndSwipe(60) ?? 9;
+            await Task.Delay(400);
+            bool flickClosed = c2?.IsVisible != true;
+            var c3 = await Card(false);
+            double home3 = c3?.Left ?? 0;
+            c3?.BeginSwipe(0); c3?.MoveSwipe(-300, 200);
+            double lean = (c3?.Left ?? 0) - home3;
+            int none = c3?.EndSwipe(500) ?? 9;
+            CaptureNotice.CloseAll();
+            log.Add($"preview swipe: short={back} back-at={backLeft:0} open={stillOpen}; far-left={open} viewed={viewed}; " +
+                    $"flick-right={flick} closed={flickClosed}; no-viewer lean={lean:0} result={none} " +
+                    "(expect 0 0 True; -1 1; 1 True; lean -30 result 0)");
         }
         Check("library count", () => $"\"{LibraryCount.Text}\" usage \"{CleanUpUsage.Text}\"");
 
