@@ -73,6 +73,12 @@ public sealed class CropBox
         set
         {
             _active = value;
+            // like other crop tools, cropping starts with the whole picture framed, ready to pull in
+            if (value && _box == null)
+            {
+                var src = _source();
+                _box = new Rect(0, 0, src.Width, src.Height);
+            }
             _canvas.IsHitTestVisible = value;
             _canvas.Cursor = value ? Cursors.Cross : null;
             Draw();
@@ -102,6 +108,18 @@ public sealed class CropBox
         Changed?.Invoke();
     }
 
+    /// <summary>The box as it is (in source pixels), to put back if cropping is cancelled.</summary>
+    public Rect? Box
+    {
+        get => _box;
+        set
+        {
+            _box = value;
+            Draw();
+            Changed?.Invoke();
+        }
+    }
+
     /// <summary>For the self-test: sets the box directly, in source pixels.</summary>
     internal void SetForTest(Rect box)
     {
@@ -122,7 +140,7 @@ public sealed class CropBox
     private int HitTest(Point source)
     {
         if (_box is not { } b) return 0;
-        double reach = 7 / Math.Max(0.01, _fit().Scale);
+        double reach = 11 / Math.Max(0.01, _fit().Scale);
         bool nearX = source.X > b.Left - reach && source.X < b.Right + reach, nearY = source.Y > b.Top - reach && source.Y < b.Bottom + reach;
         int edges = 0;
         if (nearY && Math.Abs(source.X - b.Left) <= reach) edges |= Left;
@@ -264,19 +282,34 @@ public sealed class CropBox
             _canvas.Children.Add(Line(box.X + box.Width * i / 3, box.Y, box.X + box.Width * i / 3, box.Bottom));
             _canvas.Children.Add(Line(box.X, box.Y + box.Height * i / 3, box.Right, box.Y + box.Height * i / 3));
         }
-        // handles at the corners and the middle of each side
-        foreach (var (hx, hy) in new[]
-                 {
-                     (box.Left, box.Top), (box.Right, box.Top), (box.Left, box.Bottom), (box.Right, box.Bottom),
-                     ((box.Left + box.Right) / 2, box.Top), ((box.Left + box.Right) / 2, box.Bottom),
-                     (box.Left, (box.Top + box.Bottom) / 2), (box.Right, (box.Top + box.Bottom) / 2),
-                 })
+        // thick corner brackets and short bars in the middle of each side, as photo apps draw them
+        double arm = Math.Min(20, Math.Min(box.Width, box.Height) / 3), bar = Math.Min(24, Math.Min(box.Width, box.Height) / 3);
+        var handles = new StreamGeometry();
+        using (var g = handles.Open())
         {
-            var handle = new Rectangle { Width = 9, Height = 9, Fill = Brushes.White, Stroke = new SolidColorBrush(Color.FromArgb(160, 0, 0, 0)), StrokeThickness = 1, IsHitTestVisible = false };
-            Canvas.SetLeft(handle, hx - 4.5);
-            Canvas.SetTop(handle, hy - 4.5);
-            _canvas.Children.Add(handle);
+            void Poly(params Point[] pts)
+            {
+                g.BeginFigure(pts[0], false, false);
+                for (int i = 1; i < pts.Length; i++) g.LineTo(pts[i], true, false);
+            }
+            double l = box.Left + 1, t = box.Top + 1, r = box.Right - 1, bt = box.Bottom - 1;
+            Poly(new(l, t + arm), new(l, t), new(l + arm, t));
+            Poly(new(r - arm, t), new(r, t), new(r, t + arm));
+            Poly(new(l, bt - arm), new(l, bt), new(l + arm, bt));
+            Poly(new(r - arm, bt), new(r, bt), new(r, bt - arm));
+            double cx = (box.Left + box.Right) / 2, cy = (box.Top + box.Bottom) / 2;
+            Poly(new(cx - bar / 2, t), new(cx + bar / 2, t));
+            Poly(new(cx - bar / 2, bt), new(cx + bar / 2, bt));
+            Poly(new(l, cy - bar / 2), new(l, cy + bar / 2));
+            Poly(new(r, cy - bar / 2), new(r, cy + bar / 2));
         }
+        handles.Freeze();
+        _canvas.Children.Add(new Path
+        {
+            Data = handles, Stroke = Brushes.White, StrokeThickness = 4, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+            StrokeLineJoin = PenLineJoin.Round, IsHitTestVisible = false,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 4, ShadowDepth = 0, Opacity = 0.6 },
+        });
         if (Crop is { } c)
         {
             var label = new Border

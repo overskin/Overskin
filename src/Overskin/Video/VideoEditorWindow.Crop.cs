@@ -28,7 +28,7 @@ public partial class VideoEditorWindow
     {
         if (on) Play(false);
         Cropper.Active = on;
-        CropButton.Content = on ? "Done" : "Draw the crop";
+        CropButton.Content = on ? "Done" : "Crop";
     }
 
     private void CropReset_Click(object sender, RoutedEventArgs e)

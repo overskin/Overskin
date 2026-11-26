@@ -23,6 +23,8 @@ public sealed class Annotation
     public string Text { get; set; } = "";
     /// <summary>Text: "Normal", "Bold" or "Italic".</summary>
     public string TextStyle { get; set; } = "Bold";
+    /// <summary>Text: a <see cref="FontLibrary"/> name; empty for the app's own font.</summary>
+    public string Font { get; set; } = "";
     /// <summary>Pixelate: the blocky picture of what was underneath.</summary>
     public BitmapSource? Pixels { get; set; }
     /// <summary>Boxes and ellipses: solid instead of outlined.</summary>
@@ -40,6 +42,7 @@ public sealed class Annotation
         Size = Size,
         Text = Text,
         TextStyle = TextStyle,
+        Font = Font,
         Pixels = Pixels,
         Filled = Filled,
         Mode = Mode,
@@ -53,6 +56,10 @@ public sealed class Annotation
 
     public double FontSize => 12 + Size * 3.5;
     public FontWeight TextWeight => TextStyle == "Bold" ? FontWeights.Bold : FontWeights.Normal;
+    public FontFamily TextFamily => FamilyFor(Font);
+
+    public static FontFamily FamilyFor(string font) =>
+        font.Length > 0 ? FontLibrary.Find(font).Family : (FontFamily)Application.Current.Resources["UiFont"];
     public FontStyle TextSlant => TextStyle == "Italic" ? FontStyles.Italic : FontStyles.Normal;
 
     /// <summary>Rough area the mark covers, for clicking on it and for the selection box.</summary>
@@ -78,7 +85,7 @@ public sealed class Annotation
     private Size Measure()
     {
         var tb = new TextBlock { Text = Text.Length == 0 ? " " : Text, FontSize = FontSize, FontWeight = TextWeight, FontStyle = TextSlant };
-        tb.FontFamily = (FontFamily)Application.Current.Resources["UiFont"];
+        tb.FontFamily = TextFamily;
         tb.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         return tb.DesiredSize;
     }
@@ -157,7 +164,7 @@ public sealed class Annotation
                 var tb = new TextBlock
                 {
                     Text = Text, Foreground = brush, FontSize = FontSize, FontWeight = TextWeight, FontStyle = TextSlant,
-                    FontFamily = (FontFamily)Application.Current.Resources["UiFont"], Effect = Halo(Color),
+                    FontFamily = TextFamily, Effect = Halo(Color),
                 };
                 Canvas.SetLeft(tb, Points[0].X);
                 Canvas.SetTop(tb, Points[0].Y);

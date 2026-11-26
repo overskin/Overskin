@@ -17,6 +17,19 @@ public partial class MainWindow
 
     // ---- recording -----------------------------------------------------------------------
 
+    private void GifFps_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!_ready || sender is not RadioButton { Tag: string tag } || !int.TryParse(tag, out int fps)) return;
+        _settings.GifFps = fps;
+        SaveSettings();
+    }
+
+    private void SyncGifControls()
+    {
+        int fps = GifRecorder.ValidFps(_settings.GifFps);
+        foreach (var r in GifFpsChoices.Children.OfType<RadioButton>()) r.IsChecked = (string)r.Tag == fps.ToString();
+    }
+
     private void RecordGif_Click(object sender, RoutedEventArgs e) => ToggleGifRecording();
 
     /// <summary>Starts a recording, or stops the one that's running (same button, same hotkey).</summary>
@@ -48,7 +61,7 @@ public partial class MainWindow
             _hotkeys?.Register(HkGifEsc, new Hotkey(ModifierKeys.None, Key.Escape), () => _recorder.Stop());
             FileNames.Context = NameInfo.At(area.X + area.Width / 2, area.Y + area.Height / 2);
             FileNames.Pattern = _settings.FileNamePattern;
-            _recorder.Start(area, _settings.AfterCursor);
+            _recorder.Start(area, _settings.AfterCursor, GifRecorder.ValidFps(_settings.GifFps));
         });
     }
 

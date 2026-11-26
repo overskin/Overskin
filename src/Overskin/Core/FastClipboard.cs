@@ -22,11 +22,47 @@ internal static class FastClipboard
     [DllImport("user32.dll")] private static extern bool CloseClipboard();
     [DllImport("user32.dll")] private static extern bool EmptyClipboard();
     [DllImport("user32.dll")] private static extern IntPtr SetClipboardData(uint format, IntPtr data);
+    [DllImport("user32.dll")] private static extern uint GetClipboardSequenceNumber();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern uint RegisterClipboardFormat(string name);
     [DllImport("kernel32.dll")] private static extern IntPtr GlobalAlloc(uint flags, UIntPtr bytes);
     [DllImport("kernel32.dll")] private static extern IntPtr GlobalLock(IntPtr mem);
     [DllImport("kernel32.dll")] private static extern bool GlobalUnlock(IntPtr mem);
     [DllImport("kernel32.dll")] private static extern IntPtr GlobalFree(IntPtr mem);
+
+    /// <summary>The clipboard's change count just after our last copy, so a later <see cref="AddFile"/> knows it's still ours.</summary>
+    private static uint _ours;
+
+    /// <summary>
+    /// Adds the saved file to a picture that's already on the clipboard (the picture goes on the
+    /// moment it's taken; the file follows once it's written). Does nothing if anything else has
+    /// been copied since.
+    /// </summary>
+    public static bool AddFile(string file)
+    {
+        if (_ours == 0 || GetClipboardSequenceNumber() != _ours || !File.Exists(file)) return false;
+        byte[]? png = null;
+        if (Path.GetExtension(file).Equals(".png", StringComparison.OrdinalIgnoreCase))
+            try { png = File.ReadAllBytes(file); } catch { }
+        byte[] drop = DropFiles(Path.GetFullPath(file));
+        for (int attempt = 0; attempt < 10; attempt++)
+        {
+            if (!OpenClipboard(IntPtr.Zero)) { Thread.Sleep(25); continue; }
+            try
+            {
+                if (GetClipboardSequenceNumber() != _ours) return false; // copied over in the meantime
+                if (png != null) Put(RegisterClipboardFormat("PNG"), png);
+                bool ok = Put(CF_HDROP, drop);
+                Put(RegisterClipboardFormat("Preferred DropEffect"), BitConverter.GetBytes(1));
+                return ok;
+            }
+            finally
+            {
+                CloseClipboard();
+                _ours = GetClipboardSequenceNumber();
+            }
+        }
+        return false;
+    }
 
     /// <summary>The picture, and the file when there is one. False when another app kept the clipboard busy.</summary>
     public static bool Copy(BitmapSource image, string? file = null)
@@ -59,6 +95,7 @@ internal static class FastClipboard
             finally
             {
                 CloseClipboard();
+                _ours = GetClipboardSequenceNumber();
             }
         }
         return false;

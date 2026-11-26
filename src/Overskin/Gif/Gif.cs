@@ -48,7 +48,8 @@ public sealed class GifWriter : IDisposable
     private double _elapsedMs;      // exact time so far
     private int _writtenCs;         // time written so far, in GIF centiseconds
 
-    public GifWriter(Stream output, int width, int height)
+    /// <param name="repeats">How many times it plays: 0 for forever.</param>
+    public GifWriter(Stream output, int width, int height, int repeats = 0)
     {
         _out = output;
         _w = width;
@@ -61,10 +62,15 @@ public sealed class GifWriter : IDisposable
         _out.WriteByte(0);  // background
         _out.WriteByte(0);  // aspect
 
-        // loop forever
-        _out.Write(new byte[] { 0x21, 0xFF, 0x0B });
-        Write("NETSCAPE2.0");
-        _out.Write(new byte[] { 0x03, 0x01, 0x00, 0x00, 0x00 });
+        // Loop forever (0), or play a set number of times. With no loop block a GIF plays once;
+        // with one, viewers play it once and then repeat it the count's number of times.
+        if (repeats != 1)
+        {
+            int more = repeats <= 0 ? 0 : repeats - 1;
+            _out.Write(new byte[] { 0x21, 0xFF, 0x0B });
+            Write("NETSCAPE2.0");
+            _out.Write(new byte[] { 0x03, 0x01, (byte)(more & 0xFF), (byte)(more >> 8), 0x00 });
+        }
     }
 
     private void Write(string ascii) { foreach (char c in ascii) _out.WriteByte((byte)c); }

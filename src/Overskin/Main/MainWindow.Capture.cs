@@ -86,6 +86,8 @@ public partial class MainWindow
         if (wait > 0) await CountDown(wait);
 
         bool pointer = _settings.AfterCursor && mode is OverlayMode.Region or OverlayMode.Window;
+        CaptureOverlay.MagnifierOn = _settings.Magnifier;
+        CaptureOverlay.CrosshairOn = _settings.Crosshair;
         var overlay = CaptureOverlay.Open(mode, hint, pointer, tools);
         if (overlay == null)
         {
@@ -99,6 +101,13 @@ public partial class MainWindow
             // the pointer button on the capture bar is the same setting as on the Capture page
             _settings.AfterCursor = overlay.IncludePointer;
             AfterCursorSwitch.IsChecked = _settings.AfterCursor;
+            SaveSettings();
+        }
+        if (overlay.HasToolbar && overlay.MagnifierShown != _settings.Magnifier)
+        {
+            // so is the magnifier button
+            _settings.Magnifier = overlay.MagnifierShown;
+            MagnifierSwitch.IsChecked = _settings.Magnifier;
             SaveSettings();
         }
         return (overlay, wasShown);
@@ -126,23 +135,25 @@ public partial class MainWindow
     {
         var chosen = await Choose(OverlayMode.Region, "Drag over an area, or click a window.  Esc cancels.", useDelay, tools: true, delay);
         if (chosen is not { } c) return;
-        Reappear(c.WasShown);
-        if (c.Overlay.Selection is not { } r) return;
+        if (c.Overlay.Selection is not { } r) { Reappear(c.WasShown); return; }
         _settings.LastRegion = new[] { r.X, r.Y, r.Width, r.Height };
+        // the picture goes on the clipboard before anything else is drawn
         Finish(await WindowAloneOrAsync(c.Overlay, r), r, steps);
+        Reappear(c.WasShown);
     });
 
     private void CaptureWindowPick(AfterSteps? steps = null, int? delay = null) => Guarded(async () =>
     {
         var chosen = await Choose(OverlayMode.Window, "Click the window to capture.  Esc cancels.", useDelay: true, tools: true, delay);
         if (chosen is not { } c) return;
-        Reappear(c.WasShown);
         if (c.Overlay.Selection is not { } r)
         {
+            Reappear(c.WasShown);
             CrashLog.Note("window pick: closed without a window chosen");
             return;
         }
         Finish(await WindowAloneOrAsync(c.Overlay, r), r, steps);
+        Reappear(c.WasShown);
     });
 
     /// <summary>
@@ -210,8 +221,8 @@ public partial class MainWindow
         int x = Math.Max(b.Left, vs.Left), y = Math.Max(b.Top, vs.Top);
         int w = Math.Min(b.Right, vs.Right) - x, h = Math.Min(b.Bottom, vs.Bottom) - y;
         var shot = (_settings.WindowAlpha ? await WindowAloneAsync(front) : null) ?? CaptureScreen(x, y, w, h, _settings.AfterCursor);
-        Reappear(wasShown);
         if (shot != null) Finish(shot, new Int32Rect(x, y, w, h), steps);
+        Reappear(wasShown);
     });
 
     private void CaptureFullScreen(bool useDelay = false, AfterSteps? steps = null, int? delay = null) => Guarded(async () =>
@@ -221,8 +232,8 @@ public partial class MainWindow
         if (wait > 0) await CountDown(wait);
         var r = _settings.FullScreenAllMonitors ? VirtualScreen() : MonitorBounds(CursorPos());
         var shot = CaptureScreen(r.Left, r.Top, r.Width, r.Height, _settings.AfterCursor);
-        Reappear(wasShown);
         if (shot != null) Finish(shot, new Int32Rect(r.Left, r.Top, r.Width, r.Height), steps);
+        Reappear(wasShown);
     });
 
     private void CaptureLastRegion(AfterSteps? steps = null, int? delay = null)
@@ -238,8 +249,8 @@ public partial class MainWindow
             int wait = delay ?? _settings.CaptureDelay;
             if (wait > 0) await CountDown(wait);
             var shot = CaptureScreen(a[0], a[1], a[2], a[3], _settings.AfterCursor);
-            Reappear(wasShown);
             if (shot != null) Finish(shot, new Int32Rect(a[0], a[1], a[2], a[3]), steps);
+            Reappear(wasShown);
         });
     }
 
@@ -318,12 +329,15 @@ public partial class MainWindow
             image = ImageLoader.Normalize(Beautify.Render(image, new BeautifyOptions()));
         if (s.Watermark && _settings.Watermark.HasContent)
             image = Watermark.Apply(image, _settings.Watermark);
-        // the file is written off the main thread, then the clipboard gets the picture and the file
+        // The picture goes on the clipboard straight away, so it can be pasted at once; the file
+        // is written off the main thread and added to the clipboard when it's ready (pasting into
+        // a chat or a folder then keeps its name).
         var timing = System.Diagnostics.Stopwatch.StartNew();
+        if (s.Copy) CopyImage(image, quiet: true);
+        long copied = timing.ElapsedMilliseconds;
         string? path = s.Save ? await SaveCaptureAsync(image) : null;
-        long saved = timing.ElapsedMilliseconds;
-        if (s.Copy) CopyImage(image, quiet: true, path);
-        CrashLog.Note($"after capture: saved in {saved} ms, copied by {timing.ElapsedMilliseconds} ms");
+        if (s.Copy && path != null) FastClipboard.AddFile(path);
+        CrashLog.Note($"after capture: copied in {copied} ms, saved by {timing.ElapsedMilliseconds} ms");
         bool textCopied = false;
         if (s.CopyText)
         {
@@ -601,6 +615,7 @@ public partial class MainWindow
         Redaction.Kinds = _settings.AutoHideKinds;
         WindowAlphaSwitch.IsChecked = _settings.WindowAlpha;
         SyncVideoControls();
+        SyncGifControls();
         SyncWatermarkControls();
         RefreshWorkflowRows();
         AfterSaveSwitch.IsChecked = _settings.AfterSave;
@@ -609,6 +624,8 @@ public partial class MainWindow
         AfterPinSwitch.IsChecked = _settings.AfterPin;
         AfterPreviewSwitch.IsChecked = _settings.AfterPreview;
         AfterCursorSwitch.IsChecked = _settings.AfterCursor;
+        MagnifierSwitch.IsChecked = _settings.Magnifier;
+        CrosshairSwitch.IsChecked = _settings.Crosshair;
         FormatPng.IsChecked = _settings.ImageFormat != "jpg";
         FormatJpg.IsChecked = _settings.ImageFormat == "jpg";
         JpegQualitySlider.Value = _settings.JpegQuality;
@@ -640,6 +657,13 @@ public partial class MainWindow
         _settings.AutoHide = AutoHideSwitch.IsChecked == true;
         _settings.WindowAlpha = WindowAlphaSwitch.IsChecked == true;
         AfterPreviewSwitch.IsEnabled = !_settings.AfterEditor && !_settings.AfterViewer; // they already show the picture
+        SaveSettings();
+    }
+
+    private void ShootingSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.Magnifier = MagnifierSwitch.IsChecked == true;
+        _settings.Crosshair = CrosshairSwitch.IsChecked == true;
         SaveSettings();
     }
 

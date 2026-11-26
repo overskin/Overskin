@@ -178,13 +178,16 @@ Capture → **Recording** has the Video and GIF buttons and every video setting.
 
 ## GIF clips
 
-- **Record** any area as a GIF (15 fps, up to 30 seconds) with Ctrl+Alt+G or the GIF tile.
+- **Record** any area as a GIF (15, 30 or 50 fps, chosen on the GIF card; up to 30 seconds) with Ctrl+Alt+G or the GIF tile.
   A red frame marks the area and a small bar shows the time with Stop and Cancel; neither
   appears in the recording. Press Ctrl+Alt+G again, or Esc, to stop.
-- **GIF editor**: Discord-style captions (black text on a white bar above the clip) or
-  classic top-and-bottom Impact text, trim, speed (0.5× to 2×), normal / reverse / boomerang
-  looping, output width, and **crop** (any shape, or 16:9, 9:16, 1:1, 4:3; the caption fits the
-  cropped picture).
+- **GIF editor**: Discord-style captions (a white, black or yellow bar above or below the clip)
+  or classic top-and-bottom outlined text, in any of the fonts that come with Overskin (Anton,
+  the free match for the caption-meme look, plus Bebas Neue, Oswald, Bangers, Permanent Marker
+  and Comic Neue), your Windows fonts, or a font file you add. Also trim, speed (¼× to 3×),
+  normal / reverse / boomerang looping, play forever, once or three times, grey / sepia / vivid
+  looks, mirror, fewer frames for a smaller file, output width, and **crop** (any shape, or 16:9,
+  9:16, 1:1, 4:3; the caption fits the cropped picture).
 - **Copy** puts the GIF on the clipboard as a file, so Ctrl+V in Discord just works. Or save
   it.
 - **Caption a GIF** (beside the recording buttons) opens any existing GIF (or a still picture) in the same editor.

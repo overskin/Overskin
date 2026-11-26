@@ -791,7 +791,8 @@ public partial class EditorWindow : Window
         var colour = existing?.Color ?? _colour;
         double size = existing?.Size ?? _size;
         string style = existing?.TextStyle ?? _textStyle;
-        var probe = new Annotation { Size = size, TextStyle = style };
+        _typingFont = existing?.Font ?? _textFont;
+        var probe = new Annotation { Size = size, TextStyle = style, Font = _typingFont };
 
         _textBox = new TextBox
         {
@@ -799,7 +800,7 @@ public partial class EditorWindow : Window
             FontSize = probe.FontSize,
             FontWeight = probe.TextWeight,
             FontStyle = probe.TextSlant,
-            FontFamily = (FontFamily)FindResource("UiFont"),
+            FontFamily = probe.TextFamily,
             Foreground = new SolidColorBrush(colour),
             CaretBrush = new SolidColorBrush(colour),
             Background = new SolidColorBrush(Color.FromArgb(0x40, 0, 0, 0)),
@@ -830,7 +831,7 @@ public partial class EditorWindow : Window
         if (text.Length > 0)
         {
             if (_textOriginal == null) PushUndo();
-            _items.Add(new Annotation { Kind = AnnotationKind.Text, Points = { _start }, Color = colour, Size = size, Text = text, TextStyle = style, Opacity = _textOriginal?.Opacity ?? _opacity });
+            _items.Add(new Annotation { Kind = AnnotationKind.Text, Points = { _start }, Color = colour, Size = size, Text = text, TextStyle = style, Font = _typingFont, Opacity = _textOriginal?.Opacity ?? _opacity });
         }
         _textOriginal = null;
         Render();
@@ -983,6 +984,36 @@ public partial class EditorWindow : Window
 
     /// <summary>Normal, bold or italic, for new text and the selected text.</summary>
     private string _textStyle = "Bold";
+    /// <summary>The font for new text (empty: the app's own), and the one in the box being typed in.</summary>
+    private static string _textFont = "";
+    private string _typingFont = "";
+
+    private string ShownTextFont(string font) => font.Length > 0 ? font : "Segoe UI";
+
+    private void TextFont_Click(object sender, RoutedEventArgs e)
+    {
+        string current = _textBox != null ? _typingFont : _selected is { Kind: AnnotationKind.Text } sel ? sel.Font : _textFont;
+        FontLibrary.ShowMenu(TextFontButton, ShownTextFont(current), name =>
+        {
+            // Segoe UI is the app's own font, kept as "no font chosen"
+            string font = name == "Segoe UI" ? "" : name;
+            _textFont = font;
+            if (_textBox != null)
+            {
+                _typingFont = font;
+                _textBox.FontFamily = Annotation.FamilyFor(font);
+                _textBox.Focus();
+            }
+            else if (_selected is { Kind: AnnotationKind.Text } t && t.Font != font)
+            {
+                PushUndo();
+                t.Font = font;
+                Render();
+                ShowSelection();
+            }
+            UpdateHideOptions();
+        });
+    }
 
     private void TextStyle_Checked(object sender, RoutedEventArgs e)
     {
@@ -1011,6 +1042,7 @@ public partial class EditorWindow : Window
         bool text = _tool == Tool.Text || _selected?.Kind == AnnotationKind.Text || _textBox != null;
         TextStyleOptions.Visibility = text ? Visibility.Visible : Visibility.Collapsed;
         string current = _selected is { Kind: AnnotationKind.Text } sel ? sel.TextStyle : _textStyle;
+        FontLibrary.ShowName(TextFontName, ShownTextFont(_textBox != null ? _typingFont : _selected is { Kind: AnnotationKind.Text } st ? st.Font : _textFont));
         _syncing = true;
         TextNormal.IsChecked = current == "Normal";
         TextBold.IsChecked = current == "Bold";

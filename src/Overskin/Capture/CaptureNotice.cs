@@ -191,8 +191,11 @@ public sealed class CaptureNotice : Window
         // nothing to open: it leans left a little and no further
         if (dx < 0 && _view == null) dx = -Math.Min(Math.Sqrt(-dx) * 3, 30);
         Left = _home + dx;
-        // going right it fades as it goes; going left it stays solid, ready to open
-        Opacity = dx > 0 ? Math.Clamp(1 - dx / (ActualWidth * 0.9), 0.15, 1) : 1;
+        // Going right it fades as it goes. Going left it fades too as it nears the point where
+        // letting go opens the viewer, and is faint once it's there.
+        Opacity = dx > 0 ? Math.Clamp(1 - dx / (ActualWidth * 0.9), 0.15, 1)
+            : _view == null ? 1
+            : Math.Clamp(1 - 0.65 * (-dx - SwipeDistance * 0.4) / (SwipeDistance * 0.6), 0.35, 1);
         if (time != _last.Time) _prev = _last;
         _last = (dx, time);
         _caption.Text = Outcome(dx, 0) switch

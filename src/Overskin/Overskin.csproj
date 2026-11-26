@@ -42,6 +42,7 @@
 
   <ItemGroup>
     <Resource Include="Assets\overskin.ico" />
+    <Resource Include="Fonts\*.ttf" />
   </ItemGroup>
 
   <ItemGroup>

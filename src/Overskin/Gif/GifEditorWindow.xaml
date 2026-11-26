@@ -90,7 +90,7 @@
 
                 <!-- settings -->
                 <Border Grid.Column="1" BorderBrush="{DynamicResource Line}" BorderThickness="1,0,0,0">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                    <ScrollViewer x:Name="SettingsScroll" x:FieldModifier="internal" VerticalScrollBarVisibility="Auto" Focusable="False">
                         <StackPanel Margin="12,12,12,8">
 
                             <Border Style="{StaticResource Card}">
@@ -102,9 +102,9 @@
                                     <Border Style="{StaticResource Rule}" />
                                     <StackPanel Orientation="Horizontal" Margin="-5,0,0,8">
                                         <RadioButton x:Name="StyleCaption" Style="{StaticResource Seg}" GroupName="CapStyle" Content="White bar" Tag="Caption" Checked="Style_Checked"
-                                                     ToolTip="Black text on a white bar above the GIF, like Discord caption memes" />
+                                                     ToolTip="Text on a bar above or below the GIF, like Discord caption memes" />
                                         <RadioButton x:Name="StyleMeme" Style="{StaticResource Seg}" GroupName="CapStyle" Content="Top &amp; bottom" Tag="Meme" Checked="Style_Checked"
-                                                     ToolTip="White Impact capitals with a black outline, on the picture" />
+                                                     ToolTip="Outlined capitals on the picture" />
                                         <RadioButton x:Name="StyleNone" Style="{StaticResource Seg}" GroupName="CapStyle" Content="None" Tag="None" Checked="Style_Checked" />
                                     </StackPanel>
                                     <TextBlock x:Name="TopLabel" Text="Caption" Style="{StaticResource Dim}" Margin="1,0,0,4" />
@@ -121,6 +121,42 @@
                                         <TextBlock Text="Text size" Style="{StaticResource Label}" />
                                         <Slider x:Name="TextSize" Grid.Column="1" Minimum="0.5" Maximum="1.8" Value="1" SmallChange="0.05" LargeChange="0.2"
                                                 ValueChanged="Option_Changed" />
+                                    </Grid>
+                                    <Grid Style="{StaticResource Row}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="70" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Font" Style="{StaticResource Label}" />
+                                        <Button x:Name="FontButton" Grid.Column="1" Style="{StaticResource Btn}" Height="28" HorizontalContentAlignment="Stretch"
+                                                Padding="8,0" Click="Font_Click">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="FontName" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                <local:Icon Grid.Column="1" Data="{StaticResource IcChevronRight}" Width="11" Height="11" Margin="8,0,0,0"
+                                                            RenderTransformOrigin="0.5,0.5">
+                                                    <local:Icon.RenderTransform><RotateTransform Angle="90" /></local:Icon.RenderTransform>
+                                                </local:Icon>
+                                            </Grid>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock x:Name="ColourLabel" Text="Bar" Style="{StaticResource Label}" />
+                                        <StackPanel x:Name="ColourChoices" Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="CapColour" Content="White" Tag="#FFFFFF" Checked="Option_Checked" IsChecked="True" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="CapColour" Content="Black" Tag="#000000" Checked="Option_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="CapColour" Content="Yellow" Tag="#FFE81A" Checked="Option_Checked" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid x:Name="BarPlace" Style="{StaticResource Row}">
+                                        <TextBlock Text="Bar goes" Style="{StaticResource Label}" />
+                                        <StackPanel x:Name="BarChoices" Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="CapBar" Content="Above" Tag="Above" Checked="Option_Checked" IsChecked="True" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="CapBar" Content="Below" Tag="Below" Checked="Option_Checked" />
+                                        </StackPanel>
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -141,11 +177,12 @@
                                         <RadioButton Style="{StaticResource Seg}" GroupName="CropShape" MinWidth="0" Padding="9,0" Content="4:3" Tag="4:3" Checked="CropShape_Checked" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal">
-                                        <Button x:Name="CropButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,0" Click="CropMode_Click" Content="Draw the crop"
-                                                ToolTip="Then drag on the picture. Drag inside the box to move it, or its edges and corners to resize it" />
+                                        <Button x:Name="CropButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,0" Click="CropMode_Click" Content="Crop"
+                                                ToolTip="Drag the corners or edges in, drag inside to move. Enter keeps it, Esc cancels" />
+                                        <Button x:Name="CropCancelButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,0" Click="CropCancel_Click" Content="Cancel"
+                                                Visibility="Collapsed" />
                                         <Button Style="{StaticResource Btn}" Height="26" Click="CropReset_Click" Content="Reset" ToolTip="Keep the whole picture" />
                                     </StackPanel>
-                                    <TextBlock Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,8,0,0" Text="The caption fits the cropped picture. Done shows the GIF as it will be saved." />
                                 </StackPanel>
                             </Border>
                             <Border Style="{StaticResource Card}">
@@ -187,10 +224,12 @@
                                     <Grid Style="{StaticResource Row}">
                                         <TextBlock Text="Speed" Style="{StaticResource Label}" />
                                         <StackPanel x:Name="SpeedChoices" Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <RadioButton Style="{StaticResource Seg}" MinWidth="40" GroupName="GifSpeed" Content="0.5×" Tag="0.5" Checked="Option_Checked" />
-                                            <RadioButton Style="{StaticResource Seg}" MinWidth="40" GroupName="GifSpeed" Content="1×" Tag="1" Checked="Option_Checked" IsChecked="True" />
-                                            <RadioButton Style="{StaticResource Seg}" MinWidth="40" GroupName="GifSpeed" Content="1.5×" Tag="1.5" Checked="Option_Checked" />
-                                            <RadioButton Style="{StaticResource Seg}" MinWidth="40" GroupName="GifSpeed" Content="2×" Tag="2" Checked="Option_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="6,0" GroupName="GifSpeed" Content="¼×" Tag="0.25" Checked="Option_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="6,0" GroupName="GifSpeed" Content="½×" Tag="0.5" Checked="Option_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="6,0" GroupName="GifSpeed" Content="1×" Tag="1" Checked="Option_Checked" IsChecked="True" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="6,0" GroupName="GifSpeed" Content="1.5×" Tag="1.5" Checked="Option_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="6,0" GroupName="GifSpeed" Content="2×" Tag="2" Checked="Option_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="6,0" GroupName="GifSpeed" Content="3×" Tag="3" Checked="Option_Checked" />
                                         </StackPanel>
                                     </Grid>
                                     <Grid Style="{StaticResource Row}">
@@ -201,6 +240,34 @@
                                             <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="GifLoop" Content="Boomerang" Tag="Boomerang" Checked="Option_Checked"
                                                          ToolTip="Plays forward, then backward" />
                                         </StackPanel>
+                                    </Grid>
+                                    <Grid Style="{StaticResource Row}">
+                                        <TextBlock Text="Repeat" Style="{StaticResource Label}" />
+                                        <StackPanel x:Name="RepeatChoices" Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="GifRepeat" Content="Forever" Tag="0" Checked="Option_Checked" IsChecked="True" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="GifRepeat" Content="Once" Tag="1" Checked="Option_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="GifRepeat" Content="3 times" Tag="3" Checked="Option_Checked" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcContrast}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Look" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <StackPanel x:Name="LookChoices" Orientation="Horizontal" Margin="-5,0,0,8">
+                                        <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="GifLook" Content="Normal" Tag="Normal" Checked="Option_Checked" IsChecked="True" />
+                                        <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="GifLook" Content="Grey" Tag="Grey" Checked="Option_Checked" ToolTip="Black and white" />
+                                        <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="GifLook" Content="Sepia" Tag="Sepia" Checked="Option_Checked" ToolTip="Old-photo brown" />
+                                        <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="GifLook" Content="Vivid" Tag="Vivid" Checked="Option_Checked" ToolTip="Stronger colours" />
+                                    </StackPanel>
+                                    <Grid Height="30">
+                                        <TextBlock Text="Mirror" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="MirrorSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="Option_Click" ToolTip="Flip left to right" />
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -221,6 +288,10 @@
                                         <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="GifWidth" Content="480" Tag="480" Checked="Option_Checked" IsChecked="True" ToolTip="Small and sharp in Discord" />
                                         <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="GifWidth" Content="320" Tag="320" Checked="Option_Checked" />
                                     </StackPanel>
+                                    <Grid Height="30" Margin="0,6,0,0" ToolTip="Keeps every other frame: about half the file size, a little less smooth">
+                                        <TextBlock Text="Fewer frames" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="FewerSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="Option_Click" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

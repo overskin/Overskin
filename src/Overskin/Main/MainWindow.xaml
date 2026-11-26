@@ -519,7 +519,7 @@
                                             <local:Icon Data="{StaticResource IcArrowUpDown}" Width="17" Height="17" Foreground="{DynamicResource Accent}" />
                                         </Border>
                                         <TextBlock Text="Scrolling" Style="{StaticResource Heading}" Margin="0,12,0,0" />
-                                        <TextBlock Text="Whole page" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
+                                        <TextBlock Text="" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
                                     </StackPanel>
                                 </Button>
                             </UniformGrid>
@@ -615,6 +615,25 @@
                                             </Grid>
                                         </Button>
                                     </UniformGrid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- choosing and taking a screenshot -->
+                            <Border x:Name="CardShooting" Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcCrosshair}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Taking screenshots" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31" ToolTip="The zoomed-in square by the pointer while you choose. M switches it on the capture bar too">
+                                        <TextBlock Text="Magnifier" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="MagnifierSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="ShootingSwitch_Click" />
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Lines right across the screen through the pointer, for lining up edges">
+                                        <TextBlock Text="Crosshair lines" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="CrosshairSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="ShootingSwitch_Click" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 
@@ -845,13 +864,12 @@
                                             <local:Icon Data="{StaticResource IcListOrdered}" Width="17" Height="17" Foreground="{DynamicResource Accent}" />
                                         </Border>
                                         <TextBlock Text="Steps" Style="{StaticResource Heading}" Margin="0,12,0,0" />
-                                        <TextBlock Text="How-to guide" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
+                                        <TextBlock Text="" Style="{StaticResource Dim}" FontSize="11" Margin="0,2,0,0" />
                                     </StackPanel>
                                 </Button>
                             </UniformGrid>
                             <Grid Margin="1,2,0,14">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                <local:Icon Data="{StaticResource IcKeyboard}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" VerticalAlignment="Center" />
                                 <TextBlock x:Name="RecordHint" Grid.Column="1" Style="{StaticResource Dim}" FontSize="11.5" TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="Keys that work while a video records (change them in Settings)" />
                                 <Button Grid.Column="2" Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="CaptionGif_Click"
@@ -862,6 +880,23 @@
                                     </StackPanel>
                                 </Button>
                             </Grid>
+                            <Border x:Name="CardGif" Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcImages}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="GIF" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31" ToolTip="50 fps is the smoothest a GIF can play: Discord and browsers slow faster GIFs down">
+                                        <TextBlock Text="Frame rate" Style="{StaticResource Label}" />
+                                        <StackPanel x:Name="GifFpsChoices" Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton Style="{StaticResource Seg}" GroupName="GifFps" Content="15 fps" Tag="15" Checked="GifFps_Checked" ToolTip="Smallest files" />
+                                            <RadioButton Style="{StaticResource Seg}" GroupName="GifFps" Content="30 fps" Tag="30" Checked="GifFps_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" GroupName="GifFps" Content="50 fps" Tag="50" Checked="GifFps_Checked" ToolTip="Smoothest, biggest files" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
                             <Border x:Name="CardVideo" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
@@ -1307,8 +1342,6 @@
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="Pin an image" Style="{StaticResource Heading}" />
-                                <TextBlock Text="Drop, paste or snip" Style="{StaticResource Dim}" Margin="0,2,10,0" TextTrimming="CharacterEllipsis"
-                                           ToolTip="Drop a picture file here, paste one, or snip part of the screen" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="PinClipboard_Click" ToolTip="Pin the picture on the clipboard (Ctrl+Alt+V from anywhere)">
@@ -1528,7 +1561,7 @@
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
                                 <Grid Height="28">
-                                    <TextBlock Text="Recent captures, to drag into other apps" Style="{StaticResource Label}" />
+                                    <TextBlock Text="Recent captures" Style="{StaticResource Label}" />
                                     <Button x:Name="HkRecentButton" Style="{StaticResource Btn}" Tag="HotkeyRecent" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
@@ -1538,12 +1571,12 @@
                                     <TextBlock Text="Recording" Style="{StaticResource Dim}" FontSize="11.5" FontWeight="SemiBold" />
                                 </StackPanel>
                                 <Grid Height="28">
-                                    <TextBlock Text="Record a video (again to stop)" Style="{StaticResource Label}" />
+                                    <TextBlock Text="Record a video" Style="{StaticResource Label}" />
                                     <Button x:Name="HkVideoButton" Style="{StaticResource Btn}" Tag="HotkeyVideo" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
                                 <Grid Height="28">
-                                    <TextBlock Text="Record a GIF (again to stop)" Style="{StaticResource Label}" />
+                                    <TextBlock Text="Record a GIF" Style="{StaticResource Label}" />
                                     <Button x:Name="HkGifButton" Style="{StaticResource Btn}" Tag="HotkeyGif" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
@@ -1612,7 +1645,7 @@
                                 </Grid>
                                 <Border Style="{StaticResource Rule}" />
                                 <TextBlock x:Name="WorkflowsEmpty" Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="0,0,0,4"
-                                           Text="One hotkey for a whole routine, e.g. capture an area, hide private details, add your watermark and copy it. They're in the tray menu too." />
+                                           Text="No workflows yet." />
                                 <StackPanel x:Name="WorkflowRows" />
                             </StackPanel>
                         </Border>
@@ -1665,7 +1698,7 @@
                                     </Button>
                                 </Grid>
                                 <Grid Height="31">
-                                    <TextBlock Text="Colours, hotkeys and sliders back to defaults" Style="{StaticResource Label}" />
+                                    <TextBlock Text="Reset all settings" Style="{StaticResource Label}" />
                                     <Button Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="ResetSettings_Click">
                                         <StackPanel Orientation="Horizontal">
                                             <local:Icon Data="{StaticResource IcRotateCcw}" Width="13" Height="13" Margin="0,0,6,0" />

@@ -173,7 +173,7 @@ public sealed class CaptureToolbar : Border
             Style = (Style)Application.Current.FindResource("Chip"),
             Content = new Icon { Data = Geometry("IcZoomIn"), Width = 14, Height = 14 },
             ToolTip = "Magnifier  (M)",
-            IsChecked = true,
+            IsChecked = CaptureOverlay.MagnifierOn,
             Margin = new Thickness(0, 0, 4, 0),
         };
         _magnifier.Click += (_, _) => Changed?.Invoke();

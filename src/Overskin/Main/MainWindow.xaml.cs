@@ -313,7 +313,8 @@ public partial class MainWindow : Window
         HkRecPenButton.Content = _settings.HotkeyDraw;
         HkRecPauseButton.Content = _settings.HotkeyPause;
         TileVideoKey.Text = _settings.HotkeyVideo;
-        RecordHint.Text = $"While recording: {_settings.HotkeyPause} pauses · {_settings.HotkeyDraw} draws";
+        RecordHint.Text = "";
+        RecordHint.ToolTip = $"While recording: {_settings.HotkeyPause} pauses, {_settings.HotkeyDraw} draws";
         HkSnipButton.Content = _settings.HotkeySnip;
         HintSnipKey.Text = _settings.HotkeySnip;
         HkRegionButton.Content = _settings.HotkeyRegion;
@@ -1387,6 +1388,13 @@ public partial class MainWindow : Window
             PageCapture.ScrollToEnd();
             await Shot("capture-watermark.png");
             PageCapture.ScrollToTop();
+            // the Taking screenshots card, open
+            if (!_folds[0].IsOpen) _folds[0].Toggle();
+            await Task.Delay(400);
+            PageCapture.ScrollToVerticalOffset(380);
+            await Shot("capture-shooting.png");
+            _folds[0].Toggle();
+            PageCapture.ScrollToTop();
             if (_settings.Workflows.Count == 0)
             {
                 _settings.Workflows.Add(new Workflow { Name = "Share safely", Hotkey = "Ctrl+Alt+1", AutoHide = true, Watermark = true, Save = true, Copy = true });
@@ -1515,6 +1523,23 @@ public partial class MainWindow : Window
                 var geEnc = new PngBitmapEncoder();
                 geEnc.Frames.Add(BitmapFrame.Create(geShot));
                 using (var f = System.IO.File.Create(System.IO.Path.Combine(folder, "gif-editor.png"))) geEnc.Save(f);
+                ge.SettingsScroll.ScrollToEnd();
+                await Task.Delay(400);
+                var geShot2 = new RenderTargetBitmap((int)(ge.ActualWidth * 1.5), (int)(ge.ActualHeight * 1.5), 144, 144, PixelFormats.Pbgra32);
+                geShot2.Render((FrameworkElement)ge.Content);
+                var geEnc2 = new PngBitmapEncoder();
+                geEnc2.Frames.Add(BitmapFrame.Create(geShot2));
+                using (var f = System.IO.File.Create(System.IO.Path.Combine(folder, "gif-editor-2.png"))) geEnc2.Save(f);
+                ge.SettingsScroll.ScrollToTop();
+                ge.CropButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                await Task.Delay(300);
+                ge.SetCropForTest(new Rect(gclip.Width * 0.15, gclip.Height * 0.2, gclip.Width * 0.6, gclip.Height * 0.55));
+                await Task.Delay(300);
+                var geShot3 = new RenderTargetBitmap((int)(ge.ActualWidth * 1.5), (int)(ge.ActualHeight * 1.5), 144, 144, PixelFormats.Pbgra32);
+                geShot3.Render((FrameworkElement)ge.Content);
+                var geEnc3 = new PngBitmapEncoder();
+                geEnc3.Frames.Add(BitmapFrame.Create(geShot3));
+                using (var f = System.IO.File.Create(System.IO.Path.Combine(folder, "gif-crop.png"))) geEnc3.Save(f);
                 ge.Close();
             }
 

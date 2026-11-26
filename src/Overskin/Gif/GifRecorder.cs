@@ -25,8 +25,13 @@ public interface IRecorder
 
 public sealed class GifRecorder : IRecorder
 {
-    public const int Fps = 15;
+    /// <summary>Frames per second for this recording (set when it starts).</summary>
+    public int Fps { get; private set; } = 30;
     public const int MaxSeconds = 30;
+
+    /// <summary>15, 30 or 50. GIF times are in hundredths of a second, and Discord and browsers play
+    /// anything under two hundredths slowly, so 50 is the smoothest a GIF can be.</summary>
+    public static int ValidFps(int fps) => fps >= 50 ? 50 : fps >= 30 ? 30 : 15;
     private const long MaxBytes = 900L * 1024 * 1024;
     private const int MaxWidth = 960;
 
@@ -45,12 +50,24 @@ public sealed class GifRecorder : IRecorder
     public GifRecorder(Dispatcher ui) => _ui = ui;
 
     public TimeSpan Elapsed => _clock.Elapsed;
-    public TimeSpan? Limit => TimeSpan.FromSeconds(MaxSeconds);
+    /// <summary>How long this recording can run: 30 seconds, or less for a big area at a high frame rate (memory).</summary>
+    public TimeSpan? Limit => TimeSpan.FromSeconds(_limitSeconds);
+    private double _limitSeconds = MaxSeconds;
 
-    public void Start(Int32Rect area, bool cursor)
+    /// <summary>Most frames a recording of this area can hold, at <see cref="Fps"/>.</summary>
+    private int MaxFrames(Int32Rect area)
+    {
+        int k = Math.Max(1, (int)Math.Ceiling(area.Width / (double)MaxWidth));
+        long frameBytes = (long)(area.Width / k) * (area.Height / k) * 4;
+        return (int)Math.Min(Fps * MaxSeconds, Math.Max(Fps, MaxBytes / Math.Max(1, frameBytes)));
+    }
+
+    public void Start(Int32Rect area, bool cursor, int fps = 30)
     {
         if (IsRecording) return;
         IsRecording = true;
+        Fps = ValidFps(fps);
+        _limitSeconds = MaxFrames(area) / (double)Fps;
         _stop = _cancel = false;
 
         _frame = new RecordFrameWindow(area);
@@ -74,8 +91,7 @@ public sealed class GifRecorder : IRecorder
         // big areas are shrunk while recording: GIFs that size are unusable anyway, and memory stays sane
         int k = Math.Max(1, (int)Math.Ceiling(area.Width / (double)MaxWidth));
         int outW = area.Width / k, outH = area.Height / k;
-        long frameBytes = (long)outW * outH * 4;
-        int maxFrames = (int)Math.Min(Fps * MaxSeconds, Math.Max(Fps, MaxBytes / Math.Max(1, frameBytes)));
+        int maxFrames = MaxFrames(area);
 
         var frames = new List<byte[]>();
         var stamps = new List<long>();

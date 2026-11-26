@@ -44,6 +44,7 @@ public partial class GifEditorWindow : Window
         Scrubber.Maximum = TrimStart.Maximum = TrimEnd.Maximum = Math.Max(0, clip.Count - 1);
         TrimEnd.Value = clip.Count - 1;
         StyleCaption.IsChecked = true;
+        FontLibrary.ShowName(FontName, ShownFont);
         _syncing = false;
 
         // a single picture doesn't need the timeline
@@ -78,7 +79,34 @@ public partial class GifEditorWindow : Window
     private CaptionStyle CapStyle =>
         StyleMeme.IsChecked == true ? CaptionStyle.Meme : StyleNone.IsChecked == true ? CaptionStyle.None : CaptionStyle.Caption;
 
-    private CaptionSettings Caption => new(CapStyle, TopBox.Text, BottomBox.Text, TextSize.Value);
+    /// <summary>The chosen font; empty for the style's usual one. Remembered for the next GIF.</summary>
+    private static string _font = "";
+
+    private Color? CapColour =>
+        Chosen(ColourChoices) is { Length: > 0 } hex ? (Color)ColorConverter.ConvertFromString(hex) : null;
+
+    private CaptionSettings Caption => new(CapStyle, TopBox.Text, BottomBox.Text, TextSize.Value,
+        _font, CapColour, Chosen(BarChoices) == "Below");
+
+    /// <summary>The font in use, by name, for the font button.</summary>
+    private string ShownFont => _font.Length > 0 ? _font : CapStyle == CaptionStyle.Meme ? "Impact" : FontLibrary.CaptionDefault;
+
+    private void Font_Click(object sender, RoutedEventArgs e) =>
+        FontLibrary.ShowMenu(FontButton, ShownFont, name =>
+        {
+            _font = name;
+            FontLibrary.ShowName(FontName, ShownFont);
+            Changed();
+        });
+
+    /// <summary>"Normal", "Grey", "Sepia" or "Vivid".</summary>
+    internal string Look => Chosen(LookChoices);
+    internal bool Mirrored => MirrorSwitch.IsChecked == true;
+
+    /// <summary>How many times the GIF plays: 0 for forever.</summary>
+    private int Repeats => int.TryParse(Chosen(RepeatChoices), out int n) ? n : 0;
+
+    private void Option_Click(object sender, RoutedEventArgs e) => Changed();
 
     private double Speed => double.TryParse(Chosen(SpeedChoices), System.Globalization.NumberStyles.Float,
         System.Globalization.CultureInfo.InvariantCulture, out double s) ? s : 1;
@@ -104,13 +132,22 @@ public partial class GifEditorWindow : Window
             _ => forward,
         };
         double speed = Speed;
-        _sequence = order.Select(f => (f, Math.Max(20, (int)Math.Round(_clip.DelaysMs[f] / speed)))).ToList();
+        var timed = order.Select(f => (Frame: f, Ms: (double)_clip.DelaysMs[f])).ToList();
+        if (FewerSwitch.IsChecked == true && timed.Count > 2)
+        {
+            // every other frame, each shown for as long as the pair it stands for
+            var half = new List<(int Frame, double Ms)>();
+            for (int i = 0; i < timed.Count; i += 2)
+                half.Add((timed[i].Frame, timed[i].Ms + (i + 1 < timed.Count ? timed[i + 1].Ms : 0)));
+            timed = half;
+        }
+        _sequence = timed.Select(t => (t.Frame, Math.Max(20, (int)Math.Round(t.Ms / speed)))).ToList();
         _position = Math.Min(_position, Math.Max(0, _sequence.Count - 1));
 
         int total = _sequence.Sum(s => s.DelayMs);
         var size = CaptionRenderer.Layout(PictureWidth, PictureHeight, OutputWidth, Caption, out _);
         OutputText.Text = $"{(int)size.Width} × {(int)size.Height}";
-        TrimText.Text = $"{(b - a + 1)} frames  ·  {total / 1000.0:0.0} s";
+        TrimText.Text = $"{_sequence.Count} frames  ·  {total / 1000.0:0.0} s";
     }
 
     private void Style_Checked(object sender, RoutedEventArgs e)
@@ -118,8 +155,12 @@ public partial class GifEditorWindow : Window
         if (!IsInitialized) return;
         BottomPanel.Visibility = CapStyle == CaptionStyle.Meme ? Visibility.Visible : Visibility.Collapsed;
         TopLabel.Text = CapStyle == CaptionStyle.Meme ? "Top text" : "Caption";
-        TopBox.IsEnabled = CapStyle != CaptionStyle.None;
-        TextSize.IsEnabled = CapStyle != CaptionStyle.None;
+        bool any = CapStyle != CaptionStyle.None;
+        TopBox.IsEnabled = TextSize.IsEnabled = FontButton.IsEnabled = ColourChoices.IsEnabled = any;
+        // the bar's colour for a white-bar caption, the letters' colour on the picture
+        ColourLabel.Text = CapStyle == CaptionStyle.Meme ? "Text" : "Bar";
+        BarPlace.Visibility = CapStyle == CaptionStyle.Meme ? Visibility.Collapsed : Visibility.Visible;
+        FontLibrary.ShowName(FontName, ShownFont);
         Changed();
     }
 
@@ -251,6 +292,11 @@ public partial class GifEditorWindow : Window
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
+        if (CropKey(e.Key))
+        {
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.Space && Keyboard.FocusedElement is not TextBox)
         {
             e.Handled = true;
@@ -271,6 +317,7 @@ public partial class GifEditorWindow : Window
         var sequence = _sequence.ToList();
         var caption = Caption;
         int outW = OutputWidth;
+        int repeats = Repeats;
         string temp = path + ".part";
         try
         {
@@ -282,7 +329,7 @@ public partial class GifEditorWindow : Window
                 {
                     var (frame, delay) = sequence[i];
                     byte[] px = CaptionRenderer.Render(Picture(frame), outW, caption, out int w, out int h);
-                    writer ??= new GifWriter(file, w, h);
+                    writer ??= new GifWriter(file, w, h, repeats);
                     var wr = writer;
                     await Task.Run(() => wr.AddFrame(px, delay));
                     ExportProgress.Value = (i + 1.0) / sequence.Count;

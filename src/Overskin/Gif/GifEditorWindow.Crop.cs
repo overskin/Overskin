@@ -36,11 +36,14 @@ public partial class GifEditorWindow
     /// <summary>A frame as it goes into the GIF: cropped, when there's a crop.</summary>
     private BitmapSource Picture(int frame)
     {
-        var bmp = _clip.FrameBitmap(frame);
-        if (CropArea is not { } c) return bmp;
-        var cut = new CroppedBitmap(bmp, c);
-        cut.Freeze();
-        return cut;
+        BitmapSource bmp = _clip.FrameBitmap(frame);
+        if (CropArea is { } c)
+        {
+            var cut = new CroppedBitmap(bmp, c);
+            cut.Freeze();
+            bmp = cut;
+        }
+        return GifLook.Apply(bmp, Look, Mirrored);
     }
 
     /// <summary>Where the whole frame sits in the preview while cropping (the preview shows it with no caption then).</summary>
@@ -55,16 +58,41 @@ public partial class GifEditorWindow
 
     private bool Cropping => _cropBox?.Active == true;
 
+    private Rect? _cropBefore;
+
     private void CropMode_Click(object sender, RoutedEventArgs e) => SetCropping(!Cropping);
 
     private void SetCropping(bool on)
     {
+        if (on && !Cropping)
+        {
+            _cropBefore = Cropper.Box;
+            CropButton.Focus(); // out of the caption box, so Enter and Esc reach the crop
+        }
         Cropper.Active = on;
         CropCanvas.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        CropButton.Content = on ? "Done" : "Draw the crop";
+        CropButton.Content = on ? "Done" : "Crop";
+        CropCancelButton.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         Rebuild();
         ShowFrame(ShownFrame);
         Cropper.Draw();
+    }
+
+    /// <summary>Leaves cropping and puts the box back how it was.</summary>
+    private void CropCancel_Click(object sender, RoutedEventArgs e)
+    {
+        if (!Cropping) return;
+        Cropper.Box = _cropBefore;
+        SetCropping(false);
+    }
+
+    /// <summary>While cropping, Enter keeps the crop and Esc cancels it, as in other crop tools.</summary>
+    private bool CropKey(System.Windows.Input.Key key)
+    {
+        if (!Cropping || System.Windows.Input.Keyboard.FocusedElement is TextBox) return false;
+        if (key == System.Windows.Input.Key.Enter) { SetCropping(false); return true; }
+        if (key == System.Windows.Input.Key.Escape) { CropCancel_Click(this, new RoutedEventArgs()); return true; }
+        return false;
     }
 
     private void CropReset_Click(object sender, RoutedEventArgs e)
@@ -84,7 +112,9 @@ public partial class GifEditorWindow
     }
 
 #if DEBUG
+    internal List<(int Frame, int DelayMs)> SequenceForTest => _sequence;
     internal void SetCropForTest(Rect box) => Cropper.SetForTest(box);
+    internal Rect? CropBoxForTest => _cropBox?.Box;
     internal Size OutputSizeForTest => CaptionRenderer.Layout(PictureWidth, PictureHeight, OutputWidth, Caption, out _);
     internal (int W, int H) RenderFrameForTest(int frame)
     {

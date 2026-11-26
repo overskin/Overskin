@@ -128,8 +128,6 @@
                                         <Button Style="{StaticResource Btn}" Height="26" Margin="0,0,6,0" Click="StartHere_Click" ToolTip="Start where the video is now  (I)" Content="Start here" />
                                         <Button Style="{StaticResource Btn}" Height="26" Click="EndHere_Click" ToolTip="End where the video is now  (O)" Content="End here" />
                                     </StackPanel>
-                                    <TextBlock Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,10,0,0"
-                                               Text="Playing loops the part you keep. The original file isn't changed: Save makes an edited copy." />
                                 </StackPanel>
                             </Border>
                             <Border Style="{StaticResource Card}">
@@ -148,11 +146,10 @@
                                         <RadioButton Style="{StaticResource Seg}" GroupName="CropShape" MinWidth="0" Padding="9,0" Content="4:3" Tag="4:3" Checked="CropShape_Checked" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal">
-                                        <Button x:Name="CropButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,0" Click="CropMode_Click" Content="Draw the crop"
+                                        <Button x:Name="CropButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,0" Click="CropMode_Click" Content="Crop"
                                                 ToolTip="Then drag on the picture. Drag inside the box to move it, or its edges and corners to resize it" />
                                         <Button Style="{StaticResource Btn}" Height="26" Click="CropReset_Click" Content="Reset" ToolTip="Keep the whole picture" />
                                     </StackPanel>
-                                    <TextBlock Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,8,0,0" Text="Outside the box is left out of the saved video. Blur boxes, text and arrows stay where you put them." />
                                 </StackPanel>
                             </Border>
                             <Border x:Name="ZoomCard" Style="{StaticResource Card}" Visibility="Collapsed">
@@ -165,8 +162,6 @@
                                     <StackPanel x:Name="ZoomList" />
                                     <Button Style="{StaticResource Btn}" Height="26" HorizontalAlignment="Left" Margin="0,4,0,0" Click="AddZoom_Click"
                                             ToolTip="Zooms in from where the video is now for 3 seconds, following the pointer" Content="Add a zoom here" />
-                                    <TextBlock x:Name="ZoomNote" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,8,0,0"
-                                               Text="Zooms show in your accent colour under the video. Change them here, then Save." />
                                 </StackPanel>
                             </Border>
                             <Border Style="{StaticResource Card}">
@@ -184,8 +179,6 @@
                                                 ToolTip="Click here, play or scrub to where the cut should end, then click again  (X)" Content="Cut from here" />
                                         <Button Style="{StaticResource Btn}" Height="26" Margin="0,0,6,6" Click="ClearCuts_Click" Content="Clear cuts" />
                                     </WrapPanel>
-                                    <TextBlock Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,4,0,0"
-                                               Text="Cut parts show in red under the video and are skipped while it plays." />
                                 </StackPanel>
                             </Border>
                             <Border x:Name="SubtitlesCard" Style="{StaticResource Card}">
@@ -205,8 +198,6 @@
                                     <ScrollViewer x:Name="SubtitleScroll" MaxHeight="260" VerticalScrollBarVisibility="Auto" Visibility="Collapsed" Margin="0,2,0,0">
                                         <StackPanel x:Name="SubtitleList" Margin="0,0,4,0" />
                                     </ScrollViewer>
-                                    <TextBlock x:Name="SubtitlesNote" Style="{StaticResource Dim}" FontSize="11" TextWrapping="Wrap" Margin="1,4,0,0"
-                                               Text="Works out the words and the language by itself, offline. Fix any word by typing over it; drag the subtitles on the video to move them all." />
                                 </StackPanel>
                             </Border>
                             <Border Style="{StaticResource Card}">

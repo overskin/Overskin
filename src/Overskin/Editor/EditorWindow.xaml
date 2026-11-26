@@ -170,6 +170,20 @@
 
                         <StackPanel x:Name="TextStyleOptions" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                             <Border Style="{StaticResource ToolSep}" />
+                            <Button x:Name="TextFontButton" Style="{StaticResource Btn}" Height="28" MinWidth="130" MaxWidth="180" Margin="0,0,6,0"
+                                    HorizontalContentAlignment="Stretch" Padding="8,0" Click="TextFont_Click" ToolTip="Font">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="TextFontName" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    <local:Icon Grid.Column="1" Data="{StaticResource IcChevronRight}" Width="10" Height="10" Margin="6,0,0,0"
+                                                RenderTransformOrigin="0.5,0.5">
+                                        <local:Icon.RenderTransform><RotateTransform Angle="90" /></local:Icon.RenderTransform>
+                                    </local:Icon>
+                                </Grid>
+                            </Button>
                             <RadioButton x:Name="TextNormal" Style="{StaticResource Seg}" GroupName="TextStyle" Tag="Normal" Content="Normal" Margin="0" Checked="TextStyle_Checked" ToolTip="Plain text" />
                             <RadioButton x:Name="TextBold" Style="{StaticResource Seg}" GroupName="TextStyle" Tag="Bold" Checked="TextStyle_Checked" ToolTip="Bold">
                                 <TextBlock Text="Bold" FontWeight="Bold" />

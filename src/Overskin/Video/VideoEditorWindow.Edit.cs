@@ -366,7 +366,6 @@ public partial class VideoEditorWindow
         _zooms!.Zooms.Sort((a, b) => a.Start.CompareTo(b.Start));
         RebuildZoomList();
         UpdateCuts();
-        ZoomNote.Text = "Save makes the video again with these zooms.";
     }
 
     private void AddZoom_Click(object sender, RoutedEventArgs e)

@@ -22,7 +22,36 @@
   and *Fade after* sets how long each stays (half a second to 15 seconds). With fading off,
   what you draw stays until you stop drawing, then fades all together.
 
+- **Fonts for captions and text**: the GIF editor and the picture editor's text tool have a font
+  picker, each font shown in its own look. Six free fonts come with Overskin (Anton, Bebas Neue,
+  Oswald, Bangers, Permanent Marker, Comic Neue), alongside Impact, Segoe UI and others from
+  Windows. *Add a font…* loads any font file you have, and it stays for next time.
+- **The Discord caption look**: white-bar GIF captions now use Anton, the closest free match to
+  the Futura Condensed Extra Bold those memes use. If Futura is installed, it's used instead.
+- **More GIF editor options**: the caption bar can be white, black or yellow and go above or
+  below the GIF; top-and-bottom text can be white, black or yellow. New speeds (¼× and 3×), play
+  forever, once or three times, colour looks (grey, sepia, vivid), mirror, and *Fewer frames* for
+  about half the file size.
+- **Taking screenshots settings**: a new card on the Capture page for the magnifier (on by
+  default; the capture bar's button changes it too) and crosshair lines across the screen.
+- **Smoother GIFs**: a new GIF card on the Recording page sets the frame rate before you record:
+  15, 30 (now the default, up from 15) or 50 fps. 50 is the smoothest a GIF can play; Discord
+  and browsers slow anything faster down. Big areas at 50 fps can record for less than 30
+  seconds, and the record bar shows the real limit.
+
 ### Improved
+
+- **Copying is instant**: the picture goes on the clipboard the moment it's taken, before it's
+  saved and before Overskin's window comes back, so Ctrl+V works straight away. The saved file
+  joins it a moment later, so pasting into a chat or a folder still keeps its name.
+- **Fewer extra lines of text**: the short descriptions under headings and buttons (such as
+  "Whole page", "How-to guide", "Drop, paste or snip" and the notes in the video and GIF
+  editors) are gone, and hotkey names are shorter.
+- **Cropping works like a photo app**: Crop in the GIF editor starts with the whole picture
+  framed, with thick corner and edge handles to pull in. Drag inside to move it, Enter or Done
+  keeps it, Esc or Cancel puts it back. The video editor's crop starts framed the same way.
+- **The preview card fades as you swipe it left**, and is faint once letting go would open the
+  viewer, so you can tell when it will.
 
 - **Snapping to pictures finds far more of them.** Pictures whose corners aren't all the same
   (a chat bubble's tail, a card with only its top corners rounded, gallery tiles), iOS-style

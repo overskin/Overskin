@@ -103,6 +103,7 @@ public partial class App : Application
             else if (e.Args.Contains("--speed")) { try { SpeedTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else if (e.Args.Contains("--pictures")) { try { PictureTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else if (e.Args.Contains("--pass")) { try { PassTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
+            else if (e.Args.Contains("--fonts")) { try { FontAndGifTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else if (e.Args.Contains("--subtitles")) { try { SubtitleTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else try { MoreFeatureTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); }
             System.IO.File.WriteAllLines(e.Args[1], quick);

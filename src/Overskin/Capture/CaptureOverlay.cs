@@ -51,6 +51,14 @@ public sealed class CaptureOverlay : Window
     private readonly Border _label = new();
     private readonly TextBlock _labelText = new();
     private readonly Border _magnifier = new();
+    private readonly Line _crossH = new() { Stroke = new SolidColorBrush(Color.FromArgb(0xB0, 0xFF, 0xFF, 0xFF)), IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+    private readonly Line _crossV = new() { Stroke = new SolidColorBrush(Color.FromArgb(0xB0, 0xFF, 0xFF, 0xFF)), IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+
+    /// <summary>From the settings: whether the magnifier starts on, and whether crosshair lines follow the pointer.</summary>
+    public static bool MagnifierOn = true, CrosshairOn;
+
+    /// <summary>Whether the magnifier was on when the overlay closed (it can be switched on the capture bar).</summary>
+    public bool MagnifierShown => _toolbar?.Magnifier ?? MagnifierOn;
     private readonly Rectangle _zoom = new();
     private readonly ImageBrush _zoomBrush;
     private readonly Border _swatch = new() { Width = 12, Height = 12, Margin = new Thickness(0, 0, 7, 0) };
@@ -173,6 +181,8 @@ public sealed class CaptureOverlay : Window
         _canvas.Children.Add(_backdrop);
         _canvas.Children.Add(_ink);
         if (mode != OverlayMode.Colour) _canvas.Children.Add(_dim);
+        _canvas.Children.Add(_crossH);
+        _canvas.Children.Add(_crossV);
         _canvas.Children.Add(_frame);
         _canvas.Children.Add(_ruler);
         _canvas.Children.Add(_label);
@@ -652,8 +662,20 @@ public sealed class CaptureOverlay : Window
                 ShowRuler(_start, p);
                 break;
         }
-        bool magnify = Tool == CaptureTool.None && (_toolbar?.Magnifier ?? true) && !(_toolbar?.IsMouseOver ?? false);
+        bool magnify = Tool == CaptureTool.None && (_toolbar?.Magnifier ?? MagnifierOn) && !(_toolbar?.IsMouseOver ?? false);
         _magnifier.Visibility = magnify ? Visibility.Visible : Visibility.Collapsed;
+
+        // crosshair lines right across the screen, for lining up an edge
+        bool cross = CrosshairOn && Tool == CaptureTool.None && _mode is OverlayMode.Region or OverlayMode.Colour && !(_toolbar?.IsMouseOver ?? false);
+        _crossH.Visibility = _crossV.Visibility = cross ? Visibility.Visible : Visibility.Collapsed;
+        if (cross)
+        {
+            var c = Local(p.X, p.Y);
+            double y = Math.Floor(c.Y) + 0.5 / _scale, x = Math.Floor(c.X) + 0.5 / _scale;
+            _crossH.StrokeThickness = _crossV.StrokeThickness = 1 / _scale;
+            _crossH.X1 = 0; _crossH.X2 = _backdrop.Width; _crossH.Y1 = _crossH.Y2 = y;
+            _crossV.Y1 = 0; _crossV.Y2 = _backdrop.Height; _crossV.X1 = _crossV.X2 = x;
+        }
         var cursor = Tool != CaptureTool.None ? Cursors.Pen : Cursors.Cross;
         if (Cursor != cursor) Cursor = cursor;
 

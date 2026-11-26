@@ -8,7 +8,11 @@ namespace Overskin;
 public enum CaptionStyle { None, Caption, Meme }
 
 /// <summary>Everything that decides how a captioned frame looks.</summary>
-public sealed record CaptionSettings(CaptionStyle Style, string Top, string Bottom, double Size);
+/// <param name="Font">A <see cref="FontLibrary"/> name; empty for the style's usual font.</param>
+/// <param name="Colour">White bar style: the bar's colour. Top and bottom: the letters' colour.</param>
+/// <param name="BarBelow">White bar style: the bar goes under the picture instead of above it.</param>
+public sealed record CaptionSettings(CaptionStyle Style, string Top, string Bottom, double Size,
+    string Font = "", Color? Colour = null, bool BarBelow = false);
 
 /// <summary>
 /// Draws a frame with its caption. Used both for the live preview and for export, so what you see
@@ -16,23 +20,15 @@ public sealed record CaptionSettings(CaptionStyle Style, string Top, string Bott
 /// </summary>
 public static class CaptionRenderer
 {
-    // The white-bar caption memes use Futura Condensed Extra Bold; Windows doesn't ship it, so
-    // the nearest installed heavy condensed face is used when it's missing.
-    private static readonly Typeface CaptionFace = PickCaptionFace();
-    private static readonly Typeface MemeFace = new(new FontFamily("Impact, Arial Black"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+    // The white-bar caption memes use Futura Condensed Extra Bold, a paid font: it's used when
+    // it's installed, and otherwise Anton, the nearest free one, which comes with Overskin.
+    private static Typeface CaptionFace(CaptionSettings s) =>
+        FontLibrary.Find(s.Font.Length > 0 ? s.Font : FontLibrary.CaptionDefault).Face;
 
-    private static Typeface PickCaptionFace()
-    {
-        foreach (var name in new[] { "Futura Condensed ExtraBold", "Futura Condensed Extra Bold", "Futura Extra Black Condensed" })
-        {
-            var face = new Typeface(new FontFamily(name), FontStyles.Normal, FontWeights.ExtraBold, FontStretches.Condensed);
-            if (face.TryGetGlyphTypeface(out var glyph) && glyph.FamilyNames.Values.Any(n => n.StartsWith("Futura", StringComparison.OrdinalIgnoreCase)))
-                return face;
-        }
-        var bahn = new Typeface(new FontFamily("Bahnschrift"), FontStyles.Normal, FontWeights.Bold, FontStretches.Condensed);
-        if (bahn.TryGetGlyphTypeface(out _)) return bahn;
-        return new Typeface(new FontFamily("Arial Narrow, Arial"), FontStyles.Normal, FontWeights.Bold, FontStretches.Condensed);
-    }
+    private static Typeface MemeFace(CaptionSettings s) => FontLibrary.Find(s.Font.Length > 0 ? s.Font : "Impact").Face;
+
+    private static Color BarColour(CaptionSettings s) => s.Colour ?? Colors.White;
+    private static Color Ink(Color under) => 0.299 * under.R + 0.587 * under.G + 0.114 * under.B > 128 ? Colors.Black : Colors.White;
 
     private static FormattedText Text(string text, Typeface face, double em, double maxWidth, Brush brush) =>
         new(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, face, Math.Max(4, em), brush, 1.0)
@@ -49,7 +45,7 @@ public static class CaptionRenderer
         if (s.Style == CaptionStyle.Caption && !string.IsNullOrWhiteSpace(s.Top))
         {
             double em = outW * 0.075 * s.Size;
-            var ft = Text(s.Top.Trim(), CaptionFace, em, outW * 0.9, Brushes.Black);
+            var ft = Text(s.Top.Trim(), CaptionFace(s), em, outW * 0.9, Brushes.Black);
             barHeight = Math.Round(ft.Height + em * 1.1);
         }
         return new Size(outW, Math.Max(1, barHeight + frameHeight));
@@ -60,35 +56,38 @@ public static class CaptionRenderer
         var size = Layout(frame.PixelWidth, frame.PixelHeight, outW, s, out double bar);
         double frameH = size.Height - bar;
 
+        double barY = s.BarBelow ? frameH : 0, frameY = s.BarBelow ? 0 : bar;
         if (bar > 0)
         {
-            dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, outW, bar));
+            var paper = BarColour(s);
+            dc.DrawRectangle(new SolidColorBrush(paper), null, new Rect(0, barY, outW, bar));
             double em = outW * 0.075 * s.Size;
-            var ft = Text(s.Top.Trim(), CaptionFace, em, outW * 0.9, Brushes.Black);
-            dc.DrawText(ft, new Point(outW * 0.05, (bar - ft.Height) / 2));
+            var ft = Text(s.Top.Trim(), CaptionFace(s), em, outW * 0.9, new SolidColorBrush(Ink(paper)));
+            dc.DrawText(ft, new Point(outW * 0.05, barY + (bar - ft.Height) / 2));
         }
 
-        dc.DrawImage(frame, new Rect(0, bar, outW, frameH));
+        dc.DrawImage(frame, new Rect(0, frameY, outW, frameH));
 
         if (s.Style == CaptionStyle.Meme)
         {
             double em = outW * 0.1 * s.Size;
-            DrawOutlined(dc, s.Top, em, outW, top: true, 0, frameH);
-            DrawOutlined(dc, s.Bottom, em, outW, top: false, 0, frameH);
+            DrawOutlined(dc, s, s.Top, em, outW, top: true, 0, frameH);
+            DrawOutlined(dc, s, s.Bottom, em, outW, top: false, 0, frameH);
         }
     }
 
-    /// <summary>Classic image-macro text: white Impact capitals with a thick black outline.</summary>
-    private static void DrawOutlined(DrawingContext dc, string text, double em, int outW, bool top, double y0, double frameH)
+    /// <summary>Classic image-macro text: white Impact capitals with a thick black outline (any font and colour).</summary>
+    private static void DrawOutlined(DrawingContext dc, CaptionSettings s, string text, double em, int outW, bool top, double y0, double frameH)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
-        var ft = Text(text.Trim().ToUpper(CultureInfo.CurrentCulture), MemeFace, em, outW * 0.94, Brushes.White);
+        var fill = s.Colour ?? Colors.White;
+        var ft = Text(text.Trim().ToUpper(CultureInfo.CurrentCulture), MemeFace(s), em, outW * 0.94, Brushes.White);
         double margin = frameH * 0.03;
         double y = top ? y0 + margin : y0 + frameH - ft.Height - margin;
         var geometry = ft.BuildGeometry(new Point(outW * 0.03, y));
-        var pen = new Pen(Brushes.Black, Math.Max(1.5, em * 0.11)) { LineJoin = PenLineJoin.Round };
+        var pen = new Pen(new SolidColorBrush(Ink(fill)), Math.Max(1.5, em * 0.11)) { LineJoin = PenLineJoin.Round };
         dc.DrawGeometry(null, pen, geometry);
-        dc.DrawGeometry(Brushes.White, null, geometry);
+        dc.DrawGeometry(new SolidColorBrush(fill), null, geometry);
     }
 
     /// <summary>One finished frame as BGRA bytes.</summary>

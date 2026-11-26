@@ -89,6 +89,12 @@ public sealed class AppSettings
     /// <summary>How saved captures are named, such as "{app} {date} {time}" (see <see cref="FileNames"/>).</summary>
     public string FileNamePattern { get; set; } = FileNames.Default;
     public int CaptureDelay { get; set; }
+    /// <summary>Frames per second for GIF recordings: 15, 30 or 50 (the most a GIF can play).</summary>
+    public int GifFps { get; set; } = 30;
+    /// <summary>Show the magnifier while choosing what to capture.</summary>
+    public bool Magnifier { get; set; } = true;
+    /// <summary>Lines across the whole screen through the pointer while choosing.</summary>
+    public bool Crosshair { get; set; }
     public bool FullScreenAllMonitors { get; set; }
     public int[]? LastRegion { get; set; }
     public List<HistoryEntry> History { get; set; } = new();

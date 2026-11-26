@@ -32,8 +32,10 @@ public partial class MainWindow
                 _settings.Save();
             }));
 
+        Fold(CardShooting, "shooting", ShootingSummary);
         Fold(CardAfter, "after", AfterSummary);
         Fold(CardWatermark, "watermark", WatermarkSummary);
+        Fold(CardGif, "gif", () => $"{GifRecorder.ValidFps(_settings.GifFps)} fps");
         Fold(CardVideo, "video", VideoSummary);
         Fold(CardSound, "sound", SoundSummary);
         Fold(CardWebcam, "webcam", WebcamSummary);
@@ -50,10 +52,19 @@ public partial class MainWindow
     /// <summary>For the self-test: each card's summary as shown while folded.</summary>
     internal List<string> FoldSummariesForTest() => new()
     {
-        AfterSummary(), WatermarkSummary(), VideoSummary(), SoundSummary(), WebcamSummary(), PointerSummary(), ZoomSummary(),
+        ShootingSummary(), AfterSummary(), WatermarkSummary(), VideoSummary(), SoundSummary(), WebcamSummary(), PointerSummary(), ZoomSummary(),
     };
 
     internal int FoldCountForTest => _folds.Count;
+
+    private string ShootingSummary()
+    {
+        var s = _settings;
+        var parts = new List<string>();
+        if (s.Magnifier) parts.Add("Magnifier");
+        if (s.Crosshair) parts.Add("Crosshair");
+        return parts.Count == 0 ? "Off" : string.Join(" · ", parts);
+    }
 
     private string AfterSummary()
     {
@@ -373,7 +384,12 @@ public partial class MainWindow
             await Task.Delay(400);
             double backLeft = (c1?.Left ?? 0) - home;
             bool stillOpen = c1?.IsVisible == true;
-            c1?.BeginSwipe(0); c1?.MoveSwipe(-60, 100); c1?.MoveSwipe(-110, 300);
+            c1?.BeginSwipe(0); c1?.MoveSwipe(-20, 50);
+            double fadeNear = c1?.Opacity ?? 0;
+            c1?.MoveSwipe(-60, 100);
+            double fadeHalf = c1?.Opacity ?? 0;
+            c1?.MoveSwipe(-110, 300);
+            double fadeThere = c1?.Opacity ?? 0;
             int open = c1?.EndSwipe(500) ?? 9;
             var c2 = await Card(true);
             c2?.BeginSwipe(0); c2?.MoveSwipe(12, 16); c2?.MoveSwipe(40, 48);
@@ -386,6 +402,7 @@ public partial class MainWindow
             double lean = (c3?.Left ?? 0) - home3;
             int none = c3?.EndSwipe(500) ?? 9;
             CaptureNotice.CloseAll();
+            log.Add($"preview swipe fade: left 20={fadeNear:0.00} left 60={fadeHalf:0.00} past opening={fadeThere:0.00} (expect 1.00, between, 0.35)");
             log.Add($"preview swipe: short={back} back-at={backLeft:0} open={stillOpen}; far-left={open} viewed={viewed}; " +
                     $"flick-right={flick} closed={flickClosed}; no-viewer lean={lean:0} result={none} " +
                     "(expect 0 0 True; -1 1; 1 True; lean -30 result 0)");
