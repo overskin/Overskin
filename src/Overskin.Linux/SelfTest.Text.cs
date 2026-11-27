@@ -289,7 +289,7 @@ public static partial class SelfTest
             var made = dialog.CurrentForTest();
             var s = App.Settings;
             string replayKey = s.HotkeyReplay;
-            string reordered = string.Join("+", replayKey.Split('+').Reverse());
+            string reordered = string.Join("+", Enumerable.Reverse(replayKey.Split('+')));
             string? clash = App.Current.HotkeyUsedBy(reordered);
             s.Workflows.Add(w);
             string? clashFlow = App.Current.HotkeyUsedBy("Alt+Ctrl+7");
