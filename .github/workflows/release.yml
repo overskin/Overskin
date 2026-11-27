@@ -45,3 +45,65 @@ jobs:
         with:
           files: dist/OverskinSetup.exe
           generate_release_notes: true
+
+  # the Mac app, built and tested on a Mac: Apple silicon and Intel, as a .dmg and a .zip each
+  mac:
+    runs-on: macos-14
+    needs: build
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # the same AI and speech models the Windows build fetches, checked against the same hashes
+      - name: Get the models
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src/Overskin/Models
+          get() {
+            curl -fsSL --retry 3 -o "src/Overskin/Models/$1" "$2"
+            echo "$(echo "$3" | tr 'A-F' 'a-f')  src/Overskin/Models/$1" | shasum -a 256 -c -
+          }
+          get ggml-base-q5_1.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q5_1.bin 422F1AE452ADE6F30A004D7E5C6A43195E4433BC370BF23FAC9CC591F01A8898
+          get isnet-general-int8.onnx https://huggingface.co/xrds/isnet-general-onnx-int8/resolve/main/onnx/model_quantized.onnx 3B21A6706DC8D6E4BA9F5B31EBC6940F6C785B58862E27BB25DAA9DD4424B87F
+          get clip-vision-int8.onnx https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model_int8.onnx 0AB0C1B3ACE708E539633AF1744D5A95247FE4E14D3E08FF197EF82A6CB9BD93
+          get clip-text-int8.onnx https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model_int8.onnx 18845F2CCC35223BB7FEC403383A131154B11AC0918DF25CF51986DF5EFD3A21
+          get clip-tokenizer.json https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json F7F3B7AF117D467B58374797691A6438D3E6B9E9CEF800DFD5DCED7F697A90CD
+
+      # the self-test, on a real Mac (with ffmpeg, as most users will have it)
+      - name: Self-test on a Mac
+        shell: bash
+        timeout-minutes: 25
+        # read in the log; a check this Mac can't do (it may not grant screen recording) mustn't stop the build
+        continue-on-error: true
+        run: |
+          brew install ffmpeg >/dev/null || true
+          dotnet build src/Overskin.Linux/Overskin.Linux.csproj -c Debug --nologo -v quiet
+          ./src/Overskin.Linux/bin/Debug/net8.0/overskin --selftest --no-mouse | tee selftest-mac.txt
+
+      - name: Build the Mac apps
+        shell: bash
+        run: bash src/Overskin.Linux/build-mac.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Overskin-Mac
+          path: |
+            dist/mac/*.dmg
+            dist/mac/*.zip
+            selftest-mac.txt
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/mac/Overskin-mac-AppleSilicon.dmg
+            dist/mac/Overskin-mac-Intel.dmg
+            dist/mac/Overskin-mac-AppleSilicon.zip
+            dist/mac/Overskin-mac-Intel.zip

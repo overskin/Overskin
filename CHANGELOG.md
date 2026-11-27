@@ -8,7 +8,7 @@
   Captures, the editor (live text, auto-hide, cut out, beautify), recording with auto-zoom, a
   smooth pointer, sound and the webcam, GIFs and the GIF editor, the video editor with
   subtitles, pins, the library, steps, workflows and hotkeys, laid out and coloured as on
-  Windows. Download `Overskin-mac-AppleSilicon.zip` or `Overskin-mac-Intel.zip` from the release.
+  Windows. Download `Overskin-mac-AppleSilicon.dmg` or `Overskin-mac-Intel.dmg` from the release.
 - **Cut out the subject**: *Cut out* in the editor (and the wand in the viewer) keeps the person,
   pet or thing in front and makes the background see-through, with clean edges. Worked out on
   your PC. See-through pictures show on a checkerboard in the editor, copy with their see-through

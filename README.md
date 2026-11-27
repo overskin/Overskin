@@ -7,7 +7,7 @@
 **A free, open-source screenshot and screen-recording tool for Windows and Mac.**
 
 [![Download for Windows](https://img.shields.io/badge/Download_for_Windows-OverskinSetup.exe-4f8cff?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/overskin/Overskin/releases/latest/download/OverskinSetup.exe)
-[![Download for Mac](https://img.shields.io/badge/Download_for_Mac-Apple_silicon-4f8cff?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/overskin/Overskin/releases/latest/download/Overskin-mac-AppleSilicon.zip)
+[![Download for Mac](https://img.shields.io/badge/Download_for_Mac-Apple_silicon-4f8cff?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/overskin/Overskin/releases/latest/download/Overskin-mac-AppleSilicon.dmg)
 
 [![Latest release](https://img.shields.io/github/v/release/overskin/Overskin?label=release&color=4f8cff)](../../releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/overskin/Overskin/total?color=4f8cff)](../../releases)
@@ -70,12 +70,12 @@ captures from both go to the same `Pictures\Overskin` folder.
 
 ### On a Mac
 
-Download the zip for your Mac from the [latest release](../../releases/latest):
+Download the disk image for your Mac from the [latest release](../../releases/latest):
 
-- **`Overskin-mac-AppleSilicon.zip`** for Macs with an M1 chip or newer (most Macs from late 2020 on).
-- **`Overskin-mac-Intel.zip`** for older Macs with an Intel chip.
+- **`Overskin-mac-AppleSilicon.dmg`** for Macs with an M1 chip or newer (most Macs from late 2020 on).
+- **`Overskin-mac-Intel.dmg`** for older Macs with an Intel chip.
 
-Unzip it and drag **Overskin** into **Applications**. The app isn't signed by a registered Apple
+Open it and drag **Overskin** onto **Applications** (a `.zip` of each is there too). The app isn't signed by a registered Apple
 developer yet, so macOS stops it the first time. Either open Terminal once and run
 
 ```
@@ -375,15 +375,10 @@ cache in its own private package storage instead (Windows redirects those folder
 The Microsoft Store package is built with `./src/Store/build-store.ps1` (see the notes at the
 top of the script and of `src/Store/Package.appxmanifest`).
 
-The Mac app is built on Windows too:
-
-```
-./src/Overskin.Linux/build-mac.ps1
-```
-
-That writes `dist/mac/Overskin-mac-AppleSilicon.zip` and `dist/mac/Overskin-mac-Intel.zip`: the
-app for each kind of Mac, signed ad hoc (Apple silicon won't run unsigned code) and zipped so
-the Mac keeps it runnable. `overskin --selftest` runs its checks (on a Mac, from Terminal:
+The Mac app is built on a Mac with `bash src/Overskin.Linux/build-mac.sh` (GitHub's Mac
+runners do this for each release): `dist/mac/Overskin-mac-AppleSilicon.dmg` and
+`Overskin-mac-Intel.dmg`, with a `.zip` of each, the app signed ad hoc with Apple's `codesign`.
+On Windows, `./src/Overskin.Linux/build-mac.ps1` makes the zips (signed ad hoc by the script). `overskin --selftest` runs its checks (on a Mac, from Terminal:
 `/Applications/Overskin.app/Contents/MacOS/overskin --selftest`).
 
 ## Project layout
