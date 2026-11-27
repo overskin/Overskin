@@ -48,7 +48,7 @@ jobs:
 
   # the Mac app, built and tested on a Mac: Apple silicon and Intel, as a .dmg and a .zip each
   mac:
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: build
     timeout-minutes: 60
     steps:
