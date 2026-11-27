@@ -27,6 +27,28 @@ public sealed class LibraryItem : INotifyPropertyChanged
         set { _thumb = value; Raise(); }
     }
 
+    private bool _favourite;
+
+    /// <summary>Starred in the Library.</summary>
+    public bool Favourite
+    {
+        get => _favourite;
+        set { _favourite = value; Raise(); Raise(nameof(StarVisibility)); }
+    }
+
+    public Visibility StarVisibility => _favourite ? Visibility.Visible : Visibility.Collapsed;
+
+    private string _tagText = "";
+
+    /// <summary>The capture's tags, as shown on its tile ("#work #memes").</summary>
+    public string TagText
+    {
+        get => _tagText;
+        set { _tagText = value; Raise(); Raise(nameof(TagVisibility)); }
+    }
+
+    public Visibility TagVisibility => _tagText.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+
     private bool _selected;
 
     /// <summary>Picked for combining.</summary>
@@ -88,6 +110,7 @@ public partial class MainWindow
         bool pointer = _settings.AfterCursor && mode is OverlayMode.Region or OverlayMode.Window;
         CaptureOverlay.MagnifierOn = _settings.Magnifier;
         CaptureOverlay.CrosshairOn = _settings.Crosshair;
+        CaptureOverlay.TightenOn = _settings.Tighten;
         var overlay = CaptureOverlay.Open(mode, hint, pointer, tools);
         if (overlay == null)
         {
@@ -108,6 +131,13 @@ public partial class MainWindow
             // so is the magnifier button
             _settings.Magnifier = overlay.MagnifierShown;
             MagnifierSwitch.IsChecked = _settings.Magnifier;
+            SaveSettings();
+        }
+        if (overlay.HasToolbar && overlay.TightenShown != _settings.Tighten)
+        {
+            // and so is fitting the box
+            _settings.Tighten = overlay.TightenShown;
+            TightenSwitch.IsChecked = _settings.Tighten;
             SaveSettings();
         }
         return (overlay, wasShown);
@@ -389,7 +419,8 @@ public partial class MainWindow
             if (!image.CanFreeze) return SaveCapture(image);
             image.Freeze();
         }
-        string path = NewCapturePath(_settings.ImageFormat == "jpg" ? ".jpg" : ".png");
+        bool jpg = _settings.ImageFormat == "jpg" && !ImageFiles.HasSeeThrough(image);
+        string path = NewCapturePath(jpg ? ".jpg" : ".png");
         long? limit = _settings.SizeLimit ? (long)(_settings.SizeLimitMb * 1024 * 1024) : null;
         int quality = _settings.JpegQuality;
         var done = new TaskCompletionSource<string?>();
@@ -464,7 +495,8 @@ public partial class MainWindow
     /// <summary>Writes a capture into the screenshots folder and adds it to the library.</summary>
     private string? SaveCapture(BitmapSource image)
     {
-        string path = NewCapturePath(_settings.ImageFormat == "jpg" ? ".jpg" : ".png");
+        bool jpg = _settings.ImageFormat == "jpg" && !ImageFiles.HasSeeThrough(image);
+        string path = NewCapturePath(jpg ? ".jpg" : ".png");
         long? limit = _settings.SizeLimit ? (long)(_settings.SizeLimitMb * 1024 * 1024) : null;
         if (!ImageFiles.TrySave(image, path, out string? error, _settings.JpegQuality, limit))
         {
@@ -546,7 +578,8 @@ public partial class MainWindow
         if (QrReader.Read(crop) is { } code)
         {
             try { Clipboard.SetText(code); } catch { }
-            new TextResultWindow(code, qr: true).Show();
+            if (_settings.TextJustCopy) Toast.Show("Copied what the code says: " + Short(code));
+            else new TextResultWindow(code, qr: true).Show();
             return;
         }
 
@@ -564,8 +597,16 @@ public partial class MainWindow
             return;
         }
         try { Clipboard.SetText(text); } catch { }
-        new TextResultWindow(text).Show();
+        if (_settings.TextJustCopy) Toast.Show("Copied: " + Short(text));
+        else new TextResultWindow(text).Show();
     });
+
+    /// <summary>The start of some text, on one line, for a note.</summary>
+    private static string Short(string text)
+    {
+        string one = string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return one.Length <= 60 ? one : one[..57] + "…";
+    }
 
     private void PickScreenColour() => Guarded(async () =>
     {
@@ -614,6 +655,7 @@ public partial class MainWindow
         AutoHideSwitch.IsChecked = _settings.AutoHide;
         Redaction.Kinds = _settings.AutoHideKinds;
         WindowAlphaSwitch.IsChecked = _settings.WindowAlpha;
+        TextJustCopySwitch.IsChecked = _settings.TextJustCopy;
         SyncVideoControls();
         SyncGifControls();
         SyncWatermarkControls();
@@ -626,6 +668,7 @@ public partial class MainWindow
         AfterCursorSwitch.IsChecked = _settings.AfterCursor;
         MagnifierSwitch.IsChecked = _settings.Magnifier;
         CrosshairSwitch.IsChecked = _settings.Crosshair;
+        TightenSwitch.IsChecked = _settings.Tighten;
         FormatPng.IsChecked = _settings.ImageFormat != "jpg";
         FormatJpg.IsChecked = _settings.ImageFormat == "jpg";
         JpegQualitySlider.Value = _settings.JpegQuality;
@@ -656,6 +699,7 @@ public partial class MainWindow
         _settings.AfterCursor = AfterCursorSwitch.IsChecked == true;
         _settings.AutoHide = AutoHideSwitch.IsChecked == true;
         _settings.WindowAlpha = WindowAlphaSwitch.IsChecked == true;
+        _settings.TextJustCopy = TextJustCopySwitch.IsChecked == true;
         AfterPreviewSwitch.IsEnabled = !_settings.AfterEditor && !_settings.AfterViewer; // they already show the picture
         SaveSettings();
     }
@@ -664,6 +708,7 @@ public partial class MainWindow
     {
         _settings.Magnifier = MagnifierSwitch.IsChecked == true;
         _settings.Crosshair = CrosshairSwitch.IsChecked == true;
+        _settings.Tighten = TightenSwitch.IsChecked == true;
         SaveSettings();
     }
 
@@ -752,6 +797,10 @@ public partial class MainWindow
     {
         if (sender is not RadioButton { Tag: string tag }) return;
         _libraryFilter = tag;
+        // the Duplicates tab stays until they're all dealt with or looked for again; only the
+        // picking stops while looking at something else
+        if (tag != "Duplicates" && LibraryDuplicatesTab != null && LibraryDuplicatesTab.Visibility == Visibility.Visible && _combining)
+            SetCombining(false);
         if (_ready) RefreshLibrary();
     }
 
@@ -766,12 +815,13 @@ public partial class MainWindow
 
     private void UpdateIndexing()
     {
-        int pending = _search.Pending;
-        LibraryIndexing.Text = pending > 0 ? $"Reading text… {pending} left" : "";
+        int pending = _search.Pending, pictures = _pictures.Pending;
+        LibraryIndexing.Text = pending > 0 ? $"Reading text… {pending} left" : pictures > 0 ? $"Looking at pictures… {pictures} left" : "";
     }
 
     private void RefreshLibrary()
     {
+        TidyDuplicates();
         _settings.History.RemoveAll(h => !File.Exists(h.Path));
         if (!_searchHooked)
         {
@@ -782,8 +832,15 @@ public partial class MainWindow
                 UpdateIndexing();
                 if (LibrarySearch.Text.Trim().Length > 0) RefreshLibrary();
             });
+            // and when more pictures have been looked at
+            _pictures.Updated += () => Dispatcher.BeginInvoke(() =>
+            {
+                UpdateIndexing();
+                if (LibrarySearch.Text.Trim().Length > 0) RefreshLibrary();
+            });
         }
         _search.Add(_settings.History.Select(h => h.Path));
+        _pictures.Add(_settings.History.Select(h => h.Path).Reverse()); // newest first
         UpdateIndexing();
         string query = LibrarySearch.Text.Trim();
         var entries = Sorted(_settings.History.AsEnumerable().Reverse())
@@ -792,10 +849,14 @@ public partial class MainWindow
                 "GIFs" => IsGif(h.Path),
                 "Videos" => IsVideo(h.Path),
                 "Pictures" => !IsGif(h.Path) && !IsVideo(h.Path),
+                "Favourites" => h.Favourite,
+                "Duplicates" => _duplicateGroup.ContainsKey(h.Path),
                 _ => true,
             })
-            .Where(h => query.Length == 0 || _search.Matches(h.Path, Friendly(h.Time), query))
+            .Where(h => query.Length == 0 || MatchesLibrarySearch(h, query))
             .ToList();
+        if (_libraryFilter == "Duplicates")
+            entries = entries.OrderBy(h => _duplicateGroup[h.Path]).ThenByDescending(h => h.Time).ToList();
 
         var existing = _library.ToDictionary(i => i.Path, StringComparer.OrdinalIgnoreCase);
         _library.Clear();
@@ -803,10 +864,12 @@ public partial class MainWindow
         {
             if (existing.TryGetValue(h.Path, out var kept) && kept.Time == h.Time)
             {
+                kept.Favourite = h.Favourite;
+                kept.TagText = TagText(h);
                 _library.Add(kept);
                 continue;
             }
-            var item = new LibraryItem { Path = h.Path, Time = h.Time, Caption = Friendly(h.Time) };
+            var item = new LibraryItem { Path = h.Path, Time = h.Time, Caption = Friendly(h.Time), Favourite = h.Favourite, TagText = TagText(h) };
             _library.Add(item);
             _ = IsVideo(item.Path) ? LoadVideoThumbAsync(item) : LoadThumbAsync(item);
         }
@@ -814,9 +877,14 @@ public partial class MainWindow
         UpdateLibraryCount();
         LibraryEmpty.Visibility = _library.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         LibraryEmptyTitle.Text = query.Length > 0 ? "Nothing matches"
-            : _libraryFilter switch { "GIFs" => "No GIFs", "Videos" => "No videos", "Pictures" => "No pictures", _ => "No captures yet" };
+            : _libraryFilter switch
+            {
+                "GIFs" => "No GIFs", "Videos" => "No videos", "Pictures" => "No pictures",
+                "Favourites" => "No favourites yet", "Duplicates" => "No duplicates", _ => "No captures yet",
+            };
         LibraryEmptyHint.Text = query.Length > 0 ? (_search.Pending > 0 ? "Some captures haven't been read yet." : "")
-            : _libraryFilter == "All" ? $"Press {_settings.HotkeyRegion}, or click Region on the Capture tab." : "";
+            : _libraryFilter == "All" ? $"Press {_settings.HotkeyRegion}, or click Region on the Capture tab."
+            : _libraryFilter == "Favourites" ? "Right-click a capture and choose Favourite." : "";
     }
 
     private static async Task LoadThumbAsync(LibraryItem item)
@@ -967,6 +1035,19 @@ public partial class MainWindow
     private void LibraryShow_Click(object sender, RoutedEventArgs e)
     {
         if (ItemOf(sender) is { } item) ShowInFolder(item.Path);
+    }
+
+    private void LibraryPhone_Click(object sender, RoutedEventArgs e)
+    {
+        if (ItemOf(sender) is { } item) PhoneShare.Show(item.Path, this);
+    }
+
+    /// <summary>Sends the newest capture to the phone.</summary>
+    private void SendLatestToPhone()
+    {
+        var latest = _settings.History.AsEnumerable().Reverse().Select(h => h.Path).FirstOrDefault(File.Exists);
+        if (latest == null) Toast.Show("There are no captures yet.");
+        else PhoneShare.Show(latest, this);
     }
 
     private void LibraryDelete_Click(object sender, RoutedEventArgs e)

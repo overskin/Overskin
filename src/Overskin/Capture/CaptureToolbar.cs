@@ -31,7 +31,7 @@ public sealed class CaptureToolbar : Border
 
     private readonly Dictionary<CapturePick, RadioButton> _picks = new();
     private readonly Dictionary<CaptureTool, ToggleButton> _tools = new();
-    private readonly ToggleButton _pointer, _magnifier;
+    private readonly ToggleButton _pointer, _magnifier, _tighten;
     private readonly Border _swatch;
     private readonly Button _undo;
     private int _colour;
@@ -58,6 +58,8 @@ public sealed class CaptureToolbar : Border
     public event Action? PickFromScreenRequested;
     public bool Pointer => _pointer.IsChecked == true;
     public bool Magnifier => _magnifier.IsChecked == true;
+    /// <summary>Fit a dragged box to what's inside it.</summary>
+    public bool Tighten => _tighten.IsChecked == true;
 
     /// <summary>Anything on the bar changed.</summary>
     public event Action? Changed;
@@ -178,6 +180,17 @@ public sealed class CaptureToolbar : Border
         };
         _magnifier.Click += (_, _) => Changed?.Invoke();
         row.Children.Add(_magnifier);
+
+        _tighten = new ToggleButton
+        {
+            Style = (Style)Application.Current.FindResource("Chip"),
+            Content = new Icon { Data = Geometry("IcScan"), Width = 14, Height = 14 },
+            ToolTip = "Fit the box to what's inside it: drag roughly, the plain edges are trimmed  (T)",
+            IsChecked = CaptureOverlay.TightenOn,
+            Margin = new Thickness(0, 0, 4, 0),
+        };
+        _tighten.Click += (_, _) => Changed?.Invoke();
+        row.Children.Add(_tighten);
 
         var close = new Button
         {
@@ -330,6 +343,12 @@ public sealed class CaptureToolbar : Border
         border.SetBinding(Border.BorderThicknessProperty, new System.Windows.Data.Binding("BorderThickness") { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
         template.VisualTree = border;
         return template;
+    }
+
+    public void ToggleTighten()
+    {
+        _tighten.IsChecked = !Tighten;
+        Changed?.Invoke();
     }
 
     public void ToggleMagnifier()

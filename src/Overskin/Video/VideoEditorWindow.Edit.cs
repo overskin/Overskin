@@ -183,7 +183,7 @@ public partial class VideoEditorWindow
 
     private (BitmapSource Picture, Point At) Drawn(VideoOverlay o)
     {
-        string key = $"{o.Kind}|{o.Text}|{o.A}|{o.B}";
+        string key = $"{o.Kind}|{o.Text}|{o.A}|{o.B}|{o.Look}|{o.Words}|{o.Highlight}";
         if (_drawn.TryGetValue(o, out var d) && d.Key == key) return (d.Picture, d.At);
         var (picture, at) = o.Render(Math.Max(2, Player.NaturalVideoHeight), Math.Max(2, Player.NaturalVideoWidth));
         _drawn[o] = (key, picture, at);
@@ -203,6 +203,8 @@ public partial class VideoEditorWindow
         {
             bool due = now >= o.Start && now < o.End;
             if (!due && o != _chosen) continue;
+            // subtitles that follow the voice: the word being said now
+            if (o.Kind == VideoOverlay.Kinds.Caption && o.Words != "Line") o.Highlight = due ? CaptionLook.WordAt(o, now) : -1;
             var (picture, at) = Drawn(o);
             var image = new Image { Source = picture, Width = picture.PixelWidth * s, Height = picture.PixelHeight * s, Opacity = due ? 1 : 0.45, IsHitTestVisible = false };
             Canvas.SetLeft(image, ox + at.X * s);

@@ -56,6 +56,11 @@ public sealed class CaptureOverlay : Window
 
     /// <summary>From the settings: whether the magnifier starts on, and whether crosshair lines follow the pointer.</summary>
     public static bool MagnifierOn = true, CrosshairOn;
+    /// <summary>From the settings: a dragged box is fitted to what's inside it.</summary>
+    public static bool TightenOn;
+
+    /// <summary>Whether fitting the box was on when the overlay closed (it can be switched on the capture bar).</summary>
+    public bool TightenShown => _toolbar?.Tighten ?? TightenOn;
 
     /// <summary>Whether the magnifier was on when the overlay closed (it can be switched on the capture bar).</summary>
     public bool MagnifierShown => _toolbar?.Magnifier ?? MagnifierOn;
@@ -879,6 +884,13 @@ public sealed class CaptureOverlay : Window
                     SelectedWindow = HoveredWindow(end)?.Handle ?? IntPtr.Zero;
                 if (picture != null) CrashLog.Note($"capture screen: clicked a picture inside the window, radius {picture.Value.Radius}");
                 r = ClipToScreen(r);
+                if (box && TightenShown && r.Width > 8 && r.Height > 8)
+                {
+                    var (tl, tt, tr, tb) = Tighten.Fit(_pixels, _frozen.PixelWidth,
+                        r.Left - _virtual.Left, r.Top - _virtual.Top, r.Right - _virtual.Left, r.Bottom - _virtual.Top);
+                    CrashLog.Note($"capture screen: box fitted to its content, {r.Width}x{r.Height} -> {tr - tl}x{tb - tt}");
+                    r = new RECT { Left = tl + _virtual.Left, Top = tt + _virtual.Top, Right = tr + _virtual.Left, Bottom = tb + _virtual.Top };
+                }
                 if (r.Width >= 2 && r.Height >= 2) Selection = new Int32Rect(r.Left, r.Top, r.Width, r.Height);
                 CrashLog.Note($"capture screen: {(box ? "dragged" : "clicked")}, pick={Pick}, {r.Width}x{r.Height}, window={SelectedWindow != IntPtr.Zero}");
                 Close();
@@ -944,6 +956,7 @@ public sealed class CaptureOverlay : Window
                 case Key.H: _toolbar.SetTool(Tool == CaptureTool.Highlighter ? CaptureTool.None : CaptureTool.Highlighter); e.Handled = true; return;
                 case Key.C: _toolbar.NextColour(); e.Handled = true; return;
                 case Key.M: _toolbar.ToggleMagnifier(); e.Handled = true; return;
+                case Key.T: _toolbar.ToggleTighten(); e.Handled = true; return;
                 case Key.Z when ctrl: Undo(); e.Handled = true; return;
             }
         }

@@ -22,6 +22,9 @@ public sealed record BeautifyOptions
     public string Frame { get; init; } = "None";
     /// <summary>The frame picture for "Custom".</summary>
     public string? FramePath { get; init; }
+    /// <summary>An exact size for a social post, such as 1080 × 1350; 0 for the picture's own size.</summary>
+    public int TargetWidth { get; init; }
+    public int TargetHeight { get; init; }
 }
 
 /// <summary>
@@ -36,6 +39,14 @@ public static class Beautify
         ("Candy", "#EC4899", "#8B5CF6"), ("Peach", "#FDBA74", "#F472B6"), ("Sky", "#7DD3FC", "#A5B4FC"),
         ("Forest", "#166534", "#0F766E"), ("Night", "#334155", "#0F172A"),
         ("White", "#FFFFFF", "#FFFFFF"), ("Grey", "#E5E7EB", "#D1D5DB"), ("Black", "#111111", "#111111"), ("None", "", ""),
+    };
+
+    /// <summary>Ready-made sizes for posting: the name, and the size in pixels.</summary>
+    public static readonly (string Name, int Width, int Height)[] SocialSizes =
+    {
+        ("X / Twitter", 1600, 900), ("Instagram post", 1080, 1350), ("Instagram square", 1080, 1080),
+        ("Story, TikTok, Reels", 1080, 1920), ("YouTube thumbnail", 1280, 720), ("LinkedIn", 1200, 627),
+        ("Discord banner", 960, 540), ("Slide", 1920, 1080),
     };
 
     public static Brush BackgroundBrush(string name)
@@ -57,6 +68,7 @@ public static class Beautify
             var framed = Mockup.Apply(image, o.Frame, o.FramePath);
             if (!ReferenceEquals(framed, image)) { image = framed; o = o with { Corners = 0 }; }
         }
+        if (o.TargetWidth > 0 && o.TargetHeight > 0) o = o with { Aspect = o.TargetWidth / (double)o.TargetHeight };
         double iw = image.PixelWidth, ih = image.PixelHeight;
         double w = iw + 2 * o.Padding, h = ih + 2 * o.Padding;
         if (o.Aspect > 0)
@@ -89,7 +101,15 @@ public static class Beautify
         var rtb = new RenderTargetBitmap(pw, ph, 96, 96, PixelFormats.Pbgra32);
         rtb.Render(root);
         rtb.Freeze();
-        return rtb;
+        if (o.TargetWidth <= 0 || o.TargetHeight <= 0 || (pw == o.TargetWidth && ph == o.TargetHeight)) return rtb;
+        // the exact size the site wants, scaled smoothly
+        var visual = new DrawingVisual();
+        RenderOptions.SetBitmapScalingMode(visual, BitmapScalingMode.HighQuality);
+        using (var dc = visual.RenderOpen()) dc.DrawImage(rtb, new Rect(0, 0, o.TargetWidth, o.TargetHeight));
+        var sized = new RenderTargetBitmap(o.TargetWidth, o.TargetHeight, 96, 96, PixelFormats.Pbgra32);
+        sized.Render(visual);
+        sized.Freeze();
+        return sized;
     }
 }
 
@@ -107,6 +127,7 @@ public sealed class BeautifyWindow : Window
     private string _frame = _last.Frame;
     private string? _framePath = _last.FramePath;
     private double _aspect = _last.Aspect;
+    private (int W, int H) _target = (_last.TargetWidth, _last.TargetHeight);
     private readonly WrapPanel _swatches = new() { Width = 236 };
 
     public BitmapSource? Result { get; private set; }
@@ -162,6 +183,28 @@ public sealed class BeautifyWindow : Window
             aspects.Children.Add(b);
         }
 
+        // sizes for posting: these set the shape too, and the picture comes out at exactly that size
+        var social = new WrapPanel { Width = 236 };
+        void AddSize(string label, int tw, int th)
+        {
+            var b = new RadioButton
+            {
+                Style = (Style)FindResource("Seg"), GroupName = "BeautifySocial", Content = label,
+                Margin = new Thickness(0, 0, 5, 5), IsChecked = _target == (tw, th),
+                ToolTip = tw == 0 ? "The picture's own size" : $"{tw} × {th} pixels",
+            };
+            b.Checked += (_, _) =>
+            {
+                _target = (tw, th);
+                foreach (var a in aspects.Children.OfType<RadioButton>()) a.IsEnabled = tw == 0;
+                Refresh();
+            };
+            social.Children.Add(b);
+        }
+        AddSize("Any", 0, 0);
+        foreach (var (name, sw, sh) in Beautify.SocialSizes) AddSize(name, sw, sh);
+        foreach (var a in aspects.Children.OfType<RadioButton>()) a.IsEnabled = _target.W == 0;
+
         var frames = new WrapPanel { Width = 236 };
         foreach (var name in Mockup.Frames)
         {
@@ -205,6 +248,8 @@ public sealed class BeautifyWindow : Window
         side.Children.Add(frames);
         side.Children.Add(Label("Background"));
         side.Children.Add(_swatches);
+        side.Children.Add(Label("Size for posting"));
+        side.Children.Add(social);
         side.Children.Add(Label("Shape"));
         side.Children.Add(aspects);
         side.Children.Add(Label("Padding"));
@@ -218,7 +263,7 @@ public sealed class BeautifyWindow : Window
         buttons.Children.Add(apply);
         side.Children.Add(buttons);
 
-        var panel = new Border { Child = side };
+        var panel = new Border { Child = new ScrollViewer { Content = side, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Focusable = false } };
         panel.SetResourceReference(Border.BackgroundProperty, "Panel");
         panel.SetResourceReference(Border.BorderBrushProperty, "Line");
         panel.BorderThickness = new Thickness(1, 0, 0, 0);
@@ -239,7 +284,7 @@ public sealed class BeautifyWindow : Window
     private BeautifyOptions Options() => new()
     {
         Background = _background, Padding = _padding.Value, Corners = _corners.Value, Shadow = _shadow.Value, Aspect = _aspect,
-        Frame = _frame, FramePath = _framePath,
+        Frame = _frame, FramePath = _framePath, TargetWidth = _target.W, TargetHeight = _target.H,
     };
 
     private void Refresh()
@@ -248,6 +293,8 @@ public sealed class BeautifyWindow : Window
         double k = Math.Min(1, 1100.0 / Math.Max(_image.PixelWidth, _image.PixelHeight));
         var o = Options();
         BitmapSource src = k < 1 ? new TransformedBitmap(_image, new ScaleTransform(k, k)) : _image;
-        _preview.Source = Beautify.Render(src, o with { Padding = o.Padding * k, Corners = o.Corners * k });
+        // the preview keeps the post's shape, drawn at preview size
+        _preview.Source = Beautify.Render(src, o with { Padding = o.Padding * k, Corners = o.Corners * k, TargetWidth = 0, TargetHeight = 0,
+            Aspect = _target.W > 0 ? _target.W / (double)_target.H : o.Aspect });
     }
 }

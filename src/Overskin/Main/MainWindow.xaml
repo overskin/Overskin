@@ -137,16 +137,30 @@
                         </MenuItem>
                         <MenuItem Header="Pin on screen" Click="LibraryPin_Click" />
                         <Separator />
+                        <MenuItem Header="Favourite" IsCheckable="True" IsChecked="{Binding Favourite, Mode=OneWay}" Click="LibraryFavourite_Click" />
+                        <MenuItem Header="Tags" SubmenuOpened="LibraryTags_Opened">
+                            <MenuItem Header="…" />
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="Send to phone…" Click="LibraryPhone_Click" />
                         <MenuItem Header="Show in folder" Click="LibraryShow_Click" />
                         <MenuItem Header="Delete" Click="LibraryDelete_Click" />
                     </ContextMenu>
                 </Button.ContextMenu>
                 <StackPanel>
-                    <Border Height="88" CornerRadius="{DynamicResource RadiusSmall}" Background="{DynamicResource Bg}" ClipToBounds="True">
-                        <Image Source="{Binding Thumb}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                    </Border>
+                    <Grid>
+                        <Border Height="88" CornerRadius="{DynamicResource RadiusSmall}" Background="{DynamicResource Bg}" ClipToBounds="True">
+                            <Image Source="{Binding Thumb}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                        <Border Visibility="{Binding StarVisibility}" Width="22" Height="22" CornerRadius="11" Margin="0,5,5,0"
+                                HorizontalAlignment="Right" VerticalAlignment="Top" Background="#B0000000" ToolTip="Favourite">
+                            <local:Icon Data="{StaticResource IcStar}" Width="12" Height="12" Foreground="#FFFFD34D" />
+                        </Border>
+                    </Grid>
                     <TextBlock Text="{Binding Caption}" Style="{StaticResource Label}" FontSize="11.5" Margin="2,7,0,0" TextTrimming="CharacterEllipsis" />
                     <TextBlock Text="{Binding Details}" Style="{StaticResource Dim}" FontSize="10.5" Margin="2,1,0,0" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding TagText}" Visibility="{Binding TagVisibility}" Style="{StaticResource Dim}" FontSize="10.5" Margin="2,1,0,0"
+                               Foreground="{DynamicResource Accent}" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
             </Button>
         </DataTemplate>
@@ -378,13 +392,13 @@
             <ScaleTransform x:Name="RootScale" ScaleX="1" ScaleY="1" />
         </Grid.LayoutTransform>
         <!-- shadow lives on its own layer so it never has to be redrawn with the content -->
-        <Border Background="{DynamicResource Shadow}" CornerRadius="{DynamicResource RadiusWindow}" Opacity="0.6" Margin="1,3,1,-1">
+        <Border x:Name="WindowShadow" Background="{DynamicResource Shadow}" CornerRadius="{DynamicResource RadiusWindow}" Opacity="0.6" Margin="1,3,1,-1">
             <Border.Effect>
                 <BlurEffect Radius="14" />
             </Border.Effect>
         </Border>
 
-        <Border Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+        <Border x:Name="WindowFrame" Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
                 CornerRadius="{DynamicResource RadiusWindow}">
             <Grid ClipToBounds="True"> <!-- pages slide in; keep them inside the window -->
                 <Grid.RowDefinitions>
@@ -634,6 +648,10 @@
                                         <TextBlock Text="Crosshair lines" Style="{StaticResource Label}" />
                                         <ToggleButton x:Name="CrosshairSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="ShootingSwitch_Click" />
                                     </Grid>
+                                    <Grid Height="31" ToolTip="Drag a rough box and its plain edges are trimmed, so it fits what's inside. T switches it on the capture bar too">
+                                        <TextBlock Text="Fit the box to what's inside" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="TightenSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="ShootingSwitch_Click" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 
@@ -727,6 +745,10 @@
                                     <Grid x:Name="AutoHideRow" Height="31" Background="Transparent" ToolTip="Reads the text in every screenshot and hides private details before it's copied or saved. Right-click to choose which.">
                                         <TextBlock Text="Hide private details automatically" Style="{StaticResource Label}" />
                                         <ToggleButton x:Name="AutoHideSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Text from screen (and QR codes) goes straight to the clipboard, with a small note, instead of opening a window with the text in it">
+                                        <TextBlock Text="Text from screen: just copy it" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="TextJustCopySwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="CaptureSwitch_Click" />
                                     </Grid>
                                     <Grid Height="31" ToolTip="When you click a window, keep only the window: no desktop behind it, a transparent background and a soft shadow (PNG)">
                                         <TextBlock Text="Windows on a transparent background" Style="{StaticResource Label}" />
@@ -868,18 +890,61 @@
                                     </StackPanel>
                                 </Button>
                             </UniformGrid>
-                            <Grid Margin="1,2,0,14">
+                            <Grid Margin="1,0,0,4">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Name="RecordHint" Grid.Column="1" Style="{StaticResource Dim}" FontSize="11.5" TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="Keys that work while a video records (change them in Settings)" />
-                                <Button Grid.Column="2" Style="{StaticResource Btn}" Height="25" HorizontalAlignment="Right" Click="CaptionGif_Click"
-                                        ToolTip="Add a caption to a GIF you already have">
-                                    <StackPanel Orientation="Horizontal">
-                                        <local:Icon Data="{StaticResource IcType}" Width="13" Height="13" Margin="0,0,6,0" />
-                                        <TextBlock Text="Caption a GIF" />
-                                    </StackPanel>
-                                </Button>
                             </Grid>
+                            <Border x:Name="CardStartStop" Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcTimer}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Start and stop" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31" ToolTip="Shows 3, 2, 1 in the middle of the area before a video or GIF starts recording. Esc calls it off.">
+                                        <TextBlock Text="Count down first" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="CountdownSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="StartStop_Changed" />
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="Videos and GIFs stop by themselves after this long">
+                                        <TextBlock Text="Stop after" Style="{StaticResource Label}" />
+                                        <StackPanel x:Name="StopAfterChoices" Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="9,0" GroupName="StopAfter" Content="Never" Tag="0" Checked="StartStop_Changed" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="9,0" GroupName="StopAfter" Content="15 s" Tag="15" Checked="StartStop_Changed" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="9,0" GroupName="StopAfter" Content="30 s" Tag="30" Checked="StartStop_Changed" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="9,0" GroupName="StopAfter" Content="1 min" Tag="60" Checked="StartStop_Changed" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="9,0" GroupName="StopAfter" Content="5 min" Tag="300" Checked="StartStop_Changed" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="CardReplay" Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:Icon Data="{StaticResource IcRefreshCw}" Width="14" Height="14" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" />
+                                        <TextBlock Text="Instant replay" Style="{StaticResource Heading}" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource Rule}" />
+                                    <Grid Height="31" ToolTip="Overskin keeps recording the main screen in the background, keeping only the last bit, so the hotkey can save something after it happens">
+                                        <TextBlock Text="Keep recording in the background" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="ReplaySwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="Replay_Changed" />
+                                    </Grid>
+                                    <Grid Height="31">
+                                        <TextBlock Text="Keep the last" Style="{StaticResource Label}" />
+                                        <StackPanel x:Name="ReplayLengthChoices" Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="9,0" GroupName="ReplayLength" Content="15 s" Tag="15" Checked="Replay_Changed" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="9,0" GroupName="ReplayLength" Content="30 s" Tag="30" Checked="Replay_Changed" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="9,0" GroupName="ReplayLength" Content="1 min" Tag="60" Checked="Replay_Changed" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" Padding="9,0" GroupName="ReplayLength" Content="2 min" Tag="120" Checked="Replay_Changed" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid Height="31" ToolTip="What your speakers or headphones play">
+                                        <TextBlock Text="With sound" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="ReplaySoundSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="Replay_Changed" />
+                                    </Grid>
+                                    <TextBlock x:Name="ReplayStatus" Style="{StaticResource Dim}" FontSize="11.5" TextWrapping="Wrap" Margin="1,4,0,2" />
+                                </StackPanel>
+                            </Border>
                             <Border x:Name="CardGif" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
@@ -1089,6 +1154,10 @@
                                         <TextBlock Text="Ring on each click" Style="{StaticResource Label}" />
                                         <ToggleButton x:Name="VidRingsSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
                                     </Grid>
+                                    <Grid Height="31" ToolTip="Darkens the video a little except round the pointer, so viewers' eyes follow it">
+                                        <TextBlock Text="Dim around the pointer" Style="{StaticResource Label}" />
+                                        <ToggleButton x:Name="VidSpotlightSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="VideoSetting_Click" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
                             <Border x:Name="CardZoom" Style="{StaticResource Card}">
@@ -1162,14 +1231,27 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <Grid Margin="1,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal">
                             <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Content="All" Tag="All" IsChecked="True" Checked="LibraryFilter_Checked" Margin="0" />
                             <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Content="Pictures" Tag="Pictures" Checked="LibraryFilter_Checked" />
                             <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Content="GIFs" Tag="GIFs" Checked="LibraryFilter_Checked" />
                             <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Content="Videos" Tag="Videos" Checked="LibraryFilter_Checked" />
-                            <TextBlock x:Name="LibraryCount" Style="{StaticResource Dim}" FontSize="11.5" VerticalAlignment="Center" Margin="12,0,0,0" />
+                            <RadioButton Style="{StaticResource Seg}" GroupName="LibFilter" Tag="Favourites" Checked="LibraryFilter_Checked" ToolTip="Favourites: right-click a capture to star it">
+                                <local:Icon Data="{StaticResource IcStar}" Width="12" Height="12" />
+                            </RadioButton>
+                            <RadioButton x:Name="LibraryDuplicatesTab" Style="{StaticResource Seg}" GroupName="LibFilter" Content="Duplicates" Tag="Duplicates"
+                                         Checked="LibraryFilter_Checked" Visibility="Collapsed" ToolTip="Captures that look the same, grouped" />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource Btn}" Height="25" Width="30" Padding="0" Click="LibraryTagFilter_Click" Margin="0,0,6,0"
+                                ToolTip="Tags: show only the captures with a tag">
+                            <local:Icon Data="{StaticResource IcHash}" Width="13" Height="13" />
+                        </Button>
                         <Button Style="{StaticResource Btn}" Height="25" Click="CombineMode_Click" Margin="0,0,6,0"
                                 ToolTip="Pick several captures to copy, combine, convert, rename or delete together (or Ctrl+click a capture)">
                             <StackPanel Orientation="Horizontal">
@@ -1185,13 +1267,11 @@
                     <Grid x:Name="LibrarySearchRow" Grid.Row="1" VerticalAlignment="Top" Margin="0,0,0,0" Panel.ZIndex="2">
                         <TextBox x:Name="LibrarySearch" Style="{StaticResource TextField}" Height="30" Padding="30,0,30,0"
                                  TextChanged="LibrarySearch_Changed"
-                                 ToolTip="Searches names, dates and the words inside your captures (read with Windows' built-in text reader, offline)" />
+                                 ToolTip="Searches names, dates, tags (#work), the words inside your captures, and what's in the pictures (a cat, a chart, a game), all worked out on this PC" />
                         <local:Icon Data="{StaticResource IcSearch}" Width="14" Height="14" Foreground="{DynamicResource TextDim}"
                                     HorizontalAlignment="Left" Margin="10,0,0,0" IsHitTestVisible="False" />
-                        <TextBlock x:Name="LibrarySearchHint" Text="Search the text in your captures" Style="{StaticResource Dim}"
+                        <TextBlock x:Name="LibrarySearchHint" Text="Search the words, tags and what's in your captures" Style="{StaticResource Dim}"
                                    Foreground="{DynamicResource TextFaint}" Margin="31,0,0,0" IsHitTestVisible="False" />
-                        <TextBlock x:Name="LibraryIndexing" Style="{StaticResource Dim}" FontSize="11" Foreground="{DynamicResource TextFaint}"
-                                   HorizontalAlignment="Right" Margin="0,0,40,0" IsHitTestVisible="False" />
                         <Button x:Name="LibrarySortButton" Style="{StaticResource BtnIcon}" HorizontalAlignment="Right" Margin="0,0,3,0"
                                 Click="LibrarySort_Click" ToolTip="Sort">
                             <local:Icon Data="{StaticResource IcListFilter}" Width="14" Height="14" />
@@ -1238,7 +1318,13 @@
                             </StackPanel>
                         </Grid>
                     </Border>
-                    <ScrollViewer x:Name="LibraryScroll" Grid.Row="1" Margin="0,42,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                    <Grid x:Name="LibraryInfoRow" Grid.Row="1" VerticalAlignment="Top" Margin="3,38,3,0" IsHitTestVisible="False">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="LibraryCount" Style="{StaticResource Dim}" FontSize="11" />
+                        <TextBlock x:Name="LibraryIndexing" Grid.Column="1" Style="{StaticResource Dim}" FontSize="11" Foreground="{DynamicResource TextFaint}"
+                                   HorizontalAlignment="Right" Margin="12,0,0,0" TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                    <ScrollViewer x:Name="LibraryScroll" Grid.Row="1" Margin="0,60,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
                         <ItemsControl x:Name="LibraryList" ItemTemplate="{StaticResource LibraryTile}" Margin="0,0,-8,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -1429,7 +1515,17 @@
                 <!-- ============ settings ============ -->
                 <ScrollViewer x:Name="PageSettings" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled" Focusable="False">
-                    <StackPanel Margin="14,12,6,6">
+                    <StackPanel x:Name="SettingsCards" Margin="14,12,6,6">
+
+                        <Grid Margin="0,0,0,10">
+                            <TextBox x:Name="SettingsFilter" Style="{StaticResource TextField}" Padding="29,0,10,0" TextChanged="SettingsFilter_Changed"
+                                     ToolTip="Ctrl+K searches everything Overskin does, not just settings" />
+                            <local:Icon Data="{StaticResource IcSearch}" Width="14" Height="14" Foreground="{DynamicResource TextFaint}"
+                                        HorizontalAlignment="Left" Margin="10,0,0,0" IsHitTestVisible="False" />
+                            <TextBlock x:Name="SettingsFilterHint" Text="Search settings" Style="{StaticResource Dim}" Foreground="{DynamicResource TextFaint}"
+                                       Margin="31,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" />
+                        </Grid>
+                        <TextBlock x:Name="SettingsNoMatch" Text="No settings match." Style="{StaticResource Dim}" Margin="2,4,0,12" Visibility="Collapsed" />
 
                         <!-- appearance -->
                         <Border Style="{StaticResource Card}">
@@ -1507,6 +1603,14 @@
                                         </Grid>
                                     </Button>
                                 </Grid>
+                                <Grid Height="34" ToolTip="Uses the accent colour chosen in Windows' settings (Personalisation, Colours) and follows it when it changes">
+                                    <TextBlock Text="Use Windows' accent colour" Style="{StaticResource Label}" />
+                                    <ToggleButton x:Name="MatchWindowsSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="MatchWindows_Click" />
+                                </Grid>
+                                <Grid Height="34" ToolTip="The window's background goes see-through and blurred, like Windows' own apps. Starts when Overskin opens again.">
+                                    <TextBlock Text="See-through window" Style="{StaticResource Label}" />
+                                    <ToggleButton x:Name="SeeThroughSwitch" Style="{StaticResource Switch}" HorizontalAlignment="Right" Click="SeeThrough_Click" />
+                                </Grid>
                                 <Grid Height="34" ToolTip="Makes the whole window and its text bigger. Drag the bottom-right corner to resize the window itself.">
                                     <TextBlock Text="Size" Style="{StaticResource Label}" />
                                     <StackPanel x:Name="ScaleChoices" Orientation="Horizontal" HorizontalAlignment="Right">
@@ -1565,6 +1669,16 @@
                                     <Button x:Name="HkRecentButton" Style="{StaticResource Btn}" Tag="HotkeyRecent" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
+                                <Grid Height="28" ToolTip="A ring of capture choices round the pointer: move towards one and click, or press its number">
+                                    <TextBlock Text="Ring menu" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkRingButton" Style="{StaticResource Btn}" Tag="HotkeyRing" MinWidth="124" Height="23"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="28" ToolTip="Find anything Overskin does, or any setting, by typing. Ctrl+K does the same inside Overskin.">
+                                    <TextBlock Text="Search everything" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkSearchButton" Style="{StaticResource Btn}" Tag="HotkeySearch" MinWidth="124" Height="23"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
                                 <Border Style="{StaticResource Rule}" Margin="0,6,0,2" />
                                 <StackPanel Orientation="Horizontal" Margin="0,6,0,3">
                                     <local:Icon Data="{StaticResource IcCircleDot}" Width="12" Height="12" Foreground="{DynamicResource Accent}" Margin="0,0,7,0" />
@@ -1573,6 +1687,11 @@
                                 <Grid Height="28">
                                     <TextBlock Text="Record a video" Style="{StaticResource Label}" />
                                     <Button x:Name="HkVideoButton" Style="{StaticResource Btn}" Tag="HotkeyVideo" MinWidth="124" Height="23"
+                                            HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
+                                </Grid>
+                                <Grid Height="28" ToolTip="Saves the last seconds of the screen, when instant replay is on (Capture, Recording)">
+                                    <TextBlock Text="Save the instant replay" Style="{StaticResource Label}" />
+                                    <Button x:Name="HkReplayButton" Style="{StaticResource Btn}" Tag="HotkeyReplay" MinWidth="124" Height="23"
                                             HorizontalAlignment="Right" Click="Hotkey_Click" LostKeyboardFocus="Hotkey_LostFocus" />
                                 </Grid>
                                 <Grid Height="28">

@@ -71,6 +71,8 @@ internal static class FastClipboard
         byte[]? png = null;
         if (file != null && File.Exists(file) && Path.GetExtension(file).Equals(".png", StringComparison.OrdinalIgnoreCase))
             try { png = File.ReadAllBytes(file); } catch { }
+        if (png == null && ImageFiles.HasSeeThrough(image))
+            try { png = ImageFiles.PngBytes(image); } catch { }
         byte[]? drop = file != null && File.Exists(file) ? DropFiles(Path.GetFullPath(file)) : null;
 
         for (int attempt = 0; attempt < 10; attempt++)

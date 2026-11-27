@@ -47,6 +47,8 @@ public sealed partial class ViewerWindow : Window
     private Border? _frame;
     private readonly Image _image = new() { Stretch = Stretch.Fill, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
     private readonly Canvas _canvas = new();
+    /// <summary>Links, email addresses and phone numbers in the picture, as things to click.</summary>
+    private readonly Canvas _links = new() { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
     private readonly ScaleTransform _zoom = new();
     private readonly TranslateTransform _pan = new();
     private readonly MediaElement _video = new() { LoadedBehavior = MediaState.Manual, UnloadedBehavior = MediaState.Close, Stretch = Stretch.Fill, Visibility = Visibility.Collapsed };
@@ -102,6 +104,7 @@ public sealed partial class ViewerWindow : Window
         // the picture: moved and scaled as one, so zooming is a smooth transform, not a re-layout
         _content.RenderTransform = new TransformGroup { Children = { _zoom, _pan } };
         _content.Children.Add(_image);
+        _content.Children.Add(_links);
         _content.Children.Add(_video);
         _canvas.Children.Add(_content);
         _stage.Children.Add(_canvas);
@@ -179,6 +182,8 @@ public sealed partial class ViewerWindow : Window
         _pin = ToolButton("IcPin", "Pin it on top  (P)", Pin);
         tools.Children.Add(_pin);
         tools.Children.Add(ToolButton("IcFolderOpen", "Show in folder", () => { if (CurrentPath is { } p) _host.ShowInFolder(p); }));
+        tools.Children.Add(ToolButton("IcWand", "Lift out the subject: the person, pet or thing in front, on a see-through background, opened in the editor", () => _ = LiftOutAsync()));
+        tools.Children.Add(ToolButton("IcSmartphone", "Send to your phone: a QR code to scan, over your Wi-Fi", () => { if (CurrentPath is { } p) PhoneShare.Show(p, this); }));
         tools.Children.Add(ToolButton("IcTrash", "Move to the Recycle Bin  (Delete)", Delete));
         tools.Children.Add(Separator());
         _edit = new Button { Height = 32, Margin = new Thickness(2, 0, 0, 0), Padding = new Thickness(12, 0, 12, 0), ToolTip = "Open in the editor  (E)" };
@@ -300,6 +305,7 @@ public sealed partial class ViewerWindow : Window
         _video.Visibility = Visibility.Collapsed;
         StopVideoControls();
         _message.Text = "";
+        _links.Children.Clear();
         _position.Text = _paths.Count > 1 ? $"{_index + 1} / {_paths.Count}" : "";
         MarkFilm();
         string? path = CurrentPath;
@@ -367,9 +373,92 @@ public sealed partial class ViewerWindow : Window
         _details.Text = Describe(path, picture);
         SetTools(video: false);
         if (!same || _fit) FitNow(animate: false);
+        if (_gif == null) _ = ShowLinksAsync(picture, token);
         // a quick fade, so going through them feels smooth rather than flickery
         _image.BeginAnimation(OpacityProperty, new DoubleAnimation(0.35, 1, TimeSpan.FromMilliseconds(140)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
         Preload();
+    }
+
+    /// <summary>
+    /// Reads the picture's words in the background and makes its links, email addresses and
+    /// phone numbers clickable, each with a soft underline.
+    /// </summary>
+    private async Task ShowLinksAsync(BitmapSource picture, int token)
+    {
+        List<TextAction> actions;
+        try
+        {
+            var image = ImageLoader.Normalize(picture);
+            actions = await Task.Run(async () =>
+            {
+                var lines = await TextRecognizer.RecognizeLinesAsync(image);
+                if (lines == null) return new List<TextAction>();
+                var words = new List<OcrWord>();
+                var lineOf = new List<int>();
+                for (int i = 0; i < lines.Count; i++)
+                    foreach (var w in lines[i]) { words.Add(w); lineOf.Add(i); }
+                return TextActions.Find(words, lineOf);
+            });
+        }
+        catch { return; }
+        if (token != _loadToken || _shown != picture) return;
+        _links.Children.Clear();
+        var accent = ((SolidColorBrush)FindResource("Accent")).Color;
+        foreach (var action in actions)
+        {
+            var r = action.Bounds;
+            double line = Math.Max(1.5, r.Height * 0.09);
+            var hit = new Border
+            {
+                Width = r.Width + 4,
+                Height = r.Height + line * 2 + 2,
+                Background = new SolidColorBrush(Color.FromArgb(18, accent.R, accent.G, accent.B)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(200, accent.R, accent.G, accent.B)),
+                BorderThickness = new Thickness(0, 0, 0, line),
+                CornerRadius = new CornerRadius(2),
+                Cursor = Cursors.Hand,
+                ToolTip = action.Hint,
+            };
+            var target = action;
+            hit.MouseEnter += (_, _) => hit.Background = new SolidColorBrush(Color.FromArgb(55, accent.R, accent.G, accent.B));
+            hit.MouseLeave += (_, _) => hit.Background = new SolidColorBrush(Color.FromArgb(18, accent.R, accent.G, accent.B));
+            hit.MouseLeftButtonDown += (_, e) => { e.Handled = true; if (e.ClickCount == 1) TextActions.Run(target); };
+            Canvas.SetLeft(hit, r.Left - 2);
+            Canvas.SetTop(hit, r.Top - 1);
+            _links.Children.Add(hit);
+        }
+    }
+
+    internal int LinkCountForTest => _links.Children.Count;
+
+    /// <summary>Lifts the subject out of the picture showing and opens it in the editor, see-through round it.</summary>
+    private async Task LiftOutAsync()
+    {
+        if (_shown is not { } picture || _video.Visibility == Visibility.Visible) return;
+        if (!AiModels.Available)
+        {
+            Toast.Show("This copy of Overskin was built without its AI models.", true);
+            return;
+        }
+        Toast.ShowSticky("Lifting out the subject…");
+        try
+        {
+            var frozen = picture.IsFrozen ? picture : ImageLoader.Normalize(picture);
+            var cut = await AiModels.OffThread(() => AiModels.CutOut(frozen));
+            Toast.HideNow();
+            if (cut == null)
+            {
+                Toast.Show("Nothing stands out enough in this picture to lift out.");
+                return;
+            }
+            string name = CurrentPath is { } p ? Path.GetFileNameWithoutExtension(p) + " (cut out)" : "Cut out";
+            _host.Edit(cut, null, name);
+        }
+        catch (Exception ex)
+        {
+            Toast.HideNow();
+            Toast.Show("Couldn't lift it out: " + ex.Message, true);
+        }
     }
 
     /// <summary>Keeps only the captures the search finds, staying on the one shown if it's among them.</summary>
@@ -720,6 +809,8 @@ public sealed partial class ViewerWindow : Window
         _image.Height = _content.Height = result.PixelHeight;
         _details.Text = Describe(path, result);
         FitNow(animate: true);
+        _links.Children.Clear();
+        _ = ShowLinksAsync(result, _loadToken);
     }
 
     private void Delete()

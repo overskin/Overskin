@@ -28,6 +28,7 @@ public partial class MainWindow
             new("video", "Record a video", "IcCircleDot", () => ToggleVideo(false), true),
             new("zoomvideo", "Record a video with auto-zoom", "IcZoomIn", () => ToggleVideo(true), true),
             new("steps", "Record steps (how-to guide)", "IcListOrdered", ToggleSteps, true),
+            new("replay", "Save the instant replay", "IcRefreshCw", SaveReplay),
         }.Concat(_settings.Workflows.Select((w, i) => new Command($"workflow{i + 1}", w.Title, "IcWorkflow", () => RunWorkflow(w)))).ToArray()),
         ("Tools", "IcZap", new Command[]
         {
@@ -51,14 +52,17 @@ public partial class MainWindow
             new("combinerow", "Combine pictures side by side…", "IcArrowLeftRight", () => CombineFiles(CombineLayout.SideBySide)),
             new("combinestack", "Combine pictures stacked…", "IcArrowUpDown", () => CombineFiles(CombineLayout.Stacked)),
             new("combinegrid", "Make a collage…", "IcGrid2x2", () => CombineFiles(CombineLayout.Grid)),
-            new("caption", "Caption a GIF…", "IcType", () => CaptionGif_Click(this, NoArgs)),
             new("compare", "Compare two pictures…", "IcColumns2", CompareFiles),
         }),
         ("Open", "IcLayers", new Command[]
         {
             new("recent", "Recent captures", "IcImages", ShowRecent, true),
             new("library", "Library", "IcImages", () => ShowTab(TabLibraryIndex)),
+            new("duplicates", "Find duplicate captures", "IcCopy", FindDuplicates),
+            new("phone", "Send the last capture to your phone", "IcSmartphone", SendLatestToPhone),
             new("settings", "Settings", "IcSettings", () => ShowTab(TabSettingsIndex)),
+            new("search", "Search everything…", "IcSearch", OpenSearch),
+            new("ring", "Ring menu", "IcCircleDot", OpenRing),
             new("folder", "Screenshots folder", "IcFolder", () => OpenFolder_Click(this, NoArgs)),
         }),
     };

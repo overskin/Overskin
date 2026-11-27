@@ -19,7 +19,8 @@ public partial class MainWindow
         foreach (var item in _library) item.IsSelected = false;
         _pickOrder.Clear();
         CombineBar.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        LibraryScroll.Margin = new Thickness(0, on ? 92 : 42, 0, 0);
+        LibraryScroll.Margin = new Thickness(0, on ? 92 : 60, 0, 0);
+        LibraryInfoRow.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
         CombineBar.Margin = new Thickness(0, 42, 0, 0);
         UpdateCombineBar();
     }

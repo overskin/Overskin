@@ -20,8 +20,7 @@ overskin.settings.json
 onionskin.settings.json
 overlay.settings.json
 
-# the Linux version: kept on this PC while it is worked on, not published yet
-src/Overskin.Linux/
+# the Linux packaging: kept on this PC while it is worked on, not published yet
 packaging/linux/
 build-linux.sh
 docs/screenshots/linux-*.png
@@ -31,3 +30,6 @@ website/
 
 # the Whisper speech model for subtitles: too big for the repository; a build downloads it
 src/Overskin/Models/*.bin
+# the cutout and picture-search models: the same, downloaded by the build
+src/Overskin/Models/*.onnx
+src/Overskin/Models/clip-tokenizer.json

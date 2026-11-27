@@ -8,6 +8,10 @@ public sealed class HistoryEntry
 {
     public string Path { get; set; } = "";
     public DateTime Time { get; set; }
+    /// <summary>Starred in the Library.</summary>
+    public bool Favourite { get; set; }
+    /// <summary>The Library's tags for this capture, such as "work" or "memes".</summary>
+    public List<string> Tags { get; set; } = new();
 }
 
 /// <summary>A pinned image to bring back on the next start.</summary>
@@ -53,6 +57,12 @@ public sealed class AppSettings
     public string HotkeyPinClipboard { get; set; } = "Ctrl+Alt+V";
     /// <summary>Record a video (again to stop).</summary>
     public string HotkeyVideo { get; set; } = "Ctrl+Alt+R";
+    /// <summary>The ring of capture choices round the pointer.</summary>
+    public string HotkeyRing { get; set; } = "Ctrl+Alt+Space";
+    /// <summary>Search everything, from anywhere.</summary>
+    public string HotkeySearch { get; set; } = "Ctrl+Alt+J";
+    /// <summary>Saves the instant replay.</summary>
+    public string HotkeyReplay { get; set; } = "Ctrl+Alt+F10";
     /// <summary>Library order: Newest, Oldest, Name or Largest.</summary>
     public string LibrarySort { get; set; } = "Newest";
     /// <summary>Captures older than this many days go to the Recycle Bin; 0 keeps them.</summary>
@@ -78,6 +88,8 @@ public sealed class AppSettings
     public Overskin.Shared.PrivateKinds AutoHideKinds { get; set; } = Overskin.Shared.PrivateKinds.Default;
     /// <summary>Window shots: just the window, on a transparent background with a shadow.</summary>
     public bool WindowAlpha { get; set; }
+    /// <summary>Text from screen just copies, without showing the text in a window.</summary>
+    public bool TextJustCopy { get; set; }
     public string SaveFolder { get; set; } = DefaultSaveFolder();
     /// <summary>"png" or "jpg".</summary>
     public string ImageFormat { get; set; } = "png";
@@ -89,12 +101,24 @@ public sealed class AppSettings
     /// <summary>How saved captures are named, such as "{app} {date} {time}" (see <see cref="FileNames"/>).</summary>
     public string FileNamePattern { get; set; } = FileNames.Default;
     public int CaptureDelay { get; set; }
+    /// <summary>3, 2, 1 before recording starts (off unless chosen; replaces the earlier RecordCountdown, which was on by default).</summary>
+    public bool CountdownFirst { get; set; }
+    /// <summary>Stop a video or GIF recording by itself after this many seconds; 0 for never.</summary>
+    public int RecordStopAfter { get; set; }
+    /// <summary>Instant replay: keep recording the main screen in the background.</summary>
+    public bool ReplayOn { get; set; }
+    /// <summary>How much instant replay keeps: 15, 30, 60 or 120 seconds.</summary>
+    public int ReplaySeconds { get; set; } = 30;
+    /// <summary>Instant replay records what the speakers play too.</summary>
+    public bool ReplaySound { get; set; } = true;
     /// <summary>Frames per second for GIF recordings: 15, 30 or 50 (the most a GIF can play).</summary>
     public int GifFps { get; set; } = 30;
     /// <summary>Show the magnifier while choosing what to capture.</summary>
     public bool Magnifier { get; set; } = true;
     /// <summary>Lines across the whole screen through the pointer while choosing.</summary>
     public bool Crosshair { get; set; }
+    /// <summary>Fit a dragged box to what's inside it, trimming plain edges.</summary>
+    public bool Tighten { get; set; } = true;
     public bool FullScreenAllMonitors { get; set; }
     public int[]? LastRegion { get; set; }
     public List<HistoryEntry> History { get; set; } = new();
@@ -107,6 +131,10 @@ public sealed class AppSettings
 
     // general
     public string AccentColor { get; set; } = Theming.DefaultAccent;
+    /// <summary>Use the accent colour chosen in Windows' settings.</summary>
+    public bool MatchWindows { get; set; }
+    /// <summary>The see-through, blurred window background (Windows 10 and 11).</summary>
+    public bool SeeThrough { get; set; }
     public VideoOptions Video { get; set; } = new();
     /// <summary>The colour theme (named for the older "background tone" setting it replaced).</summary>
     public string BackgroundTone { get; set; } = Theming.DefaultTone;
@@ -244,6 +272,8 @@ public sealed class AppSettings
         if (string.IsNullOrWhiteSpace(FileNamePattern)) FileNamePattern = FileNames.Default;
         SizeLimitMb = Math.Clamp(SizeLimitMb <= 0 ? 8 : SizeLimitMb, 0.5, 50);
         if (CaptureDelay is not (0 or 3 or 5 or 10)) CaptureDelay = 0;
+        if (RecordStopAfter is not (0 or 15 or 30 or 60 or 300)) RecordStopAfter = 0;
+        if (ReplaySeconds is not (15 or 30 or 60 or 120)) ReplaySeconds = 30;
         if (LastRegion is { Length: not 4 }) LastRegion = null;
         // Ctrl+Alt+S used to be "snip and pin"; it now captures a region
         if (HotkeySnip == HotkeyRegion) HotkeySnip = "Ctrl+Alt+A";
@@ -252,6 +282,8 @@ public sealed class AppSettings
         // 4 was Settings before the Trace page left in 3.3; it is 3 now
         LastTab = Math.Clamp(LastTab, 0, 3);
         if (!Theming.TryParseHex(AccentColor, out _)) AccentColor = Theming.DefaultAccent;
+        // auto-hide left as it came: it now hides faces and chat names too
+        if (AutoHideKinds == Overskin.Shared.PrivateKinds.OldDefault) AutoHideKinds = Overskin.Shared.PrivateKinds.Default;
         if (Theming.Themes.All(t => t.Name != BackgroundTone)) BackgroundTone = Theming.DefaultTone;
         if (Theming.Themes.All(t => t.Name != LastDarkTheme || t.Light)) LastDarkTheme = Theming.DefaultTone;
         if (Theming.Themes.All(t => t.Name != LastLightTheme || !t.Light)) LastLightTheme = Theming.DefaultLightTheme;

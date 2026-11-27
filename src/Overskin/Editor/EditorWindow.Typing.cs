@@ -22,10 +22,17 @@ public partial class EditorWindow
 
     private readonly Dictionary<int, TextStyle?> _lineStyles = new();
 
+    /// <summary>How many of <see cref="CommonFonts"/> (from the start) are always tried.</summary>
+    private const int CoreFonts = 12;
+
     private static readonly string[] CommonFonts =
     {
         "Segoe UI", "Segoe UI Variable Text", "Arial", "Calibri", "Cambria", "Georgia", "Times New Roman",
         "Verdana", "Tahoma", "Trebuchet MS", "Consolas", "Courier New",
+        // used by apps and websites, when this PC has them
+        "Helvetica", "Roboto", "Inter", "Open Sans", "Noto Sans", "Lato", "Source Sans Pro", "Ubuntu", "Montserrat", "Poppins",
+        "Lucida Sans Unicode", "Bahnschrift", "Century Gothic", "Franklin Gothic Medium", "Candara", "Corbel",
+        "Comic Sans MS", "Cascadia Code", "Cascadia Mono", "Lucida Console", "JetBrains Mono", "Fira Code",
     };
 
     private static List<(Typeface Face, string Name)>? _faces;
@@ -39,10 +46,26 @@ public partial class EditorWindow
         foreach (var name in CommonFonts.Where(installed.Contains))
         {
             var family = new FontFamily(name);
+            // the weights this font really has (not ones Windows would fake), from light to bold
+            var real = family.FamilyTypefaces.Where(t => t.Style == FontStyles.Normal && t.Stretch == FontStretches.Normal)
+                .Select(t => t.Weight.ToOpenTypeWeight()).ToHashSet();
             list.Add((new Typeface(family, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal), name));
-            if (name.StartsWith("Segoe UI"))
+            if (real.Contains(600) || name.StartsWith("Segoe UI"))
                 list.Add((new Typeface(family, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal), name + " Semibold"));
+            if (real.Contains(500))
+                list.Add((new Typeface(family, FontStyles.Normal, FontWeights.Medium, FontStretches.Normal), name + " Medium"));
+            if (real.Contains(300) && !name.StartsWith("Segoe UI Variable"))
+                list.Add((new Typeface(family, FontStyles.Normal, FontWeights.Light, FontStretches.Normal), name + " Light"));
             list.Add((new Typeface(family, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal), name + " Bold"));
+        }
+        // the ones that come with Overskin, when this PC doesn't have its own copy
+        foreach (var (name, weights) in FontLibrary.MatchingFonts)
+        {
+            if (installed.Contains(name)) continue;
+            var family = FontLibrary.Bundled(name);
+            foreach (var weight in weights)
+                list.Add((new Typeface(family, FontStyles.Normal, weight, FontStretches.Normal),
+                    weight == FontWeights.Normal ? name : $"{name} {WeightName(weight)}"));
         }
         return _faces = list;
     }
@@ -148,6 +171,9 @@ public partial class EditorWindow
         _lineStyles[line] = style;
         return style;
     }
+
+    /// <summary>For the self-test: which fonts the last match tried, and the closest few.</summary>
+    internal static string LastRankForTest = "";
 
     private TextStyle? MatchStyle(int line)
     {
@@ -282,10 +308,34 @@ public partial class EditorWindow
                 ranked.Add(new TextStyle(face, name, sizeSum / weight, ink, paper, baseline, total / weight));
             }
             // near-ties go to the more common font (earlier in the list): Segoe UI over its Windows 11 twin
+            // (the lean only applies among the usual fonts: the others all count as coming last of
+            // those, or a long list would push a font at its end out of reach)
             var order = Faces().Select(f => f.Name).ToList();
-            double Biased(TextStyle t) => t.Score * (1 + 0.006 * Math.Max(0, order.IndexOf(t.Name)) / 3);
+            int coreCount = Faces().Count(f => CommonFonts.Take(CoreFonts).Contains(f.Face.FontFamily.Source, StringComparer.OrdinalIgnoreCase));
+            double Biased(TextStyle t) => t.Score * (1 + 0.006 * Math.Min(coreCount, Math.Max(0, order.IndexOf(t.Name))) / 3);
             ranked.Sort((u, v) => Biased(u).CompareTo(Biased(v)));
             return ranked;
+        }
+
+        // The quick look: each font's words drawn at the size that makes them as wide as the picture's,
+        // and how far their height is out. Only the closest are compared pixel by pixel, so trying
+        // more fonts doesn't make matching slower.
+        IEnumerable<(Typeface Face, string Name)> Likely(List<(Typeface Face, string Name)> all)
+        {
+            // the usual fonts are always compared; of the others, only the few whose words come out
+            // closest to the right shape
+            var core = new HashSet<string>(CommonFonts.Take(CoreFonts), StringComparer.OrdinalIgnoreCase);
+            // one quick pixel comparison each, on the longest word at the size that fits its width
+            var (text0, crop0, cover0, ink0, cover30) = real[0];
+            var extras = all.Where(f => !core.Contains(f.Face.FontFamily.Source)).Select(f =>
+            {
+                var g = Ft(text0, f.Face, 100).BuildGeometry(new Point()).Bounds;
+                if (g.IsEmpty || g.Width < 1) return (f, Off: double.MaxValue);
+                double size0 = 100 * ink0.Width / g.Width;
+                if (Math.Abs(g.Height * size0 / 100 - ink0.Height) > Math.Max(2, ink0.Height * 0.25)) return (f, Off: double.MaxValue);
+                return (f, Off: Compare(text0, f.Face, size0, crop0, cover0, ink0, cover30).Score);
+            }).Where(x => x.Off < double.MaxValue).OrderBy(x => x.Off).Take(5).Select(x => x.f).ToHashSet();
+            return all.Where(f => core.Contains(f.Face.FontFamily.Source) || extras.Contains(f)); // in the usual order, which settles near-ties
         }
 
         // the size, finely: the ink's width runs a little wide from soft edges, so try just under it too
@@ -369,7 +419,9 @@ public partial class EditorWindow
             return chosen;
         }
 
-        var first = Rank(Faces(), 0, 1, 1);
+        var tried = Likely(Faces()).ToList();
+        var first = Rank(tried, 0, 1, 1);
+        LastRankForTest = $"tried {tried.Count}: {string.Join(", ", tried.Where(f => !CommonFonts.Take(CoreFonts).Contains(f.Face.FontFamily.Source)).Select(f => f.Name))} | top: {string.Join(", ", first.Take(5).Select(t => $"{t.Name} {t.Score:0.000}"))}";
         if (first.Count == 0) return null;
         var result = Look(Fine(first[0], 0, 1, 1));
         // darker or more colourful edges make a font look bolder than it is, and a bolder font with
@@ -572,6 +624,8 @@ public partial class EditorWindow
         int w = _pxW, h = _pxH;
         var px = (byte[])src.Clone();
         int ix = Math.Clamp((int)Math.Round(caretX), 0, w);
+        if (!afterSpace && k > 0 && k < len)
+            ix = Seam(src, w, y0, y1, caretX, 1, (style.Paper.B, style.Paper.G, style.Paper.R));
         int lineRight = Math.Clamp(right, ix, w);
         // the rest of the line moves right to make room, and the room is cleared to the background
         byte pb = style.Paper.B, pg = style.Paper.G, pr = style.Paper.R;

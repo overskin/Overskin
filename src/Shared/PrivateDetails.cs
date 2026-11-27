@@ -19,8 +19,14 @@ public enum PrivateKinds
     /// <summary>Cities, states and postcodes.</summary>
     Places = 128,
     Countries = 256,
+    /// <summary>Faces in photos and webcams (found with Windows' face finder).</summary>
+    Faces = 512,
+    /// <summary>Names at the top of chat messages, their profile pictures, and @mentions.</summary>
+    ChatNames = 1024,
 
-    Default = Emails | PhoneNumbers | Cards | IpAddresses | Keys | FolderPaths | StreetAddresses | Places,
+    /// <summary>What auto-hide looked for before faces and chat names were added.</summary>
+    OldDefault = Emails | PhoneNumbers | Cards | IpAddresses | Keys | FolderPaths | StreetAddresses | Places,
+    Default = OldDefault | Faces | ChatNames,
     All = Default | Countries,
 }
 
@@ -49,6 +55,8 @@ public static class PrivateDetails
         (PrivateKinds.StreetAddresses, "Street addresses"),
         (PrivateKinds.Places, "Cities, states and postcodes"),
         (PrivateKinds.Countries, "Countries"),
+        (PrivateKinds.Faces, "Faces"),
+        (PrivateKinds.ChatNames, "Names and profile pictures in chats (Discord, Slack, Teams)"),
     };
 
     private const RegexOptions Fast = RegexOptions.Compiled | RegexOptions.CultureInvariant;

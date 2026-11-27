@@ -159,9 +159,10 @@ SOFTWARE.
 
 ## Fonts
 
-Anton, Bebas Neue, Oswald, Bangers and Comic Neue are under the SIL Open Font License 1.1.
-Permanent Marker is under the Apache License 2.0. All come from Google Fonts
-(https://github.com/google/fonts), unchanged.
+Anton, Bebas Neue, Oswald, Bangers, Comic Neue, Inter and Roboto are under the SIL Open Font
+License 1.1. Permanent Marker is under the Apache License 2.0. All come from Google Fonts
+(https://github.com/google/fonts), unchanged; Inter and Roboto are the Latin sets from Fontsource
+(https://fontsource.org), used to match the text in screenshots.
 
 - Anton: Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont)
 - Bebas Neue: Copyright © 2010 by Dharma Type (https://github.com/dharmatype/Bebas-Neue)
@@ -169,6 +170,8 @@ Permanent Marker is under the Apache License 2.0. All come from Google Fonts
 - Bangers: Copyright 2010 The Bangers Project Authors (https://github.com/googlefonts/bangers)
 - Comic Neue: Copyright 2014 The Comic Neue Project Authors (https://github.com/crozynski/comicneue)
 - Permanent Marker: Copyright (c) 2010 by Font Diner, Inc.
+- Inter: Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+- Roboto: Copyright 2011 The Roboto Project Authors (https://github.com/googlefonts/roboto-classic)
 
 ```text
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

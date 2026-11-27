@@ -23,7 +23,7 @@ public sealed class RecentStrip : Window
     {
         if (_open != null)
         {
-            _open.Close();
+            _open.Shut();
             return;
         }
         if (paths.Count == 0)
@@ -36,6 +36,10 @@ public sealed class RecentStrip : Window
         _open.Show();
         _open.Activate();
     }
+
+    /// <summary>For the self-test: Esc on the open strip, as the key would.</summary>
+    internal static void EscapeForTest() => _open?.Shut();
+    internal static bool IsOpenForTest => _open != null;
 
     private RecentStrip(IReadOnlyList<string> paths, Action<string> open)
     {
@@ -76,8 +80,22 @@ public sealed class RecentStrip : Window
         card.Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 18, ShadowDepth = 3, Opacity = 0.35, Direction = 270 };
         Content = card;
 
-        KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
-        Deactivated += (_, _) => { if (!DragOut.IsDragging && IsLoaded) Close(); };
+        KeyDown += (_, e) => { if (e.Key == Key.Escape) Shut(); };
+        Deactivated += (_, _) => { if (!DragOut.IsDragging && IsLoaded) Shut(); };
+        Closing += (_, _) => _shutting = true;
+    }
+
+    private bool _shutting;
+
+    /// <summary>
+    /// Closes once. Closing makes the window lose focus, which would ask it to close a second
+    /// time mid-close, and Windows refuses that with an error.
+    /// </summary>
+    private void Shut()
+    {
+        if (_shutting) return;
+        _shutting = true;
+        Close();
     }
 
     private FrameworkElement Tile(string path)
@@ -113,7 +131,7 @@ public sealed class RecentStrip : Window
 
         DragOut.Attach(tile, () => path, () => Thumbs.IsVideo(path) || Thumbs.IsGif(path) ? null : LoadFull(path), () =>
         {
-            Close();
+            Shut();
             _open_(path);
         });
         return tile;

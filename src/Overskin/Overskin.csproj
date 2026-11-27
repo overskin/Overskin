@@ -74,7 +74,40 @@
     <EmbeddedResource Include="Models\ggml-base-q5_1.bin" LogicalName="Overskin.whisper-model.bin" />
   </ItemGroup>
 
+  <!--
+    Lifting the subject out of a picture and searching pictures by what's in them: two AI models
+    that run on this PC with ONNX Runtime, inside Overskin.exe like the speech model, and fetched
+    by the build the same way (too big for the repository), each checked against its hash.
+      IS-Net general use (DIS, Apache-2.0), 8-bit: finds the subject to cut out.
+      OpenAI CLIP ViT-B/32 (MIT), 8-bit, picture and text halves, and its word list.
+  -->
   <ItemGroup>
+    <AiModel Include="Models\isnet-general-int8.onnx" Url="https://huggingface.co/xrds/isnet-general-onnx-int8/resolve/main/onnx/model_quantized.onnx"
+             Hash="3B21A6706DC8D6E4BA9F5B31EBC6940F6C785B58862E27BB25DAA9DD4424B87F" Name="Overskin.cutout-model.onnx" />
+    <AiModel Include="Models\clip-vision-int8.onnx" Url="https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model_int8.onnx"
+             Hash="0AB0C1B3ACE708E539633AF1744D5A95247FE4E14D3E08FF197EF82A6CB9BD93" Name="Overskin.clip-vision.onnx" />
+    <AiModel Include="Models\clip-text-int8.onnx" Url="https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model_int8.onnx"
+             Hash="18845F2CCC35223BB7FEC403383A131154B11AC0918DF25CF51986DF5EFD3A21" Name="Overskin.clip-text.onnx" />
+    <AiModel Include="Models\clip-tokenizer.json" Url="https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/tokenizer.json"
+             Hash="F7F3B7AF117D467B58374797691A6438D3E6B9E9CEF800DFD5DCED7F697A90CD" Name="Overskin.clip-tokenizer.json" />
+  </ItemGroup>
+  <Target Name="GetAiModels" BeforeTargets="PrepareForBuild">
+    <Message Importance="high" Condition="!Exists('%(AiModel.FullPath)')" Text="Downloading %(AiModel.Filename)%(AiModel.Extension) for cutting out and picture search…" />
+    <DownloadFile Condition="!Exists('%(AiModel.FullPath)')" SourceUrl="%(AiModel.Url)" DestinationFolder="$(MSBuildThisFileDirectory)Models" DestinationFileName="%(AiModel.Filename)%(AiModel.Extension)" />
+  </Target>
+  <Target Name="CheckAiModels" AfterTargets="GetAiModels" BeforeTargets="CoreCompile">
+    <GetFileHash Files="@(AiModel)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="AiModelHashed" />
+    </GetFileHash>
+    <Error Condition="'%(AiModelHashed.FileHash)' != '%(AiModelHashed.Hash)'" Text="%(AiModelHashed.Identity) isn't the expected model. Delete it and build again." />
+  </Target>
+  <ItemGroup>
+    <!-- each model under its own short name (plain %(Name): it is the copied item's own) -->
+    <EmbeddedResource Include="@(AiModel)" LogicalName="%(Name)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.32.0" />
     <PackageReference Include="Whisper.net" Version="1.9.1" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />

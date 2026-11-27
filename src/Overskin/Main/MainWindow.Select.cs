@@ -181,6 +181,7 @@ public partial class MainWindow
         foreach (var h in _settings.History.Where(h => string.Equals(h.Path, from, StringComparison.OrdinalIgnoreCase))) h.Path = to;
         foreach (var p in _settings.PinnedImages.Where(p => string.Equals(p.Path, from, StringComparison.OrdinalIgnoreCase))) p.Path = to;
         _search.Renamed(from, to);
+        _pictures.Renamed(from, to);
         var item = _library.FirstOrDefault(i => string.Equals(i.Path, from, StringComparison.OrdinalIgnoreCase));
         if (item != null) _library[_library.IndexOf(item)] = new LibraryItem { Path = to, Time = item.Time, Caption = item.Caption, Details = item.Details, Thumb = item.Thumb };
     }
@@ -198,6 +199,10 @@ public partial class MainWindow
             item.Click += (_, _) => { _settings.LibrarySort = key; SaveSettings(); RefreshLibrary(); };
             menu.Items.Add(item);
         }
+        menu.Items.Add(new Separator());
+        var dupes = new MenuItem { Header = "Find duplicates" };
+        dupes.Click += (_, _) => FindDuplicates();
+        menu.Items.Add(dupes);
         menu.IsOpen = true;
     }
 

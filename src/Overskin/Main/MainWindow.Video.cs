@@ -10,7 +10,7 @@ namespace Overskin;
 /// <summary>Screen recording to MP4, plain or with auto-zoom.</summary>
 public partial class MainWindow
 {
-    private const int HkVideoEsc = 20, HkVideoPause = 21;
+    private const int HkVideoEsc = 20, HkVideoPause = 25; // 21 is Recent captures
 
     private VideoRecorder? _video;
     private bool _videoWasShown;
@@ -97,6 +97,7 @@ public partial class MainWindow
         VidPenFadeSwitch.IsChecked = v.PenFades;
         VidPenLinger.Value = v.PenLinger;
         VidRingsSwitch.IsChecked = v.ClickRings;
+        VidSpotlightSwitch.IsChecked = v.Spotlight;
         VideoZoomSwitch.IsChecked = v.AutoZoom;
         VidEditableZoomsSwitch.IsChecked = v.EditableZooms;
         VidZoom.Value = v.Zoom;
@@ -256,6 +257,7 @@ public partial class MainWindow
         v.PenFades = VidPenFadeSwitch.IsChecked == true;
         v.PenLinger = VidPenLinger.Value;
         v.ClickRings = VidRingsSwitch.IsChecked == true;
+        v.Spotlight = VidSpotlightSwitch.IsChecked == true;
         v.AutoZoom = VideoZoomSwitch.IsChecked == true;
         v.EditableZooms = VidEditableZoomsSwitch.IsChecked == true;
         v.Zoom = Math.Round(VidZoom.Value, 1);
@@ -299,6 +301,18 @@ public partial class MainWindow
                 _video = new VideoRecorder(Dispatcher);
                 _video.Finished += OnVideoFinished;
             }
+            if (_settings.CountdownFirst)
+            {
+                _hotkeys?.Register(HkVideoEsc, new Hotkey(ModifierKeys.None, Key.Escape), RecordCountdown.Cancel);
+                bool go = await RecordCountdown.Run(area, 3);
+                _hotkeys?.Unregister(HkVideoEsc);
+                if (!go)
+                {
+                    Reappear(c.WasShown);
+                    Toast.Show("Recording cancelled.");
+                    return;
+                }
+            }
             _hotkeys?.Register(HkVideoEsc, new Hotkey(ModifierKeys.None, Key.Escape), () => _video.Stop());
             // the pause key pauses the recording; the start-drawing key draws on the screen
             if (Hotkey.TryParse(_settings.HotkeyPause, out var pause)) _hotkeys?.Register(HkVideoPause, pause, () => _video.TogglePause());
@@ -307,6 +321,8 @@ public partial class MainWindow
             FileNames.Context = NameInfo.At(area.X + area.Width / 2, area.Y + area.Height / 2);
             string path = NewCapturePath(".mp4");
             var mark = _settings.Watermark.OnVideos && _settings.Watermark.HasContent ? _settings.Watermark.Copy() : null;
+            PauseReplay();
+            _video.StopAfter = _settings.RecordStopAfter > 0 ? TimeSpan.FromSeconds(_settings.RecordStopAfter) : null;
             _video.Start(area, path, _settings.Video.With(autoZoom), mark);
         });
     }
@@ -315,6 +331,7 @@ public partial class MainWindow
     {
         _hotkeys?.Unregister(HkVideoEsc);
         _hotkeys?.Unregister(HkVideoPause);
+        ResumeReplay();
         Reappear(_videoWasShown);
         if (error != null)
         {

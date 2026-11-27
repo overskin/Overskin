@@ -35,6 +35,8 @@ public partial class MainWindow
         Fold(CardShooting, "shooting", ShootingSummary);
         Fold(CardAfter, "after", AfterSummary);
         Fold(CardWatermark, "watermark", WatermarkSummary);
+        Fold(CardStartStop, "startstop", StartStopSummary);
+        Fold(CardReplay, "replay", ReplaySummary);
         Fold(CardGif, "gif", () => $"{GifRecorder.ValidFps(_settings.GifFps)} fps");
         Fold(CardVideo, "video", VideoSummary);
         Fold(CardSound, "sound", SoundSummary);
@@ -63,6 +65,7 @@ public partial class MainWindow
         var parts = new List<string>();
         if (s.Magnifier) parts.Add("Magnifier");
         if (s.Crosshair) parts.Add("Crosshair");
+        if (s.Tighten) parts.Add("Fit box");
         return parts.Count == 0 ? "Off" : string.Join(" · ", parts);
     }
 
@@ -123,6 +126,7 @@ public partial class MainWindow
         var parts = new List<string> { v.PointerStyle == "System" ? "Windows pointer" : v.PointerStyle };
         if (v.SmoothCursor) parts.Add("Smooth");
         if (v.ClickRings) parts.Add("Rings");
+        if (v.Spotlight) parts.Add("Dim around");
         return string.Join(" · ", parts);
     }
 
@@ -311,7 +315,7 @@ public partial class MainWindow
             catch (Exception ex) { log.Add(name + ": FAILED " + ex.Message); }
         }
 
-        Check("folds", () => $"{FoldCountForTest} cards (expect 7); summaries: {string.Join(" | ", FoldSummariesForTest())}");
+        Check("folds", () => $"{FoldCountForTest} cards (expect 11); summaries: {string.Join(" | ", FoldSummariesForTest())}");
         Check("fold toggle", () =>
         {
             var fold = _folds[0];
@@ -402,7 +406,7 @@ public partial class MainWindow
             double lean = (c3?.Left ?? 0) - home3;
             int none = c3?.EndSwipe(500) ?? 9;
             CaptureNotice.CloseAll();
-            log.Add($"preview swipe fade: left 20={fadeNear:0.00} left 60={fadeHalf:0.00} past opening={fadeThere:0.00} (expect 1.00, between, 0.35)");
+            log.Add($"preview swipe fade: left 20={fadeNear:0.00} left 60={fadeHalf:0.00} past opening={fadeThere:0.00} (expect 1.00, between, under 0.10)");
             log.Add($"preview swipe: short={back} back-at={backLeft:0} open={stillOpen}; far-left={open} viewed={viewed}; " +
                     $"flick-right={flick} closed={flickClosed}; no-viewer lean={lean:0} result={none} " +
                     "(expect 0 0 True; -1 1; 1 True; lean -30 result 0)");

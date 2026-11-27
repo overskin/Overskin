@@ -21,6 +21,12 @@ public sealed class VideoOverlay
     public Point B { get; set; }
     public double Start { get; set; }
     public double End { get; set; }
+    /// <summary>Subtitles: one of <see cref="CaptionLook.Looks"/>.</summary>
+    public string Look { get; set; } = "Classic";
+    /// <summary>Subtitles: "Line" (whole), "Light" (the word being said lights up) or "Build" (words appear as said).</summary>
+    public string Words { get; set; } = "Line";
+    /// <summary>Subtitles: the word being said, or −1.</summary>
+    public int Highlight { get; set; } = -1;
 
     /// <summary>
     /// The overlay drawn for a video <paramref name="videoHeight"/> pixels tall, and where its
@@ -34,19 +40,8 @@ public sealed class VideoOverlay
         {
             if (Kind == Kinds.Caption)
             {
-                // subtitles: white on a see-through dark band, centred, at most 85% of the width
-                double size = Math.Clamp(videoHeight * 0.042, 13, 72);
-                var ft = new FormattedText(Text.Length == 0 ? " " : Text, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-                    new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal), size, Brushes.White, 1.0)
-                { TextAlignment = TextAlignment.Center };
-                double padX = size * 0.5, padY = size * 0.22;
-                if (videoWidth > 0) ft.MaxTextWidth = Math.Max(size * 4, videoWidth * 0.85 - 2 * padX);
-                double w = ft.Width + 2 * padX, h = ft.Height + 2 * padY;
-                bounds = new Rect(A.X - w / 2, A.Y - h, w, h);
-                dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromArgb(190, 0, 0, 0)), null, bounds, size * 0.25, size * 0.25);
-                // centred text in FormattedText lines up inside MaxTextWidth, or its own width without one
-                double textLeft = ft.MaxTextWidth > 0 && ft.MaxTextWidth < double.MaxValue ? A.X - ft.MaxTextWidth / 2 : bounds.X + padX;
-                dc.DrawText(ft, new Point(textLeft, bounds.Y + padY));
+                // subtitles: centred, at most 85% of the width, in the chosen look
+                bounds = CaptionLook.Draw(dc, this, videoHeight, videoWidth);
             }
             else if (Kind == Kinds.Text)
             {

@@ -77,7 +77,8 @@ public partial class GifEditorWindow : Window
         panel.Children.OfType<RadioButton>().FirstOrDefault(r => r.IsChecked == true)?.Tag as string ?? "";
 
     private CaptionStyle CapStyle =>
-        StyleMeme.IsChecked == true ? CaptionStyle.Meme : StyleNone.IsChecked == true ? CaptionStyle.None : CaptionStyle.Caption;
+        StyleMeme.IsChecked == true ? CaptionStyle.Meme : StyleNone.IsChecked == true ? CaptionStyle.None
+        : StyleBubble.IsChecked == true ? CaptionStyle.Bubble : CaptionStyle.Caption;
 
     /// <summary>The chosen font; empty for the style's usual one. Remembered for the next GIF.</summary>
     private static string _font = "";
@@ -86,7 +87,7 @@ public partial class GifEditorWindow : Window
         Chosen(ColourChoices) is { Length: > 0 } hex ? (Color)ColorConverter.ConvertFromString(hex) : null;
 
     private CaptionSettings Caption => new(CapStyle, TopBox.Text, BottomBox.Text, TextSize.Value,
-        _font, CapColour, Chosen(BarChoices) == "Below");
+        _font, CapColour, Chosen(BarChoices) == "Below", Chosen(TailChoices) is { Length: > 0 } tail ? tail : "Left");
 
     /// <summary>The font in use, by name, for the font button.</summary>
     private string ShownFont => _font.Length > 0 ? _font : CapStyle == CaptionStyle.Meme ? "Impact" : FontLibrary.CaptionDefault;
@@ -155,11 +156,14 @@ public partial class GifEditorWindow : Window
         if (!IsInitialized) return;
         BottomPanel.Visibility = CapStyle == CaptionStyle.Meme ? Visibility.Visible : Visibility.Collapsed;
         TopLabel.Text = CapStyle == CaptionStyle.Meme ? "Top text" : "Caption";
-        bool any = CapStyle != CaptionStyle.None;
-        TopBox.IsEnabled = TextSize.IsEnabled = FontButton.IsEnabled = ColourChoices.IsEnabled = any;
+        bool any = CapStyle is not (CaptionStyle.None or CaptionStyle.Bubble);
+        TopBox.IsEnabled = FontButton.IsEnabled = ColourChoices.IsEnabled = any;
+        // text size sets the bubble's depth too
+        TextSize.IsEnabled = CapStyle != CaptionStyle.None;
         // the bar's colour for a white-bar caption, the letters' colour on the picture
         ColourLabel.Text = CapStyle == CaptionStyle.Meme ? "Text" : "Bar";
-        BarPlace.Visibility = CapStyle == CaptionStyle.Meme ? Visibility.Collapsed : Visibility.Visible;
+        BarPlace.Visibility = CapStyle is CaptionStyle.Meme or CaptionStyle.Bubble ? Visibility.Collapsed : Visibility.Visible;
+        TailPlace.Visibility = CapStyle == CaptionStyle.Bubble ? Visibility.Visible : Visibility.Collapsed;
         FontLibrary.ShowName(FontName, ShownFont);
         Changed();
     }
@@ -329,7 +333,7 @@ public partial class GifEditorWindow : Window
                 {
                     var (frame, delay) = sequence[i];
                     byte[] px = CaptionRenderer.Render(Picture(frame), outW, caption, out int w, out int h);
-                    writer ??= new GifWriter(file, w, h, repeats);
+                    writer ??= new GifWriter(file, w, h, repeats, seeThrough: caption.Style == CaptionStyle.Bubble);
                     var wr = writer;
                     await Task.Run(() => wr.AddFrame(px, delay));
                     ExportProgress.Value = (i + 1.0) / sequence.Count;

@@ -23,7 +23,7 @@ public sealed class EditorHost
 /// <summary>Marks up a screenshot: arrows, boxes, text, steps, pixelate and crop.</summary>
 public partial class EditorWindow : Window
 {
-    private enum Tool { Select, Arrow, Rectangle, Ellipse, Line, Pen, Highlighter, Text, Pixelate, Erase, Crop, Move }
+    private enum Tool { Select, Arrow, Rectangle, Ellipse, Line, Pen, Highlighter, Text, Pixelate, Erase, Crop, Move, Spotlight }
 
     private static readonly (string Name, string Hex)[] Colours =
     {
@@ -113,11 +113,19 @@ public partial class EditorWindow : Window
 
     // ---- document ------------------------------------------------------------------------
 
+    private bool _sameClear;
+
     private void ApplyBase()
     {
         BaseImage.Source = _base;
-        Doc.Width = Shadow.Width = _base.PixelWidth;
-        Doc.Height = Shadow.Height = _base.PixelHeight;
+        Doc.Width = Shadow.Width = Checker.Width = _base.PixelWidth;
+        Doc.Height = Shadow.Height = Checker.Height = _base.PixelHeight;
+        // see-through parts show as a light checkerboard, not the black of the shadow behind
+        // (typing into the text keeps the picture's see-through parts as they were: no need to look again)
+        bool clear = _sameClear ? Checker.Visibility == Visibility.Visible : ImageFiles.HasSeeThrough(_base);
+        _sameClear = false;
+        Checker.Visibility = clear ? Visibility.Visible : Visibility.Collapsed;
+        Shadow.Visibility = clear ? Visibility.Collapsed : Visibility.Visible;
         SizeText.Text = $"{_base.PixelWidth} × {_base.PixelHeight}";
         UpdateZoom();
         if (_wordsFor != _base) PictureChanged();
@@ -179,6 +187,9 @@ public partial class EditorWindow : Window
     private void Render()
     {
         Ink.Children.Clear();
+        // spotlights darken everything round them, under the other marks
+        var marks = _drawing is { Kind: AnnotationKind.Spotlight, Points.Count: > 0 } ? _items.Append(_drawing) : _items;
+        if (Annotation.DimLayer(marks, new Size(_base.PixelWidth, _base.PixelHeight)) is { } dim) Ink.Children.Add(dim);
         foreach (var a in _items) Ink.Children.Add(a.ToElement());
         if (_drawing != null && _drawing.Points.Count > 0) Ink.Children.Add(_drawing.ToElement());
         UndoButton.IsEnabled = _undo.Count > 0;
@@ -225,7 +236,7 @@ public partial class EditorWindow : Window
     {
         Tool.Select => ToolSelect, Tool.Arrow => ToolArrow, Tool.Rectangle => ToolRectangle, Tool.Ellipse => ToolEllipse,
         Tool.Line => ToolLine, Tool.Pen => ToolPen, Tool.Highlighter => ToolHighlighter, Tool.Text => ToolText,
-        Tool.Pixelate => ToolPixelate, Tool.Erase => ToolErase, Tool.Move => ToolMove, _ => ToolCrop,
+        Tool.Pixelate => ToolPixelate, Tool.Erase => ToolErase, Tool.Move => ToolMove, Tool.Spotlight => ToolSpotlight, _ => ToolCrop,
     };
 
     private void SelectTool(Tool t) => ToolButton(t).IsChecked = true;
@@ -254,6 +265,7 @@ public partial class EditorWindow : Window
             Tool.Pixelate => "Drag over anything private to hide it. Auto-hide finds emails, numbers and keys for you.",
             Tool.Erase => "Paint over text or an object to remove it. Works best on plain backgrounds. The slider sets the brush.",
             Tool.Move => "Click a word or a picture, or drag a box around anything, to lift it off and move it. The gap fills in.",
+            Tool.Spotlight => "Drag a box round what matters: everything else darkens. Draw more boxes to light up more.",
             _ => "Drag the area to keep.",
         };
     }
@@ -337,9 +349,41 @@ public partial class EditorWindow : Window
         return null;
     }
 
+    /// <summary>Where the pointer is on the picture (or where the self-test says it is).</summary>
+    private Point At(MouseEventArgs e) => _testPoint ?? e.GetPosition(Doc);
+    private Point? _testPoint;
+
+    /// <summary>For the self-test: a press, a drag and a release over the picture, through the real mouse handlers.</summary>
+    internal void DragForTest(Point from, Point to)
+    {
+        MouseButtonEventArgs Button(RoutedEvent ev) => new(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = ev };
+        try
+        {
+            _testPoint = from;
+            Doc_MouseDown(Doc, Button(UIElement.MouseLeftButtonDownEvent));
+            for (int k = 1; k <= 4; k++)
+            {
+                _testPoint = from + (to - from) * (k / 4.0);
+                Doc_MouseMove(Doc, new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.MouseMoveEvent });
+            }
+            Doc_MouseUp(Doc, Button(UIElement.MouseLeftButtonUpEvent));
+        }
+        finally { _testPoint = null; }
+    }
+
+    /// <summary>For the self-test: picks a tool as its keyboard shortcut would.</summary>
+    internal void ToolKeyForTest(Key key)
+    {
+        var args = new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(this)!, 0, key) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
+        RaiseEvent(args);
+    }
+
+    internal string ToolForTest => _tool.ToString();
+    internal int MarkCountForTest => _items.Count;
+
     private void Doc_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        var p = e.GetPosition(Doc);
+        var p = At(e);
         if (_textBox != null)
         {
             CommitText();
@@ -384,6 +428,18 @@ public partial class EditorWindow : Window
                     BeginText(hit.Points[0], hit);
                     return;
                 }
+                // a click on a link, email address or phone number opens it (or copies the number);
+                // dragging over it still selects, and a double-click picks it to edit
+                if (hit == null && e.ClickCount == 1 && ActionAt(p) is { } link)
+                {
+                    if (Keyboard.Modifiers == ModifierKeys.Control)
+                    {
+                        TextActions.Run(link);
+                        return;
+                    }
+                    _linkPress = (link, p);
+                }
+                else _linkPress = null;
                 if (hit == null && TryBeginTextSelect(p, e.ClickCount))
                 {
                     _selected = null;
@@ -433,6 +489,7 @@ public partial class EditorWindow : Window
         {
             Tool.Arrow => AnnotationKind.Arrow, Tool.Rectangle => AnnotationKind.Rectangle, Tool.Ellipse => AnnotationKind.Ellipse,
             Tool.Line => AnnotationKind.Line, Tool.Pen => AnnotationKind.Pen, Tool.Highlighter => AnnotationKind.Highlighter,
+            Tool.Spotlight => AnnotationKind.Spotlight,
             _ => AnnotationKind.Pixelate,
         };
         _drawing = new Annotation { Kind = kind, Color = _colour, Size = _size, Opacity = _opacity };
@@ -447,15 +504,20 @@ public partial class EditorWindow : Window
 
     private void Doc_MouseMove(object sender, MouseEventArgs e)
     {
-        if (_textDragging) { DragTextSelect(e.GetPosition(Doc)); return; }
-        if (_tool == Tool.Move && !_down) { MoveToolMove(e.GetPosition(Doc)); return; }
+        if (_textDragging) { DragTextSelect(At(e)); return; }
+        if (_tool == Tool.Move && !_down) { MoveToolMove(At(e)); return; }
         if (!_down)
         {
             // over a word, the Select tool shows the text cursor
-            if (_tool == Tool.Select) Doc.Cursor = WordAt(e.GetPosition(Doc)) >= 0 && HitTest(e.GetPosition(Doc)) == null ? Cursors.IBeam : Cursors.Arrow;
+            if (_tool == Tool.Select)
+            {
+                var at = At(e);
+                bool free = HitTest(at) == null;
+                Doc.Cursor = free && ActionAt(at) != null ? Cursors.Hand : free && WordAt(at) >= 0 ? Cursors.IBeam : Cursors.Arrow;
+            }
             return;
         }
-        var p = e.GetPosition(Doc);
+        var p = At(e);
 
         if (_tool is Tool.Select or Tool.Move)
         {
@@ -522,11 +584,11 @@ public partial class EditorWindow : Window
     private void Doc_MouseUp(object sender, MouseButtonEventArgs e)
     {
         if (_textDragging) { EndTextSelect(); return; }
-        if (_tool == Tool.Move && !_down) { MoveToolUp(e.GetPosition(Doc)); return; }
+        if (_tool == Tool.Move && !_down) { MoveToolUp(At(e)); return; }
         if (!_down) return;
         _down = false;
         Doc.ReleaseMouseCapture();
-        var p = e.GetPosition(Doc);
+        var p = At(e);
 
         if (_tool is Tool.Select or Tool.Move)
         {
@@ -609,7 +671,7 @@ public partial class EditorWindow : Window
         return a.Kind switch
         {
             AnnotationKind.Line or AnnotationKind.Arrow => new() { p0, p1 },
-            AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Pixelate or AnnotationKind.Piece =>
+            AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Pixelate or AnnotationKind.Piece or AnnotationKind.Spotlight =>
                 new() { p0, new Point(p1.X, p0.Y), p1, new Point(p0.X, p1.Y) },
             _ => new(),
         };
@@ -661,6 +723,7 @@ public partial class EditorWindow : Window
     {
         base.OnPreviewMouseRightButtonUp(e);
         if (!Doc.IsMouseOver) return;
+        if (ShowLinkMenu(e.GetPosition(Doc))) { e.Handled = true; return; }
         if (ShowTextMenu(e.GetPosition(Doc))) { e.Handled = true; return; }
         var hit = HitTest(e.GetPosition(Doc));
         if (hit == null)
@@ -895,6 +958,7 @@ public partial class EditorWindow : Window
             Key.X => () => SelectTool(Tool.Erase),
             Key.M => () => SelectTool(Tool.Move),
             Key.C => () => SelectTool(Tool.Crop),
+            Key.S => () => SelectTool(Tool.Spotlight),
             _ => null,
         };
         if (action == null) return;
@@ -1182,7 +1246,8 @@ public partial class EditorWindow : Window
     {
         try
         {
-            Clipboard.SetImage(Export());
+            var image = Export();
+            if (!FastClipboard.Copy(image)) Clipboard.SetImage(image);
             Toast.Show("Copied to the clipboard.");
         }
         catch
@@ -1194,6 +1259,9 @@ public partial class EditorWindow : Window
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         var image = Export();
+        // a see-through picture can't go in a JPG: it becomes a PNG beside it
+        if (FilePath != null && System.IO.Path.GetExtension(FilePath).ToLowerInvariant() is ".jpg" or ".jpeg" && ImageFiles.HasSeeThrough(image))
+            FilePath = System.IO.Path.ChangeExtension(FilePath, ".png");
         if (FilePath != null)
         {
             if (!ImageFiles.TrySave(image, FilePath, out string? error))
@@ -1250,6 +1318,46 @@ public partial class EditorWindow : Window
         ApplyBase();
         Render();
         ShowSelection();
+    }
+
+    /// <summary>Lift out the subject: the background goes see-through. Undo brings it back.</summary>
+    private async void CutOut_Click(object sender, RoutedEventArgs e)
+    {
+        if (!AiModels.Available)
+        {
+            Toast.Show("This copy of Overskin was built without its AI models.", true);
+            return;
+        }
+        var picture = Export();
+        CutOutButton.IsEnabled = false;
+        Toast.ShowSticky("Lifting out the subject…");
+        try
+        {
+            var cut = await AiModels.OffThread(() => AiModels.CutOut(picture));
+            Toast.HideNow();
+            if (cut == null)
+            {
+                Toast.Show("Nothing stands out enough in this picture to lift out.");
+                return;
+            }
+            PushUndo();
+            _base = ImageLoader.Normalize(cut);
+            _items = new List<Annotation>();
+            _selected = null;
+            ApplyBase();
+            Render();
+            ShowSelection();
+            Toast.Show("Lifted out. Save as PNG to keep the see-through background, or Pin it.");
+        }
+        catch (Exception ex)
+        {
+            Toast.HideNow();
+            Toast.Show("Couldn't lift it out: " + ex.Message, true);
+        }
+        finally
+        {
+            CutOutButton.IsEnabled = true;
+        }
     }
 
     private void Effects_Click(object sender, RoutedEventArgs e)

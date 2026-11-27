@@ -28,6 +28,32 @@ public partial class MainWindow
     {
         int fps = GifRecorder.ValidFps(_settings.GifFps);
         foreach (var r in GifFpsChoices.Children.OfType<RadioButton>()) r.IsChecked = (string)r.Tag == fps.ToString();
+        SyncReplayControls();
+        // the Start and stop card, for videos and GIFs alike
+        _syncingStartStop = true;
+        CountdownSwitch.IsChecked = _settings.CountdownFirst;
+        foreach (var r in StopAfterChoices.Children.OfType<RadioButton>()) r.IsChecked = (string)r.Tag == _settings.RecordStopAfter.ToString();
+        _syncingStartStop = false;
+    }
+
+    private bool _syncingStartStop;
+
+    private void StartStop_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_ready || _syncingStartStop || CountdownSwitch == null || StopAfterChoices == null) return;
+        _settings.CountdownFirst = CountdownSwitch.IsChecked == true;
+        var chosen = StopAfterChoices.Children.OfType<RadioButton>().FirstOrDefault(r => r.IsChecked == true);
+        if (chosen != null && int.TryParse((string)chosen.Tag, out int seconds)) _settings.RecordStopAfter = seconds;
+        SaveSettings();
+    }
+
+    private string StartStopSummary()
+    {
+        var parts = new List<string>();
+        if (_settings.CountdownFirst) parts.Add("3, 2, 1");
+        int s = _settings.RecordStopAfter;
+        if (s > 0) parts.Add("Stop after " + (s >= 60 ? $"{s / 60} min" : $"{s} s"));
+        return parts.Count == 0 ? "Start straight away" : string.Join(" · ", parts);
     }
 
     private void RecordGif_Click(object sender, RoutedEventArgs e) => ToggleGifRecording();
@@ -58,16 +84,30 @@ public partial class MainWindow
                 _recorder = new GifRecorder(Dispatcher);
                 _recorder.Finished += OnRecordingFinished;
             }
+            if (_settings.CountdownFirst)
+            {
+                _hotkeys?.Register(HkGifEsc, new Hotkey(ModifierKeys.None, Key.Escape), RecordCountdown.Cancel);
+                bool go = await RecordCountdown.Run(area, 3);
+                _hotkeys?.Unregister(HkGifEsc);
+                if (!go)
+                {
+                    Reappear(c.WasShown);
+                    Toast.Show("Recording cancelled.");
+                    return;
+                }
+            }
             _hotkeys?.Register(HkGifEsc, new Hotkey(ModifierKeys.None, Key.Escape), () => _recorder.Stop());
             FileNames.Context = NameInfo.At(area.X + area.Width / 2, area.Y + area.Height / 2);
             FileNames.Pattern = _settings.FileNamePattern;
-            _recorder.Start(area, _settings.AfterCursor, GifRecorder.ValidFps(_settings.GifFps));
+            PauseReplay();
+            _recorder.Start(area, _settings.AfterCursor, GifRecorder.ValidFps(_settings.GifFps), _settings.RecordStopAfter);
         });
     }
 
     private void OnRecordingFinished(GifClip? clip)
     {
         _hotkeys?.Unregister(HkGifEsc);
+        ResumeReplay();
         Reappear(_recordingWasShown);
         if (clip == null)
         {
@@ -79,13 +119,14 @@ public partial class MainWindow
 
     // ---- GIF editor ----------------------------------------------------------------------
 
-    private void OpenGifEditor(GifClip clip, string name)
+    private void OpenGifEditor(GifClip clip, string name, string caption = "")
     {
         var editor = new GifEditorWindow(clip, name, new GifEditorHost
         {
             Folder = _settings.SaveFolder,
             Saved = AddToHistory,
         });
+        if (caption.Length > 0) editor.TopBox.Text = caption;
         editor.Show();
         editor.Activate();
     }
@@ -95,17 +136,6 @@ public partial class MainWindow
         Path.GetExtension(path).Equals(".gif", StringComparison.OrdinalIgnoreCase)
             ? GifReader.Read(path)
             : GifClip.FromImage(ImageLoader.LoadFile(path));
-
-    private void CaptionGif_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new OpenFileDialog
-        {
-            Title = "Pick a GIF or picture to caption",
-            Filter = "GIFs and pictures|*.gif;*.png;*.jpg;*.jpeg;*.bmp;*.webp|All files|*.*",
-        };
-        if (dialog.ShowDialog(this) != true) return;
-        OpenClipFile(dialog.FileName);
-    }
 
     private void OpenClipFile(string path)
     {

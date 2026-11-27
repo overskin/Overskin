@@ -22,12 +22,34 @@ public partial class App : Application
 
     private EventWaitHandle? _activateSignal;
 
+    /// <summary>Starts Overskin again once this copy has closed (followed by this copy's process id).</summary>
+    public const string RestartArgument = "--restart-after";
+
+    /// <summary>Closes Overskin and opens it again, for settings that only apply at start.</summary>
+    public static void Restart()
+    {
+        if (Environment.ProcessPath is not { } exe) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, $"{RestartArgument} {Environment.ProcessId}") { UseShellExecute = false });
+        }
+        catch { return; }
+        (Current.MainWindow as MainWindow)?.ExitForRestart();
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
         // Developer runs (with arguments) get their own instance name so they never disturb a real one.
-        bool developerRun = e.Args.Length > 0 && e.Args[0] is "--snapshot" or "--selftest" or "--smoke";
+        bool developerRun = e.Args.Length > 0 && e.Args[0] is "--snapshot" or "--selftest" or "--smoke" or "--check-ai";
+        // "Overskin.exe --check-ai log.txt": tries every AI model in this very build (also an installed one)
+        if (e.Args.Length >= 2 && e.Args[0] == "--check-ai")
+        {
+            System.IO.File.WriteAllLines(e.Args[1], AiModels.Check());
+            Shutdown();
+            return;
+        }
         string scope = developerRun ? ".dev" : "";
         Quiet = developerRun;
         // the GitHub copy is started at sign-in with --tray; the Store copy by its startup task
@@ -35,6 +57,13 @@ public partial class App : Application
         string activateName = ActivateEventName + scope;
         int run = Array.IndexOf(e.Args, RunArgument);
         string? command = run >= 0 && run + 1 < e.Args.Length ? e.Args[run + 1] : null;
+
+        // a restart (after changing the window look): wait for the old copy to finish closing
+        int wait = Array.IndexOf(e.Args, RestartArgument);
+        if (wait >= 0 && wait + 1 < e.Args.Length && int.TryParse(e.Args[wait + 1], out int oldPid))
+        {
+            try { System.Diagnostics.Process.GetProcessById(oldPid).WaitForExit(15000); } catch { }
+        }
 
         // Two copies would fight over the same hotkeys and the same windows.
         _singleInstance = new Mutex(true, "Overskin.SingleInstance.6f0b7b1e" + scope, out bool first);
@@ -105,6 +134,7 @@ public partial class App : Application
             else if (e.Args.Contains("--pass")) { try { PassTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else if (e.Args.Contains("--fonts")) { try { FontAndGifTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else if (e.Args.Contains("--subtitles")) { try { SubtitleTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
+            else if (e.Args.Contains("--new")) { try { NewFixTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); } }
             else try { MoreFeatureTests(quick); } catch (Exception ex) { quick.Add("EXCEPTION " + ex); }
             System.IO.File.WriteAllLines(e.Args[1], quick);
             Shutdown();

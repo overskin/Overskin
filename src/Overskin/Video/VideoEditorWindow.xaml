@@ -195,6 +195,12 @@
                                         <Button x:Name="ClearSubtitlesButton" Style="{StaticResource Btn}" Height="26" Margin="0,0,6,6" Click="ClearSubtitles_Click"
                                                 Content="Remove all" ToolTip="Takes every subtitle line off the video" Visibility="Collapsed" />
                                     </WrapPanel>
+                                    <StackPanel x:Name="CaptionStyleRows" Visibility="Collapsed" Margin="0,2,0,4">
+                                        <TextBlock Text="Look" Style="{StaticResource Dim}" FontSize="11.5" Margin="0,0,0,4" />
+                                        <WrapPanel x:Name="CaptionLooks" />
+                                        <TextBlock Text="Words" Style="{StaticResource Dim}" FontSize="11.5" Margin="0,4,0,4" />
+                                        <WrapPanel x:Name="CaptionWords" />
+                                    </StackPanel>
                                     <ScrollViewer x:Name="SubtitleScroll" MaxHeight="260" VerticalScrollBarVisibility="Auto" Visibility="Collapsed" Margin="0,2,0,0">
                                         <StackPanel x:Name="SubtitleList" Margin="0,0,4,0" />
                                     </ScrollViewer>
@@ -290,6 +296,13 @@
                         <TextBlock x:Name="StatusText" Style="{StaticResource Dim}" />
                     </StackPanel>
                     <StackPanel x:Name="Actions" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="MakeGif_Click"
+                                ToolTip="Turns the trimmed part (or 5 seconds from here) into a GIF, with what's said in it as the caption">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcImages}" Width="13" Height="13" Margin="0,0,6,0" />
+                                <TextBlock Text="Make a GIF" />
+                            </StackPanel>
+                        </Button>
                         <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="SaveAs_Click">
                             <StackPanel Orientation="Horizontal">
                                 <local:Icon Data="{StaticResource IcDownload}" Width="13" Height="13" Margin="0,0,6,0" />

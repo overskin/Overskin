@@ -35,7 +35,9 @@ public sealed class VideoRecorder : IRecorder
     /// <summary>Raised on the UI thread when the recording pauses or carries on.</summary>
     public event Action? PauseChanged;
     public TimeSpan Elapsed => _clock.Elapsed;
-    public TimeSpan? Limit => null;
+    public TimeSpan? Limit => StopAfter;
+    /// <summary>Stop by itself after this long; null for no limit.</summary>
+    public TimeSpan? StopAfter { get; set; }
 
     /// <summary>Raised on the UI thread: the saved file, or null when cancelled; the error if it failed.</summary>
     public event Action<string?, string?>? Finished;
@@ -201,6 +203,11 @@ public sealed class VideoRecorder : IRecorder
             var view = f.View;
             double k = f.Scale;
             Point Out(Point a) => new((a.X - view.X) * k, (a.Y - view.Y) * k);
+            if (o.Spotlight && track!.SampleAt(f.Time) is { Showing: true })
+            {
+                var at = Out(track.SmoothAt(f.Time, sigma, ahead));
+                Spotlight.Apply(f.Pixels, cw, ch, at.X, at.Y, Spotlight.Radius(cw, ch));
+            }
             if (o.ClickRings)
                 foreach (var (time, at) in track!.ClicksBetween(f.Time - 0.5, f.Time))
                 {
@@ -254,6 +261,7 @@ public sealed class VideoRecorder : IRecorder
                     Thread.Sleep(10);
                     continue;
                 }
+                if (StopAfter is { } limit && _clock.Elapsed >= limit) break;
                 long due = n * 1000L / fps;
                 long now = _clock.ElapsedMilliseconds;
                 if (now < due)
@@ -324,6 +332,7 @@ public sealed class VideoRecorder : IRecorder
                     n = (int)(_clock.ElapsedMilliseconds * fps / 1000) + 1;
                     continue;
                 }
+                if (o.Spotlight && !drawing) Spotlight.Apply(pixels, cw, ch, px, py, Spotlight.Radius(cw, ch));
                 foreach (var (at, age) in rings)
                 {
                     double grow = 1 - Math.Pow(1 - age / 0.5, 3);

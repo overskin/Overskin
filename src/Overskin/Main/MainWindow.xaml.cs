@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reflection;
 using System.Windows;
@@ -18,7 +18,7 @@ public partial class MainWindow : Window
 {
     private const int HkPin = 1, HkOpacityUp = 2, HkOpacityDown = 3, HkClickThrough = 4;
     private const int HkPickEsc = 7, HkDraw = 8, HkSnip = 11;
-    private const int HkRegion = 12, HkWindow = 13, HkScreen = 14, HkText = 15, HkColour = 16, HkRecent = 21, HkPinClipboard = 22, HkVideo = 23;
+    private const int HkRegion = 12, HkWindow = 13, HkScreen = 14, HkText = 15, HkColour = 16, HkRecent = 21, HkPinClipboard = 22, HkVideo = 23, HkRing = 26, HkSearch = 27, HkReplay = 28;
     private const double BaseWidth = 540, BaseHeight = 700, SmallestWidth = 530, SmallestHeight = 560;
     private const int TabCaptureIndex = 0, TabLibraryIndex = 1, TabPinsIndex = 2, TabSettingsIndex = 3;
 
@@ -63,8 +63,28 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
-        Theming.Apply(_settings.AccentColor, _settings.BackgroundTone); // before any control looks up its colours
+        ApplyColours(); // before any control looks up its colours
         InitializeComponent();
+        if (_settings.SeeThrough && WindowLook.GlassSupported)
+        {
+            _glass = true;
+            WindowShadow.Visibility = Visibility.Collapsed;
+            if (WindowLook.IsWindows11)
+            {
+                // Windows 11 draws the corners, shadow and blurred background itself
+                WindowLook.PrepareGlass(this);
+                WindowFrame.CornerRadius = new CornerRadius(0);
+                WindowFrame.BorderThickness = new Thickness(0);
+            }
+            else
+            {
+                // Windows 10: Overskin's own rounded window, blurred inside its outline only
+                WindowLook.BlurInside(this, WindowFrame);
+            }
+            ApplyColours();
+        }
+        WindowLook.AccentChanged += () => Dispatcher.BeginInvoke(() => { if (_settings.MatchWindows) ApplyTheme(); });
+        if (_settings.MatchWindows) WindowLook.Watch();
         foreach (var page in new[] { PageCapture, PageSettings }) KeepSidesEven(page);
         AutoHideRow.ContextMenu = Redaction.KindsMenu();
         Redaction.KindsChanged += () => { _settings.AutoHideKinds = Redaction.Kinds; _settings.Save(); };
@@ -98,6 +118,7 @@ public partial class MainWindow : Window
 
         _ready = true;
         VideoEditorWindow.OpenPicture = (picture, name) => OpenEditor(picture, null, name);
+        VideoEditorWindow.OpenGif = (clip, name, caption) => OpenGifEditor(clip, name, caption);
         SelectTab(_settings.LastTab);
         UpdateStatus();
     }
@@ -125,6 +146,7 @@ public partial class MainWindow : Window
         RegisterHotkeys(announceFailures: true);
         RefreshWindows();
         RestorePinnedImages();
+        if (_settings.ReplayOn) StartReplay();
     }
 
     protected override void OnActivated(EventArgs e)
@@ -215,6 +237,9 @@ public partial class MainWindow : Window
         move.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(260)) { EasingFunction = EaseOut });
     }
 
+    /// <summary>Closes for good, so <see cref="App.Restart"/> can open a new copy.</summary>
+    internal void ExitForRestart() => ExitApp();
+
     private void ExitApp()
     {
         _exiting = true;
@@ -231,10 +256,12 @@ public partial class MainWindow : Window
         _cleaned = true;
 
         Try(() => _search.Save());
+        Try(() => _pictures.Save());
         Try(() => _manager.RestoreAll());    // puts other programs' windows back
         Try(() => _picker?.Dispose());
         Try(() => _tray?.Dispose());
         Try(() => _hotkeys?.Dispose());
+        Try(() => _replay?.Dispose());
         Try(SaveSettings);
         Try(() =>
         {
@@ -326,6 +353,10 @@ public partial class MainWindow : Window
         HkRecentButton.Content = _settings.HotkeyRecent;
         HkPinClipboardButton.Content = _settings.HotkeyPinClipboard;
         HkVideoButton.Content = _settings.HotkeyVideo;
+        HkRingButton.Content = _settings.HotkeyRing;
+        HkSearchButton.Content = _settings.HotkeySearch;
+        HkReplayButton.Content = _settings.HotkeyReplay;
+        UpdateReplayStatus();
         TileGifKey.Text = _settings.HotkeyGif;
         TileRegionKey.Text = _settings.HotkeyRegion;
         TileWindowKey.Text = _settings.HotkeyWindow;
@@ -484,7 +515,79 @@ public partial class MainWindow : Window
         ModeLight.IsChecked = current.Light;
         ThemeName.Text = current.Name;
         AccentHexBox.Text = _settings.AccentColor;
+        MatchWindowsSwitch.IsChecked = _settings.MatchWindows;
+        SeeThroughSwitch.IsChecked = _settings.SeeThrough;
+        SeeThroughSwitch.IsEnabled = WindowLook.GlassSupported;
+        AccentSwatches.IsEnabled = WheelSwatch.IsEnabled = AccentHexBox.IsEnabled = !_settings.MatchWindows;
         _syncingAppearance = false;
+    }
+
+    // ---- match Windows -----------------------------------------------------------------------
+
+    /// <summary>True when this window was opened see-through.</summary>
+    private bool _glass;
+
+    /// <summary>The theme and accent, with Windows' own accent when matching Windows.</summary>
+    private void ApplyColours()
+    {
+        string accent = _settings.AccentColor;
+        if (_settings.MatchWindows && WindowLook.WindowsAccent(!Theming.Find(_settings.BackgroundTone).Light) is { } windows)
+            accent = Theming.ToHex(windows);
+        Theming.Apply(accent, _settings.BackgroundTone);
+        if (_glass) ApplyGlassColours();
+    }
+
+    /// <summary>The window's own background and cards, see-through so the blur shows.</summary>
+    private void ApplyGlassColours()
+    {
+        var res = Application.Current.Resources;
+        Color Of(string key) => ((SolidColorBrush)res[key]).Color;
+        bool light = Theming.IsLight;
+        // How much of each colour covers the blur. Light themes need more, or whatever is behind
+        // turns them a muddy grey; Windows 10's blur has no tint of its own, so it needs a little
+        // more again. Cards sit a step more solid than the window so they still read as cards.
+        double more = WindowLook.IsWindows11 ? 0 : 0.08;
+        double bg = (light ? 0.74 : 0.58) + more, card = (light ? 0.82 : 0.66) + more, field = (light ? 0.9 : 0.78) + more;
+        Resources["Bg"] = WindowLook.Clear(Of("Bg"), bg);
+        Resources["Panel"] = WindowLook.Clear(Of("Panel"), card);
+        Resources["TileFill"] = WindowLook.Clear(Of("TileFill"), card);
+        Resources["MenuBg"] = WindowLook.Clear(Of("MenuBg"), Math.Min(1, card + 0.1));
+        foreach (var key in new[] { "Field", "FieldHover", "ButtonFill", "ButtonFillHover" })
+            Resources[key] = WindowLook.Clear(Of(key), Math.Min(1, field));
+        // edges a touch stronger, so cards keep their outline over a busy background
+        Resources["Line"] = WindowLook.Clear(Of(light ? "LineStrong" : "Line"), light ? 0.7 : 1);
+        WindowLook.Apply(this, !light);
+    }
+
+    private void MatchWindows_Click(object sender, RoutedEventArgs e)
+    {
+        if (_syncingAppearance) return;
+        _settings.MatchWindows = MatchWindowsSwitch.IsChecked == true;
+        SaveSettings();
+        if (_settings.MatchWindows) WindowLook.Watch();
+        ApplyTheme();
+        AccentSwatches.IsEnabled = WheelSwatch.IsEnabled = AccentHexBox.IsEnabled = !_settings.MatchWindows;
+        if (_settings.MatchWindows && WindowLook.WindowsAccent(false) is { } c && !App.Quiet)
+        {
+            // Windows' accent can be a grey, which then colours Overskin grey too
+            var (_, s, _) = Theming.ToHsv(c);
+            if (s < 0.15)
+                Toast.Show("Windows' accent colour is a grey, so Overskin goes grey too. Pick a colour in Windows' Personalisation, Colours, or turn this off.");
+        }
+    }
+
+    private void SeeThrough_Click(object sender, RoutedEventArgs e)
+    {
+        if (_syncingAppearance) return;
+        _settings.SeeThrough = SeeThroughSwitch.IsChecked == true;
+        SaveSettings();
+        bool wantGlass = _settings.SeeThrough && WindowLook.GlassSupported;
+        if (wantGlass != _glass && !App.Quiet
+            && AskDialog.Ask(this, "Restart Overskin?", wantGlass
+                ? "The see-through window starts when Overskin opens again."
+                : "The window goes back to its own look when Overskin opens again.", "IcRefreshCw",
+                ("Restart now", true), ("Later", false)) == 0)
+            App.Restart();
     }
 
     // ---- colour wheel ----------------------------------------------------------------------
@@ -508,7 +611,7 @@ public partial class MainWindow : Window
         if (_wheelSync || !_ready) return;
         var c = Theming.FromHsv(Wheel.Hue, Wheel.Saturation, BrightnessSlider.Value / 100);
         _settings.AccentColor = Theming.ToHex(c);
-        Theming.Apply(_settings.AccentColor, _settings.BackgroundTone); // live, without saving on every move
+        ApplyColours(); // live, without saving on every move
         AccentHexBox.Text = _settings.AccentColor;
         UpdateWheelPreview(c);
     }
@@ -533,7 +636,7 @@ public partial class MainWindow : Window
 
     private void ApplyTheme()
     {
-        Theming.Apply(_settings.AccentColor, _settings.BackgroundTone);
+        ApplyColours();
         SyncAppearanceControls();
         ApplyCaptureSettingsToControls();
         UpdateStatus();
@@ -620,7 +723,7 @@ public partial class MainWindow : Window
             LastRegion = _settings.LastRegion,
         };
         _settings = fresh;
-        Theming.Apply(_settings.AccentColor, _settings.BackgroundTone);
+        ApplyColours();
         ApplySettingsToControls();
         RegisterHotkeys(announceFailures: true);
         SaveSettings();
@@ -870,6 +973,9 @@ public partial class MainWindow : Window
         Bind(HkRecent, _settings.HotkeyRecent, ShowRecent);
         Bind(HkPinClipboard, _settings.HotkeyPinClipboard, PinClipboard);
         Bind(HkVideo, _settings.HotkeyVideo, () => ToggleVideo(false));
+        Bind(HkRing, _settings.HotkeyRing, OpenRing);
+        Bind(HkSearch, _settings.HotkeySearch, OpenSearch);
+        Bind(HkReplay, _settings.HotkeyReplay, SaveReplay);
         failed.AddRange(RegisterWorkflowHotkeys());
 
         if (failed.Count > 0 && announceFailures && !App.Quiet)
@@ -1022,6 +1128,9 @@ public partial class MainWindow : Window
             ["HotkeyRecent"] = _settings.HotkeyRecent,
             ["HotkeyPinClipboard"] = _settings.HotkeyPinClipboard,
             ["HotkeyVideo"] = _settings.HotkeyVideo,
+            ["HotkeyRing"] = _settings.HotkeyRing,
+            ["HotkeySearch"] = _settings.HotkeySearch,
+            ["HotkeyReplay"] = _settings.HotkeyReplay,
         };
         if (all.Any(kv => kv.Key != property && kv.Value == text) || _settings.Workflows.Any(w => w.Hotkey == text))
         {
@@ -1047,6 +1156,9 @@ public partial class MainWindow : Window
             case "HotkeyRecent": _settings.HotkeyRecent = text; break;
             case "HotkeyPinClipboard": _settings.HotkeyPinClipboard = text; break;
             case "HotkeyVideo": _settings.HotkeyVideo = text; break;
+            case "HotkeyRing": _settings.HotkeyRing = text; break;
+            case "HotkeySearch": _settings.HotkeySearch = text; break;
+            case "HotkeyReplay": _settings.HotkeyReplay = text; break;
         }
 
         _capturing = null;
@@ -1071,6 +1183,20 @@ public partial class MainWindow : Window
         {
             e.Handled = true;
             FilterBox.Text = "";
+            return;
+        }
+
+        // Ctrl+K searches everything (Ctrl+F stays the Library's own search)
+        if (e.Key == Key.K && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            e.Handled = true;
+            OpenSearch();
+            return;
+        }
+        if (e.Key == Key.Escape && SettingsFilter.IsKeyboardFocused && SettingsFilter.Text.Length > 0)
+        {
+            e.Handled = true;
+            SettingsFilter.Text = "";
             return;
         }
 

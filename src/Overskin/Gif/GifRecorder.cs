@@ -62,12 +62,14 @@ public sealed class GifRecorder : IRecorder
         return (int)Math.Min(Fps * MaxSeconds, Math.Max(Fps, MaxBytes / Math.Max(1, frameBytes)));
     }
 
-    public void Start(Int32Rect area, bool cursor, int fps = 30)
+    /// <summary>Starts recording; <paramref name="stopAfter"/> seconds (0 for no limit) ends it by itself.</summary>
+    public void Start(Int32Rect area, bool cursor, int fps = 30, int stopAfter = 0)
     {
         if (IsRecording) return;
         IsRecording = true;
         Fps = ValidFps(fps);
         _limitSeconds = MaxFrames(area) / (double)Fps;
+        if (stopAfter > 0) _limitSeconds = Math.Min(_limitSeconds, stopAfter);
         _stop = _cancel = false;
 
         _frame = new RecordFrameWindow(area);
@@ -100,7 +102,7 @@ public sealed class GifRecorder : IRecorder
         {
             using var grabber = new ScreenGrabber(area.X, area.Y, area.Width, area.Height);
             int n = 0;
-            while (!_stop && !_cancel && frames.Count < maxFrames)
+            while (!_stop && !_cancel && frames.Count < maxFrames && _clock.Elapsed.TotalSeconds < _limitSeconds)
             {
                 long due = n * 1000L / Fps;
                 long now = _clock.ElapsedMilliseconds;

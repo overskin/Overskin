@@ -4,13 +4,15 @@
 
 # Overskin
 
-**A free, open-source screenshot and screen-recording tool for Windows.**
+**A free, open-source screenshot and screen-recording tool for Windows and Mac.**
 
 [![Download for Windows](https://img.shields.io/badge/Download_for_Windows-OverskinSetup.exe-4f8cff?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/overskin/Overskin/releases/latest/download/OverskinSetup.exe)
+[![Download for Mac](https://img.shields.io/badge/Download_for_Mac-Apple_silicon-4f8cff?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/overskin/Overskin/releases/latest/download/Overskin-mac-AppleSilicon.zip)
 
 [![Latest release](https://img.shields.io/github/v/release/overskin/Overskin?label=release&color=4f8cff)](../../releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/overskin/Overskin/total?color=4f8cff)](../../releases)
 [![Windows 10 and 11](https://img.shields.io/badge/Windows-10%20%7C%2011-4f8cff)](#download)
+[![macOS 12 and later](https://img.shields.io/badge/macOS-12%2B-4f8cff)](#on-a-mac)
 [![MIT license](https://img.shields.io/github/license/overskin/Overskin?color=4f8cff)](LICENSE)
 [![No telemetry](https://img.shields.io/badge/telemetry-none-2ea44f)](#privacy)
 
@@ -66,9 +68,32 @@ version is signed by Microsoft and doesn't get this warning.
 The Store and GitHub copies keep separate settings. Only one of them runs at a time, and
 captures from both go to the same `Pictures\Overskin` folder.
 
+### On a Mac
+
+Download the zip for your Mac from the [latest release](../../releases/latest):
+
+- **`Overskin-mac-AppleSilicon.zip`** for Macs with an M1 chip or newer (most Macs from late 2020 on).
+- **`Overskin-mac-Intel.zip`** for older Macs with an Intel chip.
+
+Unzip it and drag **Overskin** into **Applications**. The app isn't signed by a registered Apple
+developer yet, so macOS stops it the first time. Either open Terminal once and run
+
+```
+xattr -cr /Applications/Overskin.app
+```
+
+or open Overskin, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
+
+The first screenshot asks for **Screen Recording** permission: switch Overskin on, then quit and
+open it again. Needs macOS 12 or later. Recording videos with sound, the webcam and GIFs uses
+ffmpeg (`brew install ffmpeg`); text from screen uses the Mac's own text reader.
+
+The Mac version looks and works like the Windows one, from the same code where it can be. Its
+hotkeys are set in Settings → Hotkeys (⌃⌥S captures an area by default).
+
 ### Platforms
 
-Overskin runs on **Windows** today. **Linux** and **macOS** versions are planned for the future.
+Overskin runs on **Windows** and **macOS**. A **Linux** version is planned.
 
 ## Screenshots
 
@@ -350,6 +375,17 @@ cache in its own private package storage instead (Windows redirects those folder
 The Microsoft Store package is built with `./src/Store/build-store.ps1` (see the notes at the
 top of the script and of `src/Store/Package.appxmanifest`).
 
+The Mac app is built on Windows too:
+
+```
+./src/Overskin.Linux/build-mac.ps1
+```
+
+That writes `dist/mac/Overskin-mac-AppleSilicon.zip` and `dist/mac/Overskin-mac-Intel.zip`: the
+app for each kind of Mac, signed ad hoc (Apple silicon won't run unsigned code) and zipped so
+the Mac keeps it runnable. `overskin --selftest` runs its checks (on a Mac, from Terminal:
+`/Applications/Overskin.app/Contents/MacOS/overskin --selftest`).
+
 ## Project layout
 
 | Folder | What's in it |
@@ -366,7 +402,8 @@ top of the script and of `src/Store/Package.appxmanifest`).
 | `src/Overskin/Assets/` | App icon and logo |
 | `src/Installer/` | `OverskinSetup.exe`: the per-user installer and uninstaller |
 | `src/Store/` | The Microsoft Store package: manifest, tile images and `build-store.ps1` |
-| `src/Shared/` | Code that doesn't depend on Windows, kept apart for the planned Linux and macOS versions |
+| `src/Overskin.Linux/` | The Mac (and future Linux) app: the same features on Avalonia, with a Mac layer in `Platform/Mac.cs` |
+| `src/Shared/` | Code that doesn't depend on Windows, shared with the Mac app |
 | `docs/screenshots/` | The pictures in this README |
 
 ## Known limitations

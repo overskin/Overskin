@@ -257,6 +257,17 @@
     </Style>
 
     <!-- buttons -->
+    <!-- behind see-through pictures: the usual light checkerboard -->
+    <DrawingBrush x:Key="CheckerBrush" TileMode="Tile" Viewport="0,0,16,16" ViewportUnits="Absolute" po:Freeze="True"
+                  xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options">
+        <DrawingBrush.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="#FFFFFF" Geometry="M0,0 H16 V16 H0 Z" />
+                <GeometryDrawing Brush="#E4E4E4" Geometry="M0,0 H8 V8 H0 Z M8,8 H16 V16 H8 Z" />
+            </DrawingGroup>
+        </DrawingBrush.Drawing>
+    </DrawingBrush>
+
     <Style x:Key="Btn" TargetType="Button">
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
         <Setter Property="Background" Value="{DynamicResource ButtonFill}" />

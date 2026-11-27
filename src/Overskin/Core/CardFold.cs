@@ -23,8 +23,12 @@ public sealed class CardFold
 
     public bool IsOpen { get; private set; }
 
+    /// <summary>The card this folds.</summary>
+    public Border Card { get; }
+
     private CardFold(Border card, bool open, Func<string> describe, Action<bool> changed)
     {
+        Card = card;
         _describe = describe;
         _changed = changed;
         var panel = (StackPanel)card.Child;
@@ -92,6 +96,12 @@ public sealed class CardFold
         IsOpen = !IsOpen;
         Apply(animate: true);
         _changed(IsOpen);
+    }
+
+    /// <summary>Opens the card if it's folded.</summary>
+    public void Open()
+    {
+        if (!IsOpen) Toggle();
     }
 
     /// <summary>Reads the settings again for the summary shown while folded.</summary>

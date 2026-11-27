@@ -29,6 +29,9 @@ public partial class MainWindow
         ["snip and pin"] = _settings.HotkeySnip,
         ["drawing on a recording"] = _settings.HotkeyDraw,
         ["pausing a recording"] = _settings.HotkeyPause,
+        ["the ring menu"] = _settings.HotkeyRing,
+        ["search everything"] = _settings.HotkeySearch,
+        ["saving the instant replay"] = _settings.HotkeyReplay,
     };
 
     /// <summary>What already uses a hotkey, leaving out <paramref name="except"/>; null when it's free.</summary>

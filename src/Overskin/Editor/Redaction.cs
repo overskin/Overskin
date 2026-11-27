@@ -167,7 +167,13 @@ public static class Redaction
                 // the extra readings only add; the first one stands on its own
             }
         }
-        return Merge(FindPrivate(all));
+        var found = FindPrivate(all);
+        // who is in it: names in chats (from the first reading) and faces
+        if ((Kinds & PrivateKinds.ChatNames) != 0)
+            found.AddRange(PeopleFinder.ChatNames(lines.Select(l => (IReadOnlyList<OcrWord>)l).ToList(), image.PixelWidth, image.PixelHeight));
+        if ((Kinds & PrivateKinds.Faces) != 0)
+            found.AddRange((await PeopleFinder.FacesAsync(image)).Select(r => (r, "face")));
+        return Merge(found);
     }
 
     /// <summary>One entry per detail when several readings found the same thing, covering all of them.</summary>

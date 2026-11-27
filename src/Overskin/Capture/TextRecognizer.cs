@@ -61,7 +61,7 @@ public static class TextRecognizer
             foreach (var word in line.Words)
             {
                 var r = word.BoundingRect;
-                words.Add(new OcrWord(word.Text, new Rect(r.X / (scale * stretchX), r.Y / scale, r.Width / (scale * stretchX), r.Height / scale)));
+                words.Add(new OcrWord(OcrFix.Word(word.Text), new Rect(r.X / (scale * stretchX), r.Y / scale, r.Width / (scale * stretchX), r.Height / scale)));
             }
             if (words.Count > 0) lines.Add(words);
         }

@@ -27,7 +27,21 @@ public static class FontLibrary
 
     public static IReadOnlyList<Choice> All => _all ??= Build();
 
-    private static FontFamily Bundled(string family) => new(new Uri("pack://application:,,,/"), "./Fonts/#" + family);
+    internal static FontFamily Bundled(string family) => new(new Uri("pack://application:,,,/"), "./Fonts/#" + family);
+
+    /// <summary>
+    /// Fonts that come with Overskin for matching text in screenshots (many apps and websites use
+    /// them, and most PCs don't have them), with the weights included.
+    /// </summary>
+    internal static readonly (string Name, FontWeight[] Weights)[] MatchingFonts =
+    {
+        ("Inter", new[] { FontWeights.Normal, FontWeights.Medium, FontWeights.SemiBold, FontWeights.Bold }),
+        ("Roboto", new[] { FontWeights.Normal, FontWeights.Medium, FontWeights.Bold }),
+    };
+
+    /// <summary>A font family's name as people know it ("Inter", not where it's kept).</summary>
+    internal static string NameOf(FontFamily family) =>
+        family.Source.LastIndexOf('#') is int i and >= 0 ? family.Source[(i + 1)..] : family.Source;
 
     private static List<Choice> Build()
     {
@@ -41,6 +55,8 @@ public static class FontLibrary
         list.Add(new("Bangers", Bundled("Bangers"), FontWeights.Normal, FontStretches.Normal));
         list.Add(new("Permanent Marker", Bundled("Permanent Marker"), FontWeights.Normal, FontStretches.Normal));
         list.Add(new("Comic Neue", Bundled("Comic Neue"), FontWeights.Bold, FontStretches.Normal));
+        list.Add(new("Inter", Bundled("Inter"), FontWeights.SemiBold, FontStretches.Normal));
+        list.Add(new("Roboto", Bundled("Roboto"), FontWeights.Medium, FontStretches.Normal));
         var installed = new HashSet<string>(Fonts.SystemFontFamilies.Select(f => f.Source), StringComparer.OrdinalIgnoreCase);
         foreach (var (name, weight, stretch) in new[]
                  {

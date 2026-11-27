@@ -21,6 +21,7 @@ public partial class VideoEditorWindow : Window
     public VideoEditorWindow(string path, Action<string> saved)
     {
         InitializeComponent();
+        BuildCaptionChoices();
         _path = path;
         _saved = saved;
         LoadZooms();
@@ -276,6 +277,8 @@ public partial class VideoEditorWindow : Window
                         if (o.Kind == VideoOverlay.Kinds.Caption)
                             o.A = new Point(c.Width / 2.0, Math.Clamp(o.A.Y, c.Height * 0.2, c.Height * 0.97));
                     }
+                // subtitles that follow the voice become one overlay per word
+                overlays = CaptionLook.Expand(overlays);
                 await VideoEdit.RenderAsync(input, temp, VideoEdit.Keep(start, end, _cuts), overlays,
                     Math.Max(2, Player.NaturalVideoHeight), progress, maxBytes, crop?.Width ?? Math.Max(2, Player.NaturalVideoWidth));
             }

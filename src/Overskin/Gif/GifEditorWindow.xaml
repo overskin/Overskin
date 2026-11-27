@@ -105,6 +105,8 @@
                                                      ToolTip="Text on a bar above or below the GIF, like Discord caption memes" />
                                         <RadioButton x:Name="StyleMeme" Style="{StaticResource Seg}" GroupName="CapStyle" Content="Top &amp; bottom" Tag="Meme" Checked="Style_Checked"
                                                      ToolTip="Outlined capitals on the picture" />
+                                        <RadioButton x:Name="StyleBubble" Style="{StaticResource Seg}" GroupName="CapStyle" Content="Bubble" Tag="Bubble" Checked="Style_Checked"
+                                                     ToolTip="The top of the GIF cut out as a see-through speech bubble, so it looks like it's saying the message above it in Discord" />
                                         <RadioButton x:Name="StyleNone" Style="{StaticResource Seg}" GroupName="CapStyle" Content="None" Tag="None" Checked="Style_Checked" />
                                     </StackPanel>
                                     <TextBlock x:Name="TopLabel" Text="Caption" Style="{StaticResource Dim}" Margin="1,0,0,4" />
@@ -149,6 +151,14 @@
                                             <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="CapColour" Content="White" Tag="#FFFFFF" Checked="Option_Checked" IsChecked="True" />
                                             <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="CapColour" Content="Black" Tag="#000000" Checked="Option_Checked" />
                                             <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="CapColour" Content="Yellow" Tag="#FFE81A" Checked="Option_Checked" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid x:Name="TailPlace" Style="{StaticResource Row}" Visibility="Collapsed">
+                                        <TextBlock Text="Tail points" Style="{StaticResource Label}" />
+                                        <StackPanel x:Name="TailChoices" Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="CapTail" Content="Left" Tag="Left" Checked="Option_Checked" IsChecked="True" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="CapTail" Content="Middle" Tag="Middle" Checked="Option_Checked" />
+                                            <RadioButton Style="{StaticResource Seg}" MinWidth="0" GroupName="CapTail" Content="Right" Tag="Right" Checked="Option_Checked" />
                                         </StackPanel>
                                     </Grid>
                                     <Grid x:Name="BarPlace" Style="{StaticResource Row}">

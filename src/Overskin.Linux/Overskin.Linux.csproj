@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Overskin for Linux: an Avalonia app, separate from the Windows (WPF) one until it can do everything -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>$(DefineConstants);OVERSKIN_LINUX</DefineConstants>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+
+    <AssemblyName>overskin</AssemblyName>
+    <RootNamespace>Overskin.Linux</RootNamespace>
+    <Version>3.3.0</Version>
+    <Product>Overskin</Product>
+    <Description>Screenshots, done right. The Mac and Linux version.</Description>
+
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.20" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.20" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.20" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.20" />
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
+  </ItemGroup>
+
+  <!-- the AI engine: recent releases dropped Intel Macs, so those get the last one that has them -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64'">
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RuntimeIdentifier)' != 'osx-x64'">
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.32.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+    <!-- the fonts that come with Overskin: the same files as the Windows app -->
+    <AvaloniaResource Include="..\Overskin\Fonts\*.ttf" Link="Assets\Fonts\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" LinkBase="Shared" />
+    <!-- Trace moved out of Overskin into its own project, so its page isn't built here either -->
+    <Compile Remove="Interface\TracePage.cs" />
+    <!-- fixing the letters and numbers text readers mix up: the same code as on Windows -->
+    <Compile Include="..\Overskin\Capture\OcrFix.cs" LinkBase="Shared" />
+    <!-- CLIP's word splitter, shared with Windows -->
+    <Compile Include="..\Overskin\Core\ClipTokenizer.cs" LinkBase="Shared" />
+    <!-- the little web server that sends a capture to a phone, shared with Windows -->
+    <Compile Include="..\Overskin\Core\PhoneShare.cs" LinkBase="Shared" />
+    <Compile Include="..\Overskin\Video\SmartCamera.cs" LinkBase="Shared" />
+    <Compile Include="..\Overskin\Video\Spotlight.cs" LinkBase="Shared" />
+    <Compile Include="..\Overskin\Capture\Tighten.cs" LinkBase="Shared" />
+    <Compile Include="..\Overskin\Capture\ImageFinder.cs" LinkBase="Shared" />
+    <Compile Include="..\Overskin\Core\Workflow.cs" LinkBase="Shared" />
+    <!-- subtitles from speech (Whisper): the same code as on Windows; reading the sound is per app -->
+    <Compile Include="..\Overskin\Video\Subtitles.cs" LinkBase="Shared" />
+  </ItemGroup>
+
+  <!--
+    The AI models, the same files the Windows build fetches into src/Overskin/Models (build the
+    Windows app once, or run its GetAiModels target, to get them). Embedded under the same names.
+    Without them the app still builds; Cut out and picture search then say they're missing.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\Overskin\Models\isnet-general-int8.onnx" LogicalName="Overskin.cutout-model.onnx" Condition="Exists('..\Overskin\Models\isnet-general-int8.onnx')" />
+    <EmbeddedResource Include="..\Overskin\Models\clip-vision-int8.onnx" LogicalName="Overskin.clip-vision.onnx" Condition="Exists('..\Overskin\Models\clip-vision-int8.onnx')" />
+    <EmbeddedResource Include="..\Overskin\Models\clip-text-int8.onnx" LogicalName="Overskin.clip-text.onnx" Condition="Exists('..\Overskin\Models\clip-text-int8.onnx')" />
+    <EmbeddedResource Include="..\Overskin\Models\ggml-base-q5_1.bin" LogicalName="Overskin.whisper-model.bin" Condition="Exists('..\Overskin\Models\ggml-base-q5_1.bin')" />
+    <EmbeddedResource Include="..\Overskin\Models\clip-tokenizer.json" LogicalName="Overskin.clip-tokenizer.json" Condition="Exists('..\Overskin\Models\clip-tokenizer.json')" />
+  </ItemGroup>
+
+</Project>

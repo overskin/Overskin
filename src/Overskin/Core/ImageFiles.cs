@@ -7,6 +7,33 @@ namespace Overskin;
 /// <summary>Writing screenshots to disk.</summary>
 public static class ImageFiles
 {
+    /// <summary>Whether any of the picture is see-through (a cut-out, a window on its own).</summary>
+    public static bool HasSeeThrough(BitmapSource image)
+    {
+        var bgra = image.Format == PixelFormats.Bgra32 ? image : new FormatConvertedBitmap(image, PixelFormats.Bgra32, null, 0);
+        if (image.Format != PixelFormats.Bgra32 && image.Format != PixelFormats.Pbgra32 && !image.Format.ToString().Contains("A", StringComparison.Ordinal))
+            return false;
+        int w = bgra.PixelWidth, h = bgra.PixelHeight;
+        var row = new byte[w * 4];
+        for (int y = 0; y < h; y++)
+        {
+            bgra.CopyPixels(new System.Windows.Int32Rect(0, y, w, 1), row, w * 4, 0);
+            for (int i = 3; i < row.Length; i += 4)
+                if (row[i] < 250) return true;
+        }
+        return false;
+    }
+
+    /// <summary>A picture as PNG bytes.</summary>
+    public static byte[] PngBytes(BitmapSource image)
+    {
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(image));
+        using var ms = new MemoryStream();
+        encoder.Save(ms);
+        return ms.ToArray();
+    }
+
     /// <summary>
     /// PNG, or JPEG when the path ends in .jpg/.jpeg (transparent areas become white), at
     /// <paramref name="jpegQuality"/>. With <paramref name="maxBytes"/>, the file is made to fit:

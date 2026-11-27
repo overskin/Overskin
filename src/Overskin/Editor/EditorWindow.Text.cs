@@ -117,6 +117,7 @@ public partial class EditorWindow
     {
         _edgeCache = Enumerable.Repeat<double[]?>(null, _words.Count).ToList();
         _lineStyles.Clear();
+        _matchedStyles.Clear();
     }
 
     private byte[] BasePixels()
@@ -392,6 +393,7 @@ public partial class EditorWindow
         if (i < 0) { ClearTextSelection(); return false; }
         if (clicks >= 2)
         {
+            _linkTimer?.Stop(); // a double-click edits the link rather than opening it
             _anchor = (i, 0);
             _focus = (i, _words[i].Text.Length);
             _wordPicked = true;
@@ -410,8 +412,13 @@ public partial class EditorWindow
 
     private bool _wordPicked;
 
+    /// <summary>A press on a link: let go without dragging and it opens.</summary>
+    private (TextAction Link, Point At)? _linkPress;
+    private System.Windows.Threading.DispatcherTimer? _linkTimer;
+
     private void DragTextSelect(Point p)
     {
+        if (_linkPress is { } press && (p - press.At).Length > 4 / Math.Max(0.05, _zoom)) _linkPress = null;
         if (_wordPicked) return;
         int i = NearestWord(p);
         if (i < 0) return;
@@ -425,6 +432,21 @@ public partial class EditorWindow
     {
         _textDragging = false;
         Doc.ReleaseMouseCapture();
+        if (_linkPress is { } press)
+        {
+            // opened once it's clear this isn't the first half of a double-click (which edits it)
+            _linkPress = null;
+            _linkTimer?.Stop();
+            _linkTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Min(500, NativeMethods.GetDoubleClickTime())) };
+            _linkTimer.Tick += (_, _) =>
+            {
+                _linkTimer?.Stop();
+                ClearTextSelection();
+                TextActions.Run(press.Link);
+                HintText.Text = press.Link.Kind == TextActionKind.Phone ? "Number copied" : "Opened · double-click a link to edit its text instead";
+            };
+            _linkTimer.Start();
+        }
         ShowTextHint();
     }
 
@@ -536,6 +558,7 @@ public partial class EditorWindow
             _caretBlink.Start();
         }
         else _caretBlink?.Stop();
+        UpdateTypeBar();
     }
 
     private void ClearTextSelection()
@@ -546,6 +569,7 @@ public partial class EditorWindow
         _caretBlink?.Stop();
         _caretMark = null;
         _textMarks?.Children.Clear();
+        UpdateTypeBar();
     }
 
     // ---- deleting letters ------------------------------------------------------------------
@@ -609,12 +633,17 @@ public partial class EditorWindow
         var (lo, hi, y0, y1, lineRight0, leftMost) = LineBand(line);
         var src = BasePixels();
         int w = _pxW, h = _pxH;
+        var bg = BackgroundOf(src, w, Math.Max(0, (int)leftMost - 2), y0, Math.Clamp(lineRight0, 0, w), y1);
         int ix0 = Math.Clamp((int)Math.Round(xa), 0, w), ix1 = Math.Clamp((int)Math.Round(xb), 0, w);
+        if (bg.Share >= 0.5 && ix1 - ix0 >= 2)
+        {
+            // the cut only ever moves outwards, never into the letters being taken out
+            ix0 = Seam(src, w, y0, y1, xa, 2, (bg.B, bg.G, bg.R), -1);
+            ix1 = Math.Max(ix0 + 1, Seam(src, w, y0, y1, xb, 2, (bg.B, bg.G, bg.R), +1));
+        }
         int lineRight = Math.Clamp(lineRight0, ix1, w);
         int shift = ix1 - ix0;
         if (shift <= 0 || y1 <= y0) return;
-
-        var bg = BackgroundOf(src, w, Math.Max(0, (int)leftMost - 2), y0, lineRight, y1);
         bool flat = bg.Share >= 0.5;
         var image = ImageLoader.Normalize(_base);
         BitmapSource result;
@@ -624,9 +653,28 @@ public partial class EditorWindow
             // the rest of the line slides left, and the end it leaves is filled with the background
             px = (byte[])src.Clone();
             byte fb = (byte)bg.B, fg = (byte)bg.G, fr = (byte)bg.R;
+            bool Ink(int x, int y)
+            {
+                int o = (y * w + x) * 4;
+                return Math.Abs(src[o] - bg.B) + Math.Abs(src[o + 1] - bg.G) + Math.Abs(src[o + 2] - bg.R) > 60;
+            }
+            int hook = Math.Max(2, (int)((y1 - y0) * 0.35));
             for (int y = y0; y < y1; y++)
             {
                 int row = y * w * 4;
+                // a stroke of a letter being taken out that runs back across the cut (the tail of a
+                // j, a slanted letter's foot): cleared too, as long as it ends in background soon
+                if (!justSpace && ix0 > 0 && ix0 < w && Ink(ix0, y) && Ink(ix0 - 1, y))
+                {
+                    int l = ix0 - 1;
+                    while (l > ix0 - 1 - hook && l > 0 && Ink(l, y)) l--;
+                    if (!Ink(l, y))
+                        for (int x = l + 1; x < ix0; x++)
+                        {
+                            int o = row + x * 4;
+                            px[o] = (byte)bg.B; px[o + 1] = (byte)bg.G; px[o + 2] = (byte)bg.R; px[o + 3] = 255;
+                        }
+                }
                 Array.Copy(px, row + ix1 * 4, px, row + ix0 * 4, (lineRight - ix1) * 4);
                 for (int x = lineRight - shift; x < lineRight; x++)
                 {
@@ -704,9 +752,85 @@ public partial class EditorWindow
         // and never less than the words themselves
         bandTop = Math.Min(bandTop, top - 1);
         bandBottom = Math.Max(bandBottom, bottom + 1);
-        BasePixels();
+        var px = BasePixels();
         int y0 = Math.Clamp((int)Math.Floor(bandTop), 0, _pxH), y1 = Math.Clamp((int)Math.Ceiling(bandBottom), 0, _pxH);
-        return (lo, hi, y0, y1, Math.Min(_pxW, (int)Math.Ceiling(right) + 2), leftMost);
+        int x0 = Math.Clamp((int)Math.Floor(leftMost) - 1, 0, _pxW), x1 = Math.Min(_pxW, (int)Math.Ceiling(right) + 2);
+        (y0, y1) = GrowBand(px, _pxW, _pxH, x0, x1, y0, y1, line, (bottom - top) * 0.6);
+        return (lo, hi, y0, y1, x1, leftMost);
+    }
+
+    /// <summary>
+    /// The band grown to take in ink that pokes out of it and joins ink inside it: the tops of tall
+    /// letters, accents and tails the reader's boxes missed. Left behind, they're the thin lines and
+    /// dots that stay where a word was. A row that's a long straight line (an underline, a box's
+    /// edge) or that belongs to another line's words is never taken.
+    /// </summary>
+    private (int Y0, int Y1) GrowBand(byte[] px, int w, int h, int x0, int x1, int y0, int y1, int line, double most)
+    {
+        if (x1 - x0 < 2 || y1 <= y0) return (y0, y1);
+        var bg = BackgroundOf(px, w, x0, y0, x1, y1);
+        if (bg.Share < 0.5) return (y0, y1);
+        bool Ink(int x, int y)
+        {
+            int o = (y * w + x) * 4;
+            double db = px[o] - bg.B, dg = px[o + 1] - bg.G, dr = px[o + 2] - bg.R;
+            return db * db + dg * dg + dr * dr > 30 * 30;
+        }
+        bool OtherWords(int y)
+        {
+            for (int k = 0; k < _words.Count; k++)
+            {
+                if (_wordLine[k] == line) continue;
+                var b = _words[k].Bounds;
+                if (y >= b.Top && y < b.Bottom && b.Right > x0 && b.Left < x1) return true;
+            }
+            return false;
+        }
+        // a row joins if some of its ink touches ink in the row it would join, and it isn't a rule
+        bool Joins(int y, int edge)
+        {
+            int count = 0, touching = 0;
+            for (int x = x0; x < x1; x++)
+            {
+                if (!Ink(x, y)) continue;
+                count++;
+                for (int d = -1; d <= 1; d++)
+                    if (x + d >= x0 && x + d < x1 && Ink(x + d, edge)) { touching++; break; }
+            }
+            return touching > 0 && count < (x1 - x0) * 0.6;
+        }
+        int limit = (int)Math.Ceiling(most);
+        for (int n = 0; n < limit && y0 > 0 && Joins(y0 - 1, y0) && !OtherWords(y0 - 1); n++) y0--;
+        for (int n = 0; n < limit && y1 < h && Joins(y1, y1 - 1) && !OtherWords(y1); n++) y1++;
+        // one more row of soft edge either way, if it's not someone else's
+        if (y0 > 0 && !OtherWords(y0 - 1) && Joins(y0 - 1, y0)) y0--;
+        if (y1 < h && !OtherWords(y1) && Joins(y1, y1 - 1)) y1++;
+        return (y0, y1);
+    }
+
+    /// <summary>
+    /// Where to cut a line near <paramref name="x"/>: the column with the least ink within
+    /// <paramref name="reach"/> pixels, so the cut runs through the gap between letters rather than
+    /// through a letter's soft edge (which leaves a thin line behind).
+    /// </summary>
+    private static int Seam(byte[] px, int w, int y0, int y1, double x, int reach, (double B, double G, double R) bg, int side = 0)
+    {
+        int centre = (int)Math.Round(x), best = centre;
+        double least = double.MaxValue;
+        for (int c = centre - (side > 0 ? 0 : reach); c <= centre + (side < 0 ? 0 : reach); c++)
+        {
+            if (c < 0 || c >= w) continue;
+            double ink = 0;
+            for (int y = y0; y < y1; y++)
+            {
+                int o = (y * w + c) * 4;
+                ink += Math.Abs(px[o] - bg.B) + Math.Abs(px[o + 1] - bg.G) + Math.Abs(px[o + 2] - bg.R);
+            }
+            // the nearer column wins a tie
+            ink += Math.Abs(c - x) * 0.5;
+            if (ink < least) { least = ink; best = c; }
+        }
+        return Math.Clamp(best, 0, w);
     }
 
     /// <summary>
@@ -754,6 +878,7 @@ public partial class EditorWindow
         _px = px;
         _pxFor = result;
         foreach (var mark in _items.Where(m => m.Kind == AnnotationKind.Pixelate)) RemakeHidden(mark);
+        _sameClear = true;
         ApplyBase();
         Render();
         ShowTextSelection();
@@ -888,6 +1013,44 @@ public partial class EditorWindow
         Render();
     }
 
+    // ---- links, email addresses and phone numbers -------------------------------------------
+
+    private List<TextAction>? _actions;
+    private List<OcrWord>? _actionsFor;
+
+    /// <summary>The link, email address or phone number at <paramref name="p"/>, if any.</summary>
+    private TextAction? ActionAt(Point p)
+    {
+        if (!ReferenceEquals(_actionsFor, _words))
+        {
+            _actions = TextActions.Find(_words, _wordLine);
+            _actionsFor = _words;
+        }
+        return _actions!.FirstOrDefault(a => { var r = a.Bounds; r.Inflate(2, 3); return r.Contains(p); });
+    }
+
+    /// <summary>Right-clicking a link, email address or phone number offers to open, write to or copy it.</summary>
+    private bool ShowLinkMenu(Point p)
+    {
+        if (ActionAt(p) is not { } action) return false;
+        var menu = new ContextMenu();
+        var open = new MenuItem { Header = action.Kind switch { TextActionKind.Link => "Open the link", TextActionKind.Email => "Write an email", _ => "Copy the number" } };
+        open.Click += (_, _) => TextActions.Run(action);
+        menu.Items.Add(open);
+        if (action.Kind != TextActionKind.Phone)
+        {
+            var copy = new MenuItem { Header = action.Kind == TextActionKind.Link ? "Copy the link" : "Copy the address" };
+            copy.Click += (_, _) => { try { Clipboard.SetText(action.Value); } catch { } };
+            menu.Items.Add(copy);
+        }
+        menu.Items.Add(new Separator());
+        var select = new MenuItem { Header = "Select all the text" };
+        select.Click += (_, _) => SelectAllText();
+        menu.Items.Add(select);
+        menu.IsOpen = true;
+        return true;
+    }
+
     /// <summary>The right-click menu over selected text. True if it was shown.</summary>
     private bool ShowTextMenu(Point p)
     {
@@ -974,6 +1137,7 @@ public partial class EditorWindow
     internal double[] EdgesForTest(int i) => Edges(i);
 
     internal Task EraseSelectedForTest() => EraseSelectedTextAsync();
+    internal Task DeleteSelectionForTest() => DeleteTextAsync(back: false);
     internal BitmapSource BaseForTest => _base;
     internal void CloseForTest() { _dirty = false; Close(); }
 }

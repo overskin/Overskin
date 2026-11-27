@@ -48,9 +48,14 @@ public sealed class GifWriter : IDisposable
     private double _elapsedMs;      // exact time so far
     private int _writtenCs;         // time written so far, in GIF centiseconds
 
+    /// <summary>Pixels with alpha under half are written see-through (a speech bubble); otherwise alpha is ignored.</summary>
+    private readonly bool _seeThrough;
+
     /// <param name="repeats">How many times it plays: 0 for forever.</param>
-    public GifWriter(Stream output, int width, int height, int repeats = 0)
+    /// <param name="seeThrough">Keep see-through pixels see-through (screen grabs can have no alpha at all, so it's off unless asked for).</param>
+    public GifWriter(Stream output, int width, int height, int repeats = 0, bool seeThrough = false)
     {
+        _seeThrough = seeThrough;
         _out = output;
         _w = width;
         _h = height;
@@ -83,7 +88,7 @@ public sealed class GifWriter : IDisposable
         // ---- palette: median cut over a 15-bit colour histogram ----
         var hist = new int[32768];
         for (int i = 0, p = 0; i < n; i++, p += 4)
-            hist[((bgra[p + 2] >> 3) << 10) | ((bgra[p + 1] >> 3) << 5) | (bgra[p] >> 3)]++;
+            if (!_seeThrough || bgra[p + 3] >= 128) hist[((bgra[p + 2] >> 3) << 10) | ((bgra[p + 1] >> 3) << 5) | (bgra[p] >> 3)]++;
         var (palette, binToIndex) = MedianCut(hist, 255); // index 255 is kept for "unchanged"
 
         // ---- map pixels, and find what changed ----
@@ -95,9 +100,18 @@ public sealed class GifWriter : IDisposable
             for (int x = 0; x < _w; x++, i++)
             {
                 int p = i * 4;
-                int idx = binToIndex[((bgra[p + 2] >> 3) << 10) | ((bgra[p + 1] >> 3) << 5) | (bgra[p] >> 3)];
-                indices[i] = (byte)idx;
-                rgb[i] = palette[idx];
+                if (_seeThrough && bgra[p + 3] < 128)
+                {
+                    // see-through (a speech bubble): the transparent index, on every frame
+                    indices[i] = 255;
+                    rgb[i] = -1;
+                }
+                else
+                {
+                    int idx = binToIndex[((bgra[p + 2] >> 3) << 10) | ((bgra[p + 1] >> 3) << 5) | (bgra[p] >> 3)];
+                    indices[i] = (byte)idx;
+                    rgb[i] = palette[idx];
+                }
                 if (_previous == null || _previous[i] != rgb[i])
                 {
                     if (x < minX) minX = x;
@@ -130,7 +144,8 @@ public sealed class GifWriter : IDisposable
         _previous = rgb;
 
         // graphic control: keep previous frame underneath, index 255 transparent
-        _out.Write(new byte[] { 0x21, 0xF9, 0x04, (byte)((1 << 2) | (first ? 0 : 1)) });
+        // (the first frame uses it too, for anything see-through such as a speech bubble)
+        _out.Write(new byte[] { 0x21, 0xF9, 0x04, (byte)((1 << 2) | 1) });
         WriteShort(cs);
         _out.WriteByte(255);
         _out.WriteByte(0);

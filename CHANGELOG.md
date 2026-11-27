@@ -4,6 +4,55 @@
 
 ### New
 
+- **Overskin for Mac**: the same app on macOS 12 and later, for Apple silicon and Intel Macs.
+  Captures, the editor (live text, auto-hide, cut out, beautify), recording with auto-zoom, a
+  smooth pointer, sound and the webcam, GIFs and the GIF editor, the video editor with
+  subtitles, pins, the library, steps, workflows and hotkeys, laid out and coloured as on
+  Windows. Download `Overskin-mac-AppleSilicon.zip` or `Overskin-mac-Intel.zip` from the release.
+- **Cut out the subject**: *Cut out* in the editor (and the wand in the viewer) keeps the person,
+  pet or thing in front and makes the background see-through, with clean edges. Worked out on
+  your PC. See-through pictures show on a checkerboard in the editor, copy with their see-through
+  parts, and always save as PNG.
+- **Search by what's in the picture**: the Library finds "cat", "chart" or "minecraft" in
+  captures with no such words in them. Each capture is looked at once, in the background, on
+  your PC.
+- **Favourites and tags**: star captures and tag them (#work) in the Library, then search by tag.
+- **Find duplicates** in the Library, and **send to your phone**: a QR code opens the capture
+  on your phone over your home Wi-Fi, with *Share* and *Save to Photos* buttons.
+- **Instant replay**: Overskin can keep recording the main screen in the background and save the
+  last 15 seconds to 2 minutes with a hotkey (Ctrl+Alt+F10), sound included.
+- **Before recording**: an optional 3-2-1 countdown (off unless you turn it on: the area darkens
+  except a clear circle with the number and a ring running down), *Stop after* a set time, and
+  *Dim around the pointer* so viewers' eyes follow it.
+- **Spotlight** in the editor (S): drag boxes round what matters and everything else darkens.
+- **Social sizes** in Beautify: the picture laid out for an X post, Instagram square or story,
+  YouTube thumbnail and more.
+- **Clickable text**: links, email addresses and phone numbers in a screenshot open with a click
+  in the editor and the viewer. Double-click one to edit its text instead.
+- **Hide faces and chat names**: Auto-hide can also find faces and Discord-style names.
+- **Auto-tight box**: press T while choosing an area and the box shrinks to fit what's inside,
+  solid shapes (buttons, coloured panels) included.
+- **Captions**: word-by-word captions (each word lighting up, or building up) and four looks
+  (Classic, Bold, Clean, Boxed) in the video editor; a speech-bubble style for GIFs; and *Make a
+  GIF* from a stretch of a video, subtitles included. (*Caption a GIF* on the Recording page is gone.)
+- **Command search** (Ctrl+Alt+J) finds any action or setting by typing, and the **ring menu**
+  (Ctrl+Alt+Space) puts the capture choices round the pointer. Settings has a search box too.
+- **Windows' look**: *Use Windows' accent colour*, and a *See-through window* with the blurred
+  background of Windows' own apps, on Windows 11 and Windows 10 alike (on Windows 10 the window
+  keeps its own rounded corners), tuned so light themes stay clean rather than grey.
+- **Text from screen: just copy it**: a switch (Capture, After capturing) that copies the text
+  without opening a window. The reader also fixes letters and numbers it mixes up, from what's
+  round them ("HELL0" becomes HELLO, "2O26" becomes 2026), leaving codes and addresses alone.
+- **Fine-tuning typed letters**: typing into a screenshot's text shows a bar to change the font,
+  size and weight when the matched style is a little off. It restyles the selected text (or the
+  word the cursor is in) as well as what's typed next.
+- **Editing a screenshot's text is cleaner**: taking out or moving words no longer leaves thin
+  lines or the tails of letters behind, more of the fonts on your PC (and their real weights) are
+  tried when matching, and links open with one click. Inter and Roboto, which many apps and
+  websites use, now come with Overskin (about 400 KB), so text in them is matched exactly.
+- **The Library header** no longer overlaps: the count and progress sit on their own line under
+  the search, and the Duplicates view stays until they're dealt with.
+
 - **Overskin on the Microsoft Store**: a Store version alongside the GitHub installer, with the
   same features. It's signed by Microsoft (no SmartScreen warning), updated by the Store, and
   makes no network requests. Start with Windows uses the Store's startup task, listed in Task
@@ -50,8 +99,8 @@
 - **Cropping works like a photo app**: Crop in the GIF editor starts with the whole picture
   framed, with thick corner and edge handles to pull in. Drag inside to move it, Enter or Done
   keeps it, Esc or Cancel puts it back. The video editor's crop starts framed the same way.
-- **The preview card fades as you swipe it left**, and is faint once letting go would open the
-  viewer, so you can tell when it will.
+- **The preview card swipes smoothly**: it moves once per screen refresh, measured on the screen,
+  and fades all the way out as it opens the viewer.
 
 - **Snapping to pictures finds far more of them.** Pictures whose corners aren't all the same
   (a chat bubble's tail, a card with only its top corners rounded, gallery tiles), iOS-style

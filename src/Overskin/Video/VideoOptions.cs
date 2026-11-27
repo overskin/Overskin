@@ -14,6 +14,8 @@ public sealed class VideoOptions
     /// <summary>0 (none) to 100 (very smooth).</summary>
     public int PointerSmoothing { get; set; } = 45;
     public bool ClickRings { get; set; } = true;
+    /// <summary>Dim the video around the pointer, so the eye follows it.</summary>
+    public bool Spotlight { get; set; }
     /// <summary>
     /// Records the pointer apart from the picture and draws it a moment later, smoothed with no lag
     /// and blurred while it moves (instead of drawing it as it is, frame by frame).

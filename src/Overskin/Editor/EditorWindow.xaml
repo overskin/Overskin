@@ -123,6 +123,9 @@
                         <RadioButton x:Name="ToolHighlighter" Style="{StaticResource Tool}" Tag="Highlighter" ToolTip="Highlighter  (H)" Checked="Tool_Checked">
                             <local:Icon Data="{StaticResource IcHighlighter}" Width="16" Height="16" />
                         </RadioButton>
+                        <RadioButton x:Name="ToolSpotlight" Style="{StaticResource Tool}" Tag="Spotlight" ToolTip="Spotlight: darken everything except the boxes you draw  (S)" Checked="Tool_Checked">
+                            <local:Icon Data="{StaticResource IcFocus}" Width="16" Height="16" />
+                        </RadioButton>
                         <RadioButton x:Name="ToolText" Style="{StaticResource Tool}" Tag="Text" ToolTip="Text  (T)" Checked="Tool_Checked">
                             <local:Icon Data="{StaticResource IcType}" Width="16" Height="16" />
                         </RadioButton>
@@ -240,6 +243,7 @@
                                 <BlurEffect Radius="18" />
                             </Border.Effect>
                         </Border>
+                        <Border x:Name="Checker" Visibility="Collapsed" Background="{StaticResource CheckerBrush}" />
                         <Grid x:Name="Doc" ClipToBounds="True" Background="Transparent"
                               MouseLeftButtonDown="Doc_MouseDown" MouseMove="Doc_MouseMove" MouseLeftButtonUp="Doc_MouseUp">
                             <Image x:Name="BaseImage" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality" />
@@ -248,6 +252,35 @@
                         <Canvas x:Name="Adorn" />
                     </Grid>
                 </ScrollViewer>
+                <!-- fine-tuning the letters typed into the picture's text -->
+                <Border x:Name="TypeBar" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0"
+                        Background="{DynamicResource Panel}" BorderBrush="{DynamicResource LineStrong}" BorderThickness="1"
+                        CornerRadius="{DynamicResource RadiusCard}" Padding="10,5,6,5">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="14" ShadowDepth="2" Direction="270" Opacity="0.3" />
+                    </Border.Effect>
+                    <StackPanel Orientation="Horizontal">
+                        <local:Icon Data="{StaticResource IcType}" Width="13" Height="13" Foreground="{DynamicResource TextDim}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <TextBlock Text="New letters" Style="{StaticResource Dim}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <Button Style="{StaticResource Btn}" Height="26" Padding="9,0" Focusable="False" Click="TypeFont_Click" ToolTip="The font for letters you type">
+                            <TextBlock x:Name="TypeFontText" />
+                        </Button>
+                        <Button Style="{StaticResource BtnIcon}" Width="26" Height="26" Margin="6,0,0,0" Focusable="False" Click="TypeSmaller_Click" ToolTip="Smaller">
+                            <local:Icon Data="{StaticResource IcMinus}" Width="12" Height="12" />
+                        </Button>
+                        <TextBlock x:Name="TypeSizeText" MinWidth="44" TextAlignment="Center" VerticalAlignment="Center" />
+                        <Button Style="{StaticResource BtnIcon}" Width="26" Height="26" Focusable="False" Click="TypeBigger_Click" ToolTip="Bigger">
+                            <local:Icon Data="{StaticResource IcPlus}" Width="12" Height="12" />
+                        </Button>
+                        <Button Style="{StaticResource Btn}" Height="26" Padding="9,0" Margin="6,0,0,0" Focusable="False" Click="TypeWeight_Click" ToolTip="How thick the letters are">
+                            <TextBlock x:Name="TypeWeightText" />
+                        </Button>
+                        <Button Style="{StaticResource BtnIcon}" Width="26" Height="26" Margin="4,0,0,0" Focusable="False" Click="TypeReset_Click"
+                                ToolTip="Back to the style worked out from the picture">
+                            <local:Icon Data="{StaticResource IcRotateCcw}" Width="12" Height="12" />
+                        </Button>
+                    </StackPanel>
+                </Border>
             </Grid>
 
             <!-- actions -->
@@ -259,7 +292,8 @@
                                 ToolTip="Ctrl+scroll to zoom. Click to switch between fit and 100%.">
                             <TextBlock x:Name="ZoomText" />
                         </Button>
-                        <TextBlock x:Name="HintText" Style="{StaticResource Dim}" Foreground="{DynamicResource TextFaint}" Margin="16,0,0,0" />
+                        <!-- tips are shown as tooltips; this line is kept for the code that sets it, but not shown -->
+                        <TextBlock x:Name="HintText" Visibility="Collapsed" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="Effects_Click"
@@ -267,6 +301,13 @@
                             <StackPanel Orientation="Horizontal">
                                 <local:Icon Data="{StaticResource IcSquare}" Width="13" Height="13" Margin="0,0,6,0" />
                                 <TextBlock Text="Effects" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="CutOutButton" Style="{StaticResource Btn}" Margin="0,0,6,0" Click="CutOut_Click"
+                                ToolTip="Lift out the subject: keeps the person, pet or thing in front and makes the background see-through (worked out on this PC)">
+                            <StackPanel Orientation="Horizontal">
+                                <local:Icon Data="{StaticResource IcWand}" Width="13" Height="13" Margin="0,0,6,0" />
+                                <TextBlock Text="Cut out" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource Btn}" Margin="0,0,6,0" Click="Beautify_Click"

@@ -7,7 +7,7 @@ using System.Windows.Shapes;
 
 namespace Overskin;
 
-public enum AnnotationKind { Pen, Highlighter, Line, Arrow, Rectangle, Ellipse, Text, Pixelate, Piece }
+public enum AnnotationKind { Pen, Highlighter, Line, Arrow, Rectangle, Ellipse, Text, Pixelate, Piece, Spotlight }
 
 /// <summary>
 /// One mark on a screenshot, in image pixels. Kept as plain data so undo is just a copy of the
@@ -170,6 +170,9 @@ public sealed class Annotation
                 Canvas.SetTop(tb, Points[0].Y);
                 return tb;
             }
+            case AnnotationKind.Spotlight:
+                // the dimming round every spotlight is drawn once, by DimLayer; this is just its place
+                return new Canvas();
             case AnnotationKind.Pixelate:
             case AnnotationKind.Piece:
             {
@@ -182,6 +185,32 @@ public sealed class Annotation
             }
         }
         return new Canvas();
+    }
+
+    /// <summary>
+    /// Everything darkened except the spotlights' boxes (rounded, with soft corners). One layer
+    /// for all of them, so two spotlights don't darken each other. Null when there are none.
+    /// </summary>
+    public static UIElement? DimLayer(IEnumerable<Annotation> marks, Size picture)
+    {
+        var spots = marks.Where(a => a.Kind == AnnotationKind.Spotlight && a.Points.Count >= 2).ToList();
+        if (spots.Count == 0) return null;
+        var holes = new GeometryGroup { FillRule = FillRule.Nonzero };
+        foreach (var s in spots)
+        {
+            var r = Span(s.Points[0], s.Points[^1]);
+            double round = Math.Min(Math.Min(r.Width, r.Height) / 2, 6 + s.Size * 1.5);
+            holes.Children.Add(new RectangleGeometry(r, round, round));
+        }
+        // just the picture (and a little over): a huge shape can fail to draw on some graphics cards
+        var all = new RectangleGeometry(new Rect(-4, -4, picture.Width + 8, picture.Height + 8));
+        double strength = Math.Clamp(0.6 * spots.Max(s => s.Opacity), 0.1, 0.85);
+        return new Path
+        {
+            Data = new CombinedGeometry(GeometryCombineMode.Exclude, all, holes),
+            Fill = new SolidColorBrush(Color.FromArgb((byte)(strength * 255), 0, 0, 0)),
+            IsHitTestVisible = false,
+        };
     }
 
     /// <summary>Shaft plus a solid head, sized from the line thickness.</summary>

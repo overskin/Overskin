@@ -56,8 +56,40 @@ public partial class VideoEditorWindow
         if (_chosen?.Kind == VideoOverlay.Kinds.Caption) _chosen = null;
         var at = CaptionHome();
         foreach (var l in lines)
-            _overlays.Add(new VideoOverlay { Kind = VideoOverlay.Kinds.Caption, Text = l.Text, A = at, Start = l.Start, End = Math.Min(_length, l.End) });
+            _overlays.Add(new VideoOverlay { Kind = VideoOverlay.Kinds.Caption, Text = l.Text, A = at, Start = l.Start, End = Math.Min(_length, l.End), Look = _captionLook, Words = _captionWords });
         RebuildSubtitleList();
+        DrawOverlays();
+    }
+
+    // the look and word mode, kept for the next video while Overskin runs
+    private static string _captionLook = "Classic", _captionWords = "Light";
+
+    private void BuildCaptionChoices()
+    {
+        foreach (var (name, tip) in CaptionLook.Looks)
+        {
+            var b = new RadioButton { Style = (Style)FindResource("Seg"), GroupName = "CaptionLook", Content = name, ToolTip = tip, MinWidth = 0, Padding = new Thickness(9, 0, 9, 0), Margin = new Thickness(0, 0, 4, 4), IsChecked = name == _captionLook };
+            var chosen = name;
+            b.Checked += (_, _) => { _captionLook = chosen; RestyleCaptions(); };
+            CaptionLooks.Children.Add(b);
+        }
+        foreach (var (name, label, tip) in CaptionLook.WordModes)
+        {
+            var b = new RadioButton { Style = (Style)FindResource("Seg"), GroupName = "CaptionWords", Content = label, ToolTip = tip, MinWidth = 0, Padding = new Thickness(9, 0, 9, 0), Margin = new Thickness(0, 0, 4, 4), IsChecked = name == _captionWords };
+            var chosen = name;
+            b.Checked += (_, _) => { _captionWords = chosen; RestyleCaptions(); };
+            CaptionWords.Children.Add(b);
+        }
+    }
+
+    /// <summary>Every subtitle line takes the chosen look and word mode.</summary>
+    private void RestyleCaptions()
+    {
+        foreach (var c in Captions)
+        {
+            c.Look = _captionLook;
+            c.Words = _captionWords;
+        }
         DrawOverlays();
     }
 
@@ -78,6 +110,7 @@ public partial class VideoEditorWindow
         var captions = Captions.OrderBy(c => c.Start).ToList();
         SubtitleScroll.Visibility = captions.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         ClearSubtitlesButton.Visibility = captions.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        CaptionStyleRows.Visibility = captions.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         SubtitlesButton.Content = captions.Count > 0 ? "Make them again" : "Make subtitles";
         SubtitlesText.Text = captions.Count > 0 ? $"{captions.Count} line{(captions.Count == 1 ? "" : "s")}" : "";
         foreach (var c in captions)
