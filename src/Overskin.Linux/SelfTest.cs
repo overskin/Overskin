@@ -1013,13 +1013,13 @@ public static partial class SelfTest
                 var windows = Mac.Windows();
                 Check("Mac: windows on screen", true, $"{windows.Count} found{(windows.Count > 0 ? ", front: " + windows[0].Title : "")}");
             });
-            Try("Mac: clipboard", () =>
+            await TryAsync("Mac: clipboard", async () =>
             {
                 string text = "Overskin " + Guid.NewGuid().ToString("N")[..8];
                 bool put = Mac.CopyText(text);
-                var back = ScreenGrabber.OutputOf("/usr/bin/pbpaste", "").GetAwaiter().GetResult()?.Trim();
+                var back = (await ScreenGrabber.OutputOf("/usr/bin/pbpaste", ""))?.Trim();
                 bool png = Mac.CopyPng(Imaging.Png(Quarters(40, 20)));
-                var types = ScreenGrabber.OutputOf("/usr/bin/osascript", "-e \"clipboard info\"").GetAwaiter().GetResult() ?? "";
+                var types = await ScreenGrabber.OutputOf("/usr/bin/osascript", "-e \"clipboard info\"") ?? "";
                 var pasted = Mac.PastePicture();
                 Bitmap? round = null;
                 if (pasted != null) { using var ms = new MemoryStream(pasted); round = new Bitmap(ms); }

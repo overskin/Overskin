@@ -174,8 +174,9 @@ public static class ScreenGrabber
         if (p == null) return null;
         p.StandardInput.Close(); // nothing to type: tools that would wait for keys see the end straight away
         _ = p.StandardError.ReadToEndAsync();
-        var text = await p.StandardOutput.ReadToEndAsync();
-        await p.WaitForExitAsync();
+        // not back on the UI thread: a caller that waits for this there mustn't lock it up
+        var text = await p.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
+        await p.WaitForExitAsync().ConfigureAwait(false);
         return p.ExitCode == 0 ? text : null;
     }
 
